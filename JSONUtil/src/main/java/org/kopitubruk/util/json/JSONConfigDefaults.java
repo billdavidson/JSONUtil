@@ -181,7 +181,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
                 String localeString = JNDIUtil.getString(ctx, "locale", null);
                 if ( localeString != null ){
-                    locale = Locale.forLanguageTag(localeString);
+                    String[] loc = localeString.split("[-_]");
+                    switch ( loc.length ){
+                        case 1: locale = new Locale(loc[0]); break;
+                        case 2: locale = new Locale(loc[0], loc[1]); break;
+                        default: locale = new Locale(loc[0], loc[1], loc[2]); break;
+                    }
+                    //locale = Locale.forLanguageTag(localeString); // Java 7
                 }
             }catch ( Exception e ){
                 // Nothing set in JNDI.  Use code defaults.  Not a problem.
@@ -299,7 +305,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         if ( numericClass != null ){
             if ( fmtMap == null ){
                 // don't create the map unless it's actually going to be used.
-                fmtMap = new HashMap<>();
+                fmtMap = new HashMap<Class<? extends Number>,NumberFormat>();
             }
             fmtMap.put(numericClass, fmt);
         }

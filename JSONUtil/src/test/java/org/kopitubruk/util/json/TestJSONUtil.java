@@ -112,7 +112,7 @@ public class TestJSONUtil
                 }else{
                     buf.append(String.format("\n%d U+%04X %s %d",
                                              i, codePoint,
-                                             Character.getName(codePoint),
+                                             "" /* Character.getName(codePoint) */,
                                              Character.getType(codePoint)));
                     lastCode = true;
                 }
@@ -173,8 +173,8 @@ public class TestJSONUtil
     @Test
     public void testValidPropertyNames() throws ScriptException
     {
-        ArrayList<Integer> validStart = new ArrayList<>();
-        ArrayList<Integer> validPart = new ArrayList<>();
+        ArrayList<Integer> validStart = new ArrayList<Integer>();
+        ArrayList<Integer> validPart = new ArrayList<Integer>();
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
             if ( isValidStart(i) ){
@@ -193,7 +193,7 @@ public class TestJSONUtil
         int partIndex = 0;
         int nameIndex = 0;
 
-        Map<String,Object> jsonObj = new HashMap<>(2);
+        Map<String,Object> jsonObj = new HashMap<String,Object>(2);
 
         int startSize = validStart.size();
         int partSize = validPart.size();
@@ -226,7 +226,7 @@ public class TestJSONUtil
     @Test
     public void testBadStartPropertyNames()
     {
-        Map<String,Object> jsonObj = new HashMap<>(2);
+        Map<String,Object> jsonObj = new HashMap<String,Object>(2);
         int[] codePoints = new int[1];
         JSONConfig cfg = new JSONConfig();
 
@@ -247,11 +247,11 @@ public class TestJSONUtil
         int[] codePoints = new int[256];
         int j = 1;
         codePoints[0] = '_';
-        Map<String,Object> jsonObj = new HashMap<>(2);
+        Map<String,Object> jsonObj = new HashMap<String,Object>(2);
         JSONConfig cfg = new JSONConfig();
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
-            if ( ! isValidStart(i) && ! isValidPart(i) && ! (i <= 0xFFFF && Character.isSurrogate((char)i)) ){
+            if ( ! isValidStart(i) && ! isValidPart(i) && ! (i <= 0xFFFF && JSONUtil.isSurrogate((char)i)) ){
                 // high surrogates break the test unless they are followed immediately by low surrogates.
                 // just skip them.  anyone who sends bad surrogate pairs deserves what they get.
                 codePoints[j++] = i;
@@ -299,12 +299,12 @@ public class TestJSONUtil
     public void testValidStrings() throws ScriptException
     {
         int[] codePoints = new int[32768];
-        Map<String,Object> jsonObj = new HashMap<>(2);
+        Map<String,Object> jsonObj = new HashMap<String,Object>(2);
         JSONConfig cfg = new JSONConfig();
         int j = 0;
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
-            if ( Character.isDefined(i) && ! (i <= 0xFFFF && Character.isSurrogate((char)i)) ){
+            if ( Character.isDefined(i) && ! (i <= 0xFFFF && JSONUtil.isSurrogate((char)i)) ){
                 // 247650 code points, the last time I checked.
                 codePoints[j++] = i;
                 if ( j == codePoints.length ){
@@ -330,7 +330,7 @@ public class TestJSONUtil
     @Test
     public void testUnicodeEscapeInIdentifier() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         String[] ids = { "a\\u1234", "\\u1234x" };
         for ( String id : ids ){
             jsonObj.clear();
@@ -350,7 +350,7 @@ public class TestJSONUtil
     @Test
     public void testECMA6UnicodeEscapeInString() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         JSONConfig cfg = new JSONConfig();
         cfg.setUseECMA6CodePoints(true);
         cfg.setEscapeNonAscii(true);
@@ -374,7 +374,7 @@ public class TestJSONUtil
     @Test
     public void testEscapePassThrough() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         String[] strs = { "a\\u1234", "b\\x4F", "c\\377", "d\\u{1F4A9}", "e\\nf"};
         for ( String str : strs ){
             jsonObj.clear();
@@ -397,7 +397,7 @@ public class TestJSONUtil
     @Test
     public void testUnEscape() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         String[] strs = { "a\\u0041", "b\\x41", "c\\101", "d\\u{41}", "e\\v"};
         JSONConfig cfg = new JSONConfig();
         cfg.setUnEscapeWherePossible(true);
@@ -441,7 +441,7 @@ public class TestJSONUtil
     @Test
     public void testByte() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         byte b = 27;
         jsonObj.put("x", b);
         String json = JSONUtil.toJSON(jsonObj);
@@ -457,7 +457,7 @@ public class TestJSONUtil
     @Test
     public void testChar() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         char ch = '@';
         jsonObj.put("x", ch);
         String json = JSONUtil.toJSON(jsonObj);
@@ -473,7 +473,7 @@ public class TestJSONUtil
     @Test
     public void testShort() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         short s = 275;
         jsonObj.put("x", s);
         String json = JSONUtil.toJSON(jsonObj);
@@ -489,7 +489,7 @@ public class TestJSONUtil
     @Test
     public void testInt() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         int i = 100000;
         jsonObj.put("x", i);
         String json = JSONUtil.toJSON(jsonObj);
@@ -505,7 +505,7 @@ public class TestJSONUtil
     @Test
     public void testLong() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         long l = 68719476735L;
         jsonObj.put("x", l);
         String json = JSONUtil.toJSON(jsonObj);
@@ -521,7 +521,7 @@ public class TestJSONUtil
     @Test
     public void testFloat() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         float f = 3.14f;
         jsonObj.put("x", f);
         String json = JSONUtil.toJSON(jsonObj);
@@ -537,7 +537,7 @@ public class TestJSONUtil
     @Test
     public void testDouble() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         double d = 6.28;
         jsonObj.put("x", d);
         String json = JSONUtil.toJSON(jsonObj);
@@ -553,7 +553,7 @@ public class TestJSONUtil
     @Test
     public void testBigInteger() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         BigInteger bi = new BigInteger("1234567890");
         jsonObj.put("x", bi);
         String json = JSONUtil.toJSON(jsonObj);
@@ -569,7 +569,7 @@ public class TestJSONUtil
     @Test
     public void testBigDecimal() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         BigDecimal bd = new BigDecimal("12345.67890");
         jsonObj.put("x", bd);
         String json = JSONUtil.toJSON(jsonObj);
@@ -585,7 +585,7 @@ public class TestJSONUtil
     @Test
     public void testNumberFormat() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         float f = 1.23456f;
         jsonObj.put("x", f);
         JSONConfig cfg = new JSONConfig();
@@ -606,7 +606,7 @@ public class TestJSONUtil
     @Test
     public void testString() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         String s = "bar";
         jsonObj.put("x", s);
         String json = JSONUtil.toJSON(jsonObj);
@@ -622,7 +622,7 @@ public class TestJSONUtil
     @Test
     public void testQuoteString() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         String s = "ba\"r";
         jsonObj.put("x", s);
         String json = JSONUtil.toJSON(jsonObj);
@@ -638,7 +638,7 @@ public class TestJSONUtil
     @Test
     public void testNonBmp() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
         StringBuilder buf = new StringBuilder(2);
         buf.appendCodePoint(0x1F4A9);
         jsonObj.put("x", buf);
@@ -655,8 +655,8 @@ public class TestJSONUtil
     @Test
     public void testIterable() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
-        List<Integer> it = new ArrayList<>(3);
+        Map<String,Object> jsonObj = new HashMap<String,Object>();
+        List<Integer> it = new ArrayList<Integer>(3);
         it.add(1);
         it.add(2);
         it.add(3);
@@ -674,7 +674,7 @@ public class TestJSONUtil
     @Test
     public void testLoop() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>(4);
+        Map<String,Object> jsonObj = new HashMap<String,Object>(4);
         jsonObj.put("a",1);
         jsonObj.put("b",2);
         jsonObj.put("c",3);
@@ -723,7 +723,7 @@ public class TestJSONUtil
     @Test
     public void testComplex() throws ScriptException
     {
-        Map<String,Object> jsonObj = new LinkedHashMap<>();
+        Map<String,Object> jsonObj = new LinkedHashMap<String,Object>();
         jsonObj.put("a",1);
         jsonObj.put("b","x");
         String[] ia = {"1","2","3"};
@@ -738,7 +738,7 @@ public class TestJSONUtil
                           public void toJSON( JSONConfig jsonConfig, Writer json ) throws BadPropertyNameException, DataStructureLoopException, IOException
                           {
                               JSONConfig cfg = jsonConfig == null ? new JSONConfig() : jsonConfig;
-                              Map<String,Object> jsonObj = new LinkedHashMap<>();
+                              Map<String,Object> jsonObj = new LinkedHashMap<String,Object>();
                               jsonObj.put("a", 0);
                               jsonObj.put("b", 2);
                               int[] ar = {1, 2, 3};
@@ -781,7 +781,7 @@ public class TestJSONUtil
     @Test
     public void testDuplicateKeys()
     {
-        Map<Object,Object> jsonObj = new HashMap<>();
+        Map<Object,Object> jsonObj = new HashMap<Object, Object>();
         jsonObj.put(new DupStr(1), 0);
         jsonObj.put(new DupStr(2), 1);
         JSONConfig cfg = new JSONConfig();

@@ -256,7 +256,7 @@ public class JSONUtil
      * names.
      */
     private static final Set<String> RESERVED_WORDS =
-            new HashSet<>(Arrays.asList(
+            new HashSet<String>(Arrays.asList(
                                     /* keywords */
                           "break", "case", "catch", "continue", "debugger",
                           "default", "delete", "do", "else", "finally", "for",
@@ -334,7 +334,11 @@ public class JSONUtil
         JSONConfig cfg = jsonConfig == null ? new JSONConfig() : jsonConfig;
         try{
             appendPropertyValue(obj, json, cfg);
-        }catch ( Exception e ){
+        }catch ( IOException e ){
+            // in case the original calling code catches the exception and reuses the JSONConfig.
+            cfg.clearObjStack();
+            throw e;
+        }catch ( RuntimeException e ){
             // in case the original calling code catches the exception and reuses the JSONConfig.
             cfg.clearObjStack();
             throw e;
@@ -451,7 +455,7 @@ public class JSONUtil
 
                 Set<String> propertyNames = null;
                 if ( validatePropertyNames ){
-                    propertyNames = new HashSet<>(keys.size());
+                    propertyNames = new HashSet<String>(keys.size());
                 }
 
                 json.write('{');
@@ -688,11 +692,16 @@ public class JSONUtil
     private static boolean hasSurrogates( String str )
     {
         for ( int i = 0, len = str.length(); i < len; i++ ){
-            if ( Character.isSurrogate(str.charAt(i)) ){
+            if ( isSurrogate(str.charAt(i)) ){
                 return true;
             }
         }
         return false;
+    }
+
+    static boolean isSurrogate( char ch )
+    {
+        return ch >= Character.MIN_SURROGATE && ch < (Character.MAX_SURROGATE + 1);
     }
 
     /**
@@ -901,7 +910,7 @@ public class JSONUtil
     public static Set<String> getJavascriptReservedWords()
     {
         // sorts them and preserves the original Set.
-        return new TreeSet<>(RESERVED_WORDS);
+        return new TreeSet<String>(RESERVED_WORDS);
     }
 
     /**

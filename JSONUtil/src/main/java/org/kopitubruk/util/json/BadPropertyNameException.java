@@ -67,7 +67,7 @@ public final class BadPropertyNameException extends JSONException
         }
 
         // HashSet discards duplicates.
-        LinkedHashSet<Integer> badCodePoints = new LinkedHashSet<>();
+        LinkedHashSet<Integer> badCodePoints = new LinkedHashSet<Integer>();
         boolean badStart = false;
 
         /*
@@ -128,7 +128,7 @@ public final class BadPropertyNameException extends JSONException
                 }else{
                     fmt = mfmt;
                 }
-                message.append(String.format(fmt, badCodePoint, Character.getName(badCodePoint)));
+                message.append(String.format(fmt, badCodePoint, "" /* Character.getName(badCodePoint) */ ));
             }
         }
         return message.toString();

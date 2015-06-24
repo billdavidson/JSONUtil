@@ -136,12 +136,12 @@ public class JSONConfig implements Serializable
 
         synchronized ( JSONConfigDefaults.class ){
             Map<Class<? extends Number>,NumberFormat> defMap = JSONConfigDefaults.getFormatMap();
-            fmtMap = defMap != null ? new HashMap<>(defMap) : null;
+            fmtMap = defMap != null ? new HashMap<Class<? extends Number>,NumberFormat>(defMap) : null;
         }
 
         setLocale(locale);
 
-        objStack = detectDataStructureLoops ? new ArrayList<>() : null;
+        objStack = detectDataStructureLoops ? new ArrayList<Object>() : null;
     }
 
     /**
@@ -204,7 +204,7 @@ public class JSONConfig implements Serializable
         if ( clazz != null ){
             if ( fmtMap == null ){
                 // don't create the map unless it's actually going to be used.
-                fmtMap = new HashMap<>();
+                fmtMap = new HashMap<Class<? extends Number>,NumberFormat>();
             }
             fmtMap.put(clazz, fmt);
         }
@@ -300,7 +300,7 @@ public class JSONConfig implements Serializable
     public void setDetectDataStructureLoops( boolean detectDataStructureLoops )
     {
         if ( detectDataStructureLoops && objStack == null ){
-            objStack = new ArrayList<>();
+            objStack = new ArrayList<Object>();
         }
         this.detectDataStructureLoops = detectDataStructureLoops;
     }
