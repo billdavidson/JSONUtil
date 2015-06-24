@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -434,7 +435,7 @@ public class JSONUtil
                     keys = map.keySet();
                 }else{
                     bundle = (ResourceBundle)propertyValue;
-                    keys = bundle.keySet();
+                    keys = enumerationToSet(bundle.getKeys());
                 }
 
                 // make a Javascript object with the keys as the property names.
@@ -558,6 +559,20 @@ public class JSONUtil
                 throw new RuntimeException("loop detection logic failure.");
             }
         }
+    }
+
+    /**
+     * Java5 can't get a key set from a resource bundle.
+     * @param enr the enumeration.
+     * @return the set.
+     */
+    private static Set<String> enumerationToSet( Enumeration<String> enr )
+    {
+        Set<String> result = new LinkedHashSet<String>();
+        while ( enr.hasMoreElements() ){
+            result.add(enr.nextElement());
+        }
+        return result;
     }
 
     /**

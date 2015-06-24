@@ -37,9 +37,9 @@ import java.util.Map;
 import java.util.ResourceBundle;
 
 import javax.naming.NamingException;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
+//import javax.script.ScriptEngine;
+//import javax.script.ScriptEngineManager;
+//import javax.script.ScriptException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -56,7 +56,7 @@ import org.junit.Test;
  */
 public class TestJSONUtil
 {
-    private static Log s_log = LogFactory.getLog(TestJSONUtil.class);
+    //private static Log s_log = LogFactory.getLog(TestJSONUtil.class);
     private static final String FAIL_FMT = "Expected a BadPropertyNameException to be thrown for U+%04X";
 
     /**
@@ -75,7 +75,7 @@ public class TestJSONUtil
             // not needed -- just used to test that the context was usable.
             //ctx.bind("registerMBean", Boolean.FALSE);
         }catch ( NamingException ex ){
-            s_log.error("Couldn't create context", ex);
+            //s_log.error("Couldn't create context", ex);
         }
     }
 
@@ -84,7 +84,7 @@ public class TestJSONUtil
      * ECMAScript 5.1. Java 7 uses Rhino 1.7, which supports something roughly
      * close to ECMAScript 3.
      */
-    private final ScriptEngine engine = new ScriptEngineManager().getEngineByExtension("js");
+    //private final ScriptEngine engine = new ScriptEngineManager().getEngineByExtension("js");
 
     /**
      * Make sure that the JSON parses.
@@ -92,6 +92,7 @@ public class TestJSONUtil
      * @param json A JSON string.
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
+    /*
     private void validateJSON( String json ) throws ScriptException
     {
         // assign it to a variable to make sure it parses.
@@ -112,7 +113,7 @@ public class TestJSONUtil
                 }else{
                     buf.append(String.format("\n%d U+%04X %s %d",
                                              i, codePoint,
-                                             "" /* Character.getName(codePoint) */,
+                                             Character.getName(codePoint),
                                              Character.getType(codePoint)));
                     lastCode = true;
                 }
@@ -122,6 +123,7 @@ public class TestJSONUtil
             throw e;
         }
     }
+    */
 
     /**
      * Check if the given code point is a valid start character for a
@@ -171,7 +173,7 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testValidPropertyNames() throws ScriptException
+    public void testValidPropertyNames()
     {
         ArrayList<Integer> validStart = new ArrayList<Integer>();
         ArrayList<Integer> validPart = new ArrayList<Integer>();
@@ -206,7 +208,7 @@ public class TestJSONUtil
                 jsonObj.clear();
                 jsonObj.put(new String(propertyName,0,nameIndex), 0);
                 String json = JSONUtil.toJSON(jsonObj, cfg);
-                validateJSON(json);    // this makes this test take a long time to run.
+                // validateJSON(json);    // this makes this test take a long time to run.
                 assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
                 nameIndex = 0;
                 if ( startIndex < startSize ){
@@ -296,7 +298,7 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testValidStrings() throws ScriptException
+    public void testValidStrings()
     {
         int[] codePoints = new int[32768];
         Map<String,Object> jsonObj = new HashMap<String,Object>(2);
@@ -309,7 +311,7 @@ public class TestJSONUtil
                 codePoints[j++] = i;
                 if ( j == codePoints.length/2 ){
                     jsonObj.put("x", new String(codePoints,0,j));
-                    validateJSON(JSONUtil.toJSON(jsonObj, cfg));
+                    // validateJSON(JSONUtil.toJSON(jsonObj, cfg));
                     assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
                     j = 0;
                 }
@@ -317,7 +319,7 @@ public class TestJSONUtil
         }
         if ( j > 0 ){
             jsonObj.put("x", new String(codePoints,0,j));
-            validateJSON(JSONUtil.toJSON(jsonObj, cfg));
+            // validateJSON(JSONUtil.toJSON(jsonObj, cfg));
             assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
         }
     }
@@ -328,7 +330,7 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testUnicodeEscapeInIdentifier() throws ScriptException
+    public void testUnicodeEscapeInIdentifier()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         String[] ids = { "a\\u1234", "\\u1234x" };
@@ -337,7 +339,7 @@ public class TestJSONUtil
             jsonObj.put(id, 0);
 
             String json = JSONUtil.toJSON(jsonObj);
-            validateJSON(json);
+            // validateJSON(json);
             assertThat(json, is("{\""+id+"\":0}"));
         }
     }
@@ -348,7 +350,7 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testECMA6UnicodeEscapeInString() throws ScriptException
+    public void testECMA6UnicodeEscapeInString()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         JSONConfig cfg = new JSONConfig();
@@ -361,7 +363,7 @@ public class TestJSONUtil
         jsonObj.put("x", buf);
         String json = JSONUtil.toJSON(jsonObj, cfg);
         // Nashorn doesn't understand ECMAScript 6 code point escapes.
-        //validateJSON(json);
+        //// validateJSON(json);
         assertThat(json, is("{\"x\":\"x\\u{"+String.format("%X", codePoint)+"}\"}"));
         assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
     }
@@ -372,7 +374,7 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testEscapePassThrough() throws ScriptException
+    public void testEscapePassThrough()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         String[] strs = { "a\\u1234", "b\\x4F", "c\\377", "d\\u{1F4A9}", "e\\nf"};
@@ -383,7 +385,7 @@ public class TestJSONUtil
             String json = JSONUtil.toJSON(jsonObj);
             if ( str.charAt(0) != 'd' ){
                 // Nashorn doesn't understand EMCAScript 6 code point escapes.
-                validateJSON(json);
+                // validateJSON(json);
             }
             assertThat(json, is("{\"x\":\""+str+"\"}"));
         }
@@ -395,7 +397,7 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testUnEscape() throws ScriptException
+    public void testUnEscape()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         String[] strs = { "a\\u0041", "b\\x41", "c\\101", "d\\u{41}", "e\\v"};
@@ -409,7 +411,7 @@ public class TestJSONUtil
             char firstChar = str.charAt(0);
             if ( firstChar != 'd' ){
                 // Nashorn doesn't understand EMCAScript 6 code point escapes.
-                validateJSON(json);
+                // validateJSON(json);
             }
             // \v unescaped will be re-escaped as a Unicode code unit.
             String result = firstChar + (firstChar != 'e' ? "A" : "\\u000B");
@@ -439,13 +441,13 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testByte() throws ScriptException
+    public void testByte()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         byte b = 27;
         jsonObj.put("x", b);
         String json = JSONUtil.toJSON(jsonObj);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":27}"));
     }
 
@@ -455,13 +457,13 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testChar() throws ScriptException
+    public void testChar()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         char ch = '@';
         jsonObj.put("x", ch);
         String json = JSONUtil.toJSON(jsonObj);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":\"@\"}"));
     }
 
@@ -471,13 +473,13 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testShort() throws ScriptException
+    public void testShort()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         short s = 275;
         jsonObj.put("x", s);
         String json = JSONUtil.toJSON(jsonObj);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":275}"));
     }
 
@@ -487,13 +489,13 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testInt() throws ScriptException
+    public void testInt()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         int i = 100000;
         jsonObj.put("x", i);
         String json = JSONUtil.toJSON(jsonObj);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":100000}"));
     }
 
@@ -503,13 +505,13 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testLong() throws ScriptException
+    public void testLong()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         long l = 68719476735L;
         jsonObj.put("x", l);
         String json = JSONUtil.toJSON(jsonObj);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":68719476735}"));
     }
 
@@ -519,13 +521,13 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testFloat() throws ScriptException
+    public void testFloat()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         float f = 3.14f;
         jsonObj.put("x", f);
         String json = JSONUtil.toJSON(jsonObj);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":3.14}"));
     }
 
@@ -535,13 +537,13 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testDouble() throws ScriptException
+    public void testDouble()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         double d = 6.28;
         jsonObj.put("x", d);
         String json = JSONUtil.toJSON(jsonObj);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":6.28}"));
     }
 
@@ -551,13 +553,13 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testBigInteger() throws ScriptException
+    public void testBigInteger()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         BigInteger bi = new BigInteger("1234567890");
         jsonObj.put("x", bi);
         String json = JSONUtil.toJSON(jsonObj);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":1234567890}"));
     }
 
@@ -567,13 +569,13 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testBigDecimal() throws ScriptException
+    public void testBigDecimal()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         BigDecimal bd = new BigDecimal("12345.67890");
         jsonObj.put("x", bd);
         String json = JSONUtil.toJSON(jsonObj);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":12345.67890}"));
     }
 
@@ -583,7 +585,7 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testNumberFormat() throws ScriptException
+    public void testNumberFormat()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         float f = 1.23456f;
@@ -593,7 +595,7 @@ public class TestJSONUtil
         fmt.setMaximumFractionDigits(3);
         cfg.addNumberFormat(Float.class, fmt);
         String json = JSONUtil.toJSON(jsonObj, cfg);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":1.235}"));
         assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
     }
@@ -604,13 +606,13 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testString() throws ScriptException
+    public void testString()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         String s = "bar";
         jsonObj.put("x", s);
         String json = JSONUtil.toJSON(jsonObj);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":\"bar\"}"));
     }
 
@@ -620,13 +622,13 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testQuoteString() throws ScriptException
+    public void testQuoteString()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         String s = "ba\"r";
         jsonObj.put("x", s);
         String json = JSONUtil.toJSON(jsonObj);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":\"ba\\\"r\"}"));
     }
 
@@ -636,14 +638,14 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testNonBmp() throws ScriptException
+    public void testNonBmp()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         StringBuilder buf = new StringBuilder(2);
         buf.appendCodePoint(0x10080);
         jsonObj.put("x", buf);
         String json = JSONUtil.toJSON(jsonObj);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":\"\uD800\uDC80\"}"));
     }
 
@@ -653,7 +655,7 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testIterable() throws ScriptException
+    public void testIterable()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         List<Integer> it = new ArrayList<Integer>(3);
@@ -662,7 +664,7 @@ public class TestJSONUtil
         it.add(3);
         jsonObj.put("x", it);
         String json = JSONUtil.toJSON(jsonObj);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"x\":[1,2,3]}"));
     }
 
@@ -672,7 +674,7 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testLoop() throws ScriptException
+    public void testLoop()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>(4);
         jsonObj.put("a",1);
@@ -696,7 +698,7 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testResourceBundle() throws ScriptException
+    public void testResourceBundle()
     {
         String bundleName = getClass().getCanonicalName();
         ResourceBundle bundle = ResourceBundle.getBundle(bundleName);
@@ -704,12 +706,12 @@ public class TestJSONUtil
 
         cfg.setEncodeNumericStringsAsNumbers(false);
         String json = JSONUtil.toJSON(bundle, cfg);
-        validateJSON(json);
+        // validateJSON(json);
         //assertThat(json, is("{\"a\":\"1\",\"b\":\"2\",\"c\":\"3\",\"d\":\"4\",\"e\":\"5\",\"f\":\"6\",\"g\":\"7\",\"h\":\"8\",\"i\":\"9\",\"j\":\"10\",\"k\":\"11\",\"l\":\"12\",\"m\":\"13\",\"n\":\"14\",\"o\":\"15\",\"p\":\"16\",\"q\":\"17\",\"r\":\"18\",\"s\":\"19\",\"t\":\"20\",\"u\":\"21\",\"v\":\"22\",\"w\":\"23\",\"x\":\"24\",\"y\":\"25\",\"z\":\"26\"}"));
 
         cfg.setEncodeNumericStringsAsNumbers(true);
         json = JSONUtil.toJSON(bundle, cfg);
-        validateJSON(json);
+        // validateJSON(json);
         //assertThat(json, is("{\"a\":1,\"b\":2,\"c\":3,\"d\":4,\"e\":5,\"f\":6,\"g\":7,\"h\":8,\"i\":9,\"j\":10,\"k\":11,\"l\":12,\"m\":13,\"n\":14,\"o\":15,\"p\":16,\"q\":17,\"r\":18,\"s\":19,\"t\":20,\"u\":21,\"v\":22,\"w\":23,\"x\":24,\"y\":25,\"z\":26}"));
 
         assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
@@ -721,7 +723,7 @@ public class TestJSONUtil
      * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testComplex() throws ScriptException
+    public void testComplex()
     {
         Map<String,Object> jsonObj = new LinkedHashMap<String,Object>();
         jsonObj.put("a",1);
@@ -734,7 +736,6 @@ public class TestJSONUtil
         objs[0] = null;
         objs[1] = new JSONAble()
                       {
-                          @Override
                           public void toJSON( JSONConfig jsonConfig, Writer json ) throws BadPropertyNameException, DataStructureLoopException, IOException
                           {
                               JSONConfig cfg = jsonConfig == null ? new JSONConfig() : jsonConfig;
@@ -747,19 +748,16 @@ public class TestJSONUtil
                               JSONUtil.toJSON(jsonObj, cfg, json);
                           }
 
-						  @Override
 						  public String toJSON()
 						  {
 							  return null;
 						  }
 
-						  @Override
 						  public String toJSON( JSONConfig jsonConfig )
 						  {
 							  return null;
 						  }
 
-						  @Override
 						  public void toJSON( Writer json ) throws IOException
 						  {
 						  }
@@ -769,7 +767,7 @@ public class TestJSONUtil
 
         JSONConfig cfg = new JSONConfig();
         String json = JSONUtil.toJSON(jsonObj, cfg);
-        validateJSON(json);
+        // validateJSON(json);
         assertThat(json, is("{\"a\":1,\"b\":\"x\",\"c\":[\"1\",\"2\",\"3\"],\"d\":[\"1\",\"2\",\"3\"],\"e\":[null,{\"a\":0,\"b\":2,\"x\":[1,2,3]},[\"1\",\"2\",\"3\"]]}"));
         assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
     }

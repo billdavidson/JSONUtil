@@ -103,7 +103,7 @@ import org.apache.commons.logging.LogFactory;
  */
 public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 {
-    private static Log s_log = LogFactory.getLog(JSONConfigDefaults.class);
+    //private static Log s_log = LogFactory.getLog(JSONConfigDefaults.class);
 
     // Default flag values.
     private static volatile boolean validatePropertyNames;
@@ -191,7 +191,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 }
             }catch ( Exception e ){
                 // Nothing set in JNDI.  Use code defaults.  Not a problem.
-                s_log.debug(JSONUtil.getBundle(getLocale()).getString("badJNDIforConfig"), e);
+                //s_log.debug(JSONUtil.getBundle(getLocale()).getString("badJNDIforConfig"), e);
             }
         }
 
@@ -203,10 +203,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
                 mBeanName = JNDIUtil.getObjectName(jsonConfigDefaults);
                 mBeanServer.registerMBean(jsonConfigDefaults, mBeanName);
-                s_log.debug(bundle.getString("registeredMbean")+mBeanName);
+                //s_log.debug(bundle.getString("registeredMbean")+mBeanName);
             }catch ( Exception e ){
                 // No MBean server.  Not a problem.
-                s_log.debug(bundle.getString("couldntRegisterMBean"), e);
+                //s_log.debug(bundle.getString("couldntRegisterMBean"), e);
             }
         }
     }
@@ -262,9 +262,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             try{
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
                 mBeanServer.unregisterMBean(mBeanName);
-                s_log.debug("MBean "+mBeanName+bundle.getString("unregistered"));
+                //s_log.debug("MBean "+mBeanName+bundle.getString("unregistered"));
             }catch ( Exception e ){
-                s_log.error(bundle.getString("couldntUnregister")+mBeanName, e);
+                //s_log.error(bundle.getString("couldntUnregister")+mBeanName, e);
             }finally{
                 // don't try again.
                 mBeanName = null;
@@ -343,7 +343,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     /**
      * Clear any default number formats.  Accessible via MBean server.
      */
-    @Override
     public void clearNumberFormats()
     {
         synchronized ( this.getClass() ){
@@ -357,7 +356,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return The default validate property names policy.
      */
-    @Override
     public boolean isValidatePropertyNames()
     {
         return validatePropertyNames;
@@ -370,7 +368,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true, then property names will be validated by default.
      */
-    @Override
     public void setValidatePropertyNames( boolean dflt )
     {
         validatePropertyNames = dflt;
@@ -382,7 +379,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return The default detect data structure loops policy.
      */
-    @Override
     public boolean isDetectDataStructureLoops()
     {
         return detectDataStructureLoops;
@@ -395,7 +391,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true, then all identifiers will be quoted.
      */
-    @Override
     public void setDetectDataStructureLoops( boolean dflt )
     {
          detectDataStructureLoops = dflt;
@@ -407,7 +402,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return The default escape bad identifier code points policy.
      */
-    @Override
     public boolean isEscapeBadIdentifierCodePoints()
     {
         return escapeBadIdentifierCodePoints;
@@ -419,7 +413,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt the escapeBadIdentifierCodePoints to set
      */
-    @Override
+    
     public void setEscapeBadIdentifierCodePoints( boolean dflt )
     {
         escapeBadIdentifierCodePoints = dflt;
@@ -431,7 +425,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return The default encode numeric strings as numbers policy.
      */
-    @Override
+    
     public boolean isEncodeNumericStringsAsNumbers()
     {
         return encodeNumericStringsAsNumbers;
@@ -445,7 +439,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @param dflt If true, then strings that look like numbers will be encoded
      * as numbers.
      */
-    @Override
+    
     public void setEncodeNumericStringsAsNumbers( boolean dflt )
     {
         encodeNumericStringsAsNumbers = dflt;
@@ -457,7 +451,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return The default quote non-ASCII policy.
      */
-    @Override
+    
     public boolean isEscapeNonAscii()
     {
         return escapeNonAscii;
@@ -470,7 +464,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true, then all non-ASCII will be Unicode escaped.
      */
-    @Override
+    
     public void setEscapeNonAscii( boolean dflt )
     {
         escapeNonAscii = dflt;
@@ -482,7 +476,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return the unEscape policy.
      */
-    @Override
+    
     public boolean isUnEscapeWherePossible()
     {
         return unEscapeWherePossible;
@@ -494,7 +488,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true then where possible, undo inline escapes in strings.
      */
-    @Override
+    
     public void setUnEscapeWherePossible( boolean dflt )
     {
         unEscapeWherePossible = dflt;
@@ -505,7 +499,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return the s_defaultEscapeSurrogates
      */
-    @Override
+    
     public boolean isEscapeSurrogates()
     {
         return escapeSurrogates;
@@ -516,7 +510,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt the defaultEscapeSurrogates to set
      */
-    @Override
+    
     public void setEscapeSurrogates( boolean dflt )
     {
         escapeSurrogates = dflt;
@@ -527,7 +521,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return The default quote identifier policy.
      */
-    @Override
+    
     public boolean isQuoteIdentifier()
     {
         return quoteIdentifier;
@@ -540,7 +534,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true, then all identifiers will be quoted.
      */
-    @Override
+    
     public void setQuoteIdentifier( boolean dflt )
     {
         quoteIdentifier = dflt;
@@ -552,7 +546,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return The default escape ECMA 6 code points policy.
      */
-    @Override
+    
     public boolean isUseECMA6CodePoints()
     {
         return useECMA6CodePoints;
@@ -565,7 +559,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @param dflt if true then ECMA 6 code points
      * will be used to encode Unicode escapes as needed.
      */
-    @Override
+    
     public void setUseECMA6CodePoints( boolean dflt )
     {
         useECMA6CodePoints = dflt;
@@ -576,7 +570,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return the defaultAllowReservedWordsInIdentifiers
      */
-    @Override
+    
     public boolean isAllowReservedWordsInIdentifiers()
     {
         return allowReservedWordsInIdentifiers;
@@ -587,7 +581,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt the defaultAllowReservedWordsInIdentifiers to set
      */
-    @Override
+    
     public void setAllowReservedWordsInIdentifiers( boolean dflt )
     {
         allowReservedWordsInIdentifiers = dflt;

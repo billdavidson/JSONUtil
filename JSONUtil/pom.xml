@@ -21,7 +21,7 @@
 
   <groupId>org.kopitubruk.util</groupId>
   <artifactId>json</artifactId>
-  <version>0.0.6</version>
+  <version>0.0.5</version>
   <packaging>jar</packaging>
 
   <name>JSONUtil</name>
@@ -40,8 +40,8 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.target>1.6</maven.compiler.target>
-    <maven.compiler.source>1.6</maven.compiler.source>
+    <maven.compiler.target>1.5</maven.compiler.target>
+    <maven.compiler.source>1.5</maven.compiler.source>
   </properties>
 
   <build>
@@ -95,8 +95,8 @@
     <!-- The rest is test scope only - not needed for main build or deployment. -->
     <dependency>
       <groupId>org.apache.tomcat</groupId>
-      <artifactId>tomcat-catalina</artifactId>
-      <version>7.0.23</version>
+      <artifactId>catalina</artifactId>
+      <version>6.0.26</version>
       <scope>test</scope>
     </dependency>
     <dependency>
