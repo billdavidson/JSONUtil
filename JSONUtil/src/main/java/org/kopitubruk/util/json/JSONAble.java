@@ -16,7 +16,6 @@
 package org.kopitubruk.util.json;
 
 import java.io.IOException;
-import java.io.StringWriter;
 import java.io.Writer;
 
 /**
@@ -29,7 +28,8 @@ import java.io.Writer;
  * This interface includes some default methods, which were introduced in Java 8.
  * If you want to make this library work with Java 7, then change those to
  * regular public interface signatures and comment out the rest of the code
- * for the default methods.
+ * for the default methods.  The Java 7 and earlier versions of this library
+ * have that already done.
  *
  * @author Bill Davidson
  */
@@ -48,14 +48,14 @@ public interface JSONAble
      *
      * @return A string of JSON data.
      */
-    /* Java 8 version */
+    /* Java 8 version *
     default String toJSON()
     {
         return toJSON((JSONConfig)null);
     }
-    /* */
+    * */
     // Java 7 version.
-    // public String toJSON();
+    public String toJSON();
 
     /**
      * Convert this object to a string of JSON data.
@@ -73,7 +73,7 @@ public interface JSONAble
      * @param jsonConfig A configuration object to use to optionally set encoding options.
      * @return A string of JSON data.
      */
-    /* Java 8 version */
+    /* Java 8 version *
     default String toJSON( JSONConfig jsonConfig )
     {
         JSONConfig cfg = jsonConfig == null ? new JSONConfig() : jsonConfig;
@@ -92,9 +92,9 @@ public interface JSONAble
         cfg = null;
         return json.toString();
     }
-    /* */
+    * */
     // Java 7 version.
-    // public String toJSON( JSONConfig jsonConfig );
+    public String toJSON( JSONConfig jsonConfig );
 
     /**
      * Write to the given writer as JSON data using all
@@ -103,14 +103,14 @@ public interface JSONAble
      * @param json json A writer for the output.
      * @throws IOException  If there is an error on output.
      */
-    /* Java 8 version */
+    /* Java 8 version *
     default void toJSON( Writer json ) throws IOException
     {
         toJSON(new JSONConfig(), json);
     }
-    /* */
+    * */
     // Java 7 version.
-    // public String toJSON(  Writer json ) throws IOException;
+    public void toJSON( Writer json ) throws IOException;
 
     /**
      * Write this object to the given writer as JSON data. This is the one that

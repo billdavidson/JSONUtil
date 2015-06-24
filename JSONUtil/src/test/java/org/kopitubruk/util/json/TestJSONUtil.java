@@ -746,6 +746,23 @@ public class TestJSONUtil
 
                               JSONUtil.toJSON(jsonObj, cfg, json);
                           }
+
+						  @Override
+						  public String toJSON()
+						  {
+							  return null;
+						  }
+
+						  @Override
+						  public String toJSON( JSONConfig jsonConfig )
+						  {
+							  return null;
+						  }
+
+						  @Override
+						  public void toJSON( Writer json ) throws IOException
+						  {
+						  }
                       };
         objs[2] = il;
         jsonObj.put("e", objs);
