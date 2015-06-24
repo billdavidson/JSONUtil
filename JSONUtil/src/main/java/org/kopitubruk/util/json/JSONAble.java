@@ -110,7 +110,7 @@ public interface JSONAble
     }
     /* */
     // Java 7 version.
-    // public String toJSON(  Writer json ) throws IOException;
+    // public void toJSON( Writer json ) throws IOException;
 
     /**
      * Write this object to the given writer as JSON data. This is the one that

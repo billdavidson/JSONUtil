@@ -21,11 +21,22 @@
 
   <groupId>org.kopitubruk.util</groupId>
   <artifactId>json</artifactId>
-  <version>0.0.8</version>
+  <version>0.0.7</version>
   <packaging>jar</packaging>
 
   <name>JSONUtil</name>
   <url>http://maven.apache.org</url>
+
+  <licenses>
+    <license>
+      <name>The Apache Software License, Version 2.0</name>
+      <url>/LICENSE</url>
+    </license>
+    <license>
+      <name>The Apache Software Notice, Version 2.0</name>
+      <url>/NOTICE</url>
+    </license>
+  </licenses>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -35,14 +46,12 @@
 
   <build>
     <plugins>
+
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
 	    <artifactId>maven-source-plugin</artifactId>
 	    <version>2.4</version>
 	    <configuration>
-	      <excludes>
-	       <exclude>/**/*.class</exclude>
-	      </excludes>
 	      <forceCreation>true</forceCreation>
 	    </configuration>
 	    <executions>
@@ -54,6 +63,7 @@
 	      </execution>
 	    </executions>
 	  </plugin>
+
 	  <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
@@ -70,6 +80,7 @@
 		  </execution>
 		</executions>
       </plugin>
+
     </plugins>
   </build>
 
