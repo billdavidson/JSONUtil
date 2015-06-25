@@ -51,8 +51,8 @@ import java.util.Map;
  *   standard JSON.  Be careful about changing these.  They should
  *   work fine if the JSON is interpreted by a standard Javascript
  *   eval(), except ECMA 6 code points if your interpreter doesn't
- *   support those.  They tend not to work in strict JSON parsers
- *   like JQuery.
+ *   support those.  Going non-default on any of these tends not to
+ *   work in strict JSON parsers.
  * </h3>
  * <ul>
  *   <li>quoteIdentifier = true</li>

@@ -32,15 +32,16 @@ import org.apache.commons.logging.LogFactory;
 
 /**
  * <p>
- * This is a singleton object which is used to change static defaults used by
- * JSONConfig and it is used as an MBean to allow JMX clients with MBean
- * support to view and modify the defaults.
+ * This class provides a singleton object which is used to change static
+ * defaults used by JSONConfig and it is used as an MBean to allow JMX
+ * clients with MBean support to view and modify the defaults.
  * <p>
  * Keep in mind that affects all new JSONConfig objects created in the
  * same class loader, which could have undesirable side effects depending upon
  * your app. Use with care, if at all.  All data in this class is static.  The
  * only reason that there is an instance or instance methods is to support
- * MBean access to the defaults.
+ * MBean access to the defaults.  A few defaults are only available
+ * programmatically.  Those are accessed statically.
  * <p>
  * It is possible to configure the default values of these flags via JNDI
  * such as is typically available in a web application by adding values to
@@ -94,8 +95,8 @@ import org.apache.commons.logging.LogFactory;
  * in the environment as shown above for the flags.
  * <p>
  * You can disable JNDI lookups and/or MBean registration by defining
- * boolean system properties for org/kopitubruk.util.json.useJNDI and/or
- * org.kopitubruk.util.json.registerMBean.
+ * boolean system properties for org.kopitubruk.util.json.useJNDI and/or
+ * org.kopitubruk.util.json.registerMBean as false.
  *
  * @see Locale
  * @see JSONConfig
