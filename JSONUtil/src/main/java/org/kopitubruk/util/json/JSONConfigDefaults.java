@@ -186,7 +186,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 }
             }catch ( Exception e ){
                 // Nothing set in JNDI.  Use code defaults.  Not a problem.
-                s_log.debug(JSONUtil.getBundle(getLocale()).getString("badJNDIforConfig"), e);
+                ResourceBundle bundle = JSONUtil.getBundle(getLocale());
+                s_log.debug(bundle.getString("badJNDIforConfig"), e);
             }
         }
 
@@ -198,7 +199,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
                 mBeanName = JNDIUtil.getObjectName(jsonConfigDefaults);
                 mBeanServer.registerMBean(jsonConfigDefaults, mBeanName);
-                s_log.debug(bundle.getString("registeredMbean")+mBeanName);
+                s_log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));
             }catch ( Exception e ){
                 // No MBean server.  Not a problem.
                 s_log.debug(bundle.getString("couldntRegisterMBean"), e);
@@ -257,9 +258,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             try{
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
                 mBeanServer.unregisterMBean(mBeanName);
-                s_log.debug("MBean "+mBeanName+bundle.getString("unregistered"));
+                s_log.debug(String.format(bundle.getString("unregistered"), mBeanName));
             }catch ( Exception e ){
-                s_log.error(bundle.getString("couldntUnregister")+mBeanName, e);
+                s_log.error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
             }finally{
                 // don't try again.
                 mBeanName = null;
