@@ -21,14 +21,14 @@ import java.text.NumberFormat;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.ResourceBundle;
+//import java.util.ResourceBundle;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import javax.naming.Context;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+//import org.apache.commons.logging.Log;
+//import org.apache.commons.logging.LogFactory;
 
 /**
  * <p>
@@ -192,19 +192,21 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 }
             }catch ( Exception e ){
                 // Nothing set in JNDI.  Use code defaults.  Not a problem.
-                //s_log.debug(JSONUtil.getBundle(getLocale()).getString("badJNDIforConfig"), e);
+                //ResourceBundle bundle = JSONUtil.getBundle(getLocale());
+                //s_log.debug(bundle.getString("badJNDIforConfig"), e);
             }
         }
 
         if ( registerMBean ){
             // Register an instance with MBean server if one is available.
-            ResourceBundle bundle = JSONUtil.getBundle(getLocale());
+            //ResourceBundle bundle = JSONUtil.getBundle(getLocale());
             try{
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
 
                 mBeanName = JNDIUtil.getObjectName(jsonConfigDefaults);
                 mBeanServer.registerMBean(jsonConfigDefaults, mBeanName);
-                //s_log.debug(bundle.getString("registeredMbean")+mBeanName);
+
+                //s_log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));
             }catch ( Exception e ){
                 // No MBean server.  Not a problem.
                 //s_log.debug(bundle.getString("couldntRegisterMBean"), e);
@@ -259,13 +261,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public static synchronized void clearMBean()
     {
         if ( mBeanName != null ){
-            ResourceBundle bundle = JSONUtil.getBundle(getLocale());
+            //ResourceBundle bundle = JSONUtil.getBundle(getLocale());
             try{
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
                 mBeanServer.unregisterMBean(mBeanName);
-                //s_log.debug("MBean "+mBeanName+bundle.getString("unregistered"));
+                //s_log.debug(String.format(bundle.getString("unregistered"), mBeanName));
             }catch ( Exception e ){
-                //s_log.error(bundle.getString("couldntUnregister")+mBeanName, e);
+                //s_log.error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
             }finally{
                 // don't try again.
                 mBeanName = null;
