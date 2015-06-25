@@ -67,13 +67,18 @@ public class TestJSONUtil
     public static void setUpClass()
     {
         try{
-            String pkgName = JSONConfigDefaults.class.getPackage().getName().replaceAll("\\.", "/");
+            String pkgName = JSONUtil.class.getPackage().getName().replaceAll("\\.", "/");
 
             //Context ctx =
             JNDIUtil.createContext("java:/comp/env/"+pkgName);
 
             // not needed -- just used to test that the context was usable.
             //ctx.bind("registerMBean", Boolean.FALSE);
+
+            // Some of these tests depend upon error messages
+            // which need to be in English, so it's forced
+            // during the tests.
+            JSONConfigDefaults.setLocale(Locale.US);
         }catch ( NamingException ex ){
             s_log.error("Couldn't create context", ex);
         }
