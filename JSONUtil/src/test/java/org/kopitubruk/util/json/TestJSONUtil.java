@@ -311,6 +311,7 @@ public class TestJSONUtil
                 codePoints[j++] = i;
                 if ( j == codePoints.length/2 ){
                     jsonObj.put("x", new String(codePoints,0,j));
+                    JSONUtil.toJSON(jsonObj, cfg);
                     // validateJSON(JSONUtil.toJSON(jsonObj, cfg));
                     assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
                     j = 0;
