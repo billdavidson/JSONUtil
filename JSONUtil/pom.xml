@@ -21,7 +21,7 @@
 
   <groupId>org.kopitubruk.util</groupId>
   <artifactId>json</artifactId>
-  <version>0.0.7</version>
+  <version>0.0.8</version>
   <packaging>jar</packaging>
 
   <name>JSONUtil</name>
