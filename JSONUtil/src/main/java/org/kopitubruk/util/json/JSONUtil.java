@@ -475,7 +475,7 @@ public class JSONUtil
                         propertyNames.add(propertyName);
                         try{
                             checkValidJavascriptPropertyName(propertyName, jsonConfig);
-                        }catch ( BadPropertyNameException e ){
+                        }catch ( RuntimeException e ){
                             if ( allowReservedWords && isReservedWord(propertyName) ){
                                 // OK.
                             }else if ( escapeBadIdentifierCodePoints ){
@@ -767,7 +767,7 @@ public class JSONUtil
      * @param e The BadPropertyNameException that caused this to be called.
      * @return the escaped property name.
      */
-    private static String escapeBadIdentifierCharacters( String propertyName, JSONConfig jsonConfig, BadPropertyNameException e )
+    private static String escapeBadIdentifierCharacters( String propertyName, JSONConfig jsonConfig, RuntimeException e )
     {
         if ( propertyName == null || propertyName.length() < 1 || isReservedWord(propertyName) ){
             jsonConfig.clearObjStack();
