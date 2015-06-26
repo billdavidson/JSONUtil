@@ -96,7 +96,8 @@ import javax.naming.Context;
  * <p>
  * You can disable JNDI lookups and/or MBean registration by defining
  * boolean system properties for org.kopitubruk.util.json.useJNDI and/or
- * org.kopitubruk.util.json.registerMBean as false.
+ * org.kopitubruk.util.json.registerMBean as false.  System properties
+ * may be set on the java command line using the "-D" flag.
  *
  * @see Locale
  * @see JSONConfig
