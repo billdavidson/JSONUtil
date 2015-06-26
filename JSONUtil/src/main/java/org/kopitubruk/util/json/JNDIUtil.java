@@ -139,6 +139,7 @@ class JNDIUtil
     static Context createContext( String contextName ) throws NamingException
     {
         InitialContext ctx = null;
+        Context result = null;
 
         try{
             ctx = new InitialContext();
@@ -168,10 +169,10 @@ class JNDIUtil
             try{
                 ctx.lookup(ctxName);
             }catch ( NamingException e ){
-                ctx.createSubcontext(ctxName);
+                result = ctx.createSubcontext(ctxName);
             }
         }
 
-        return (Context)ctx.lookup(contextName);
+        return result != null ? result : (Context)ctx.lookup(contextName);
     }
 }

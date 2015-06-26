@@ -404,7 +404,9 @@ public class JSONConfig implements Serializable
     }
 
     /**
-     * @return the escapeSurrogates
+     * Return the escape surrogates policy.
+     *
+     * @return the escape surrogates policy.
      */
     public boolean isEscapeSurrogates()
     {
@@ -412,6 +414,8 @@ public class JSONConfig implements Serializable
     }
 
     /**
+     * If true then all surrogates will be escaped.
+     *
      * @param escapeSurrogates the escapeSurrogates to set
      */
     public void setEscapeSurrogates( boolean escapeSurrogates )
