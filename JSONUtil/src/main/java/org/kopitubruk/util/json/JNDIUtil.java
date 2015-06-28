@@ -117,7 +117,7 @@ class JNDIUtil
 
         try{
             obj = ctx.lookup(name);
-            if ( obj != null /* && s_log.isDebugEnabled() */ ){
+            if ( JSONConfigDefaults.getLogging() && obj != null /* && s_log.isDebugEnabled() */ ){
                 //s_log.debug(name+" = "+obj);
             }
         }catch ( NamingException e ){

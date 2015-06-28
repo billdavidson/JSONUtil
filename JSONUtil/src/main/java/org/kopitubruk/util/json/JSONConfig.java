@@ -61,7 +61,7 @@ import java.util.Map;
  * </ul>
  * <p>
  * You can change the locale being used for error messages and
- * possibly by JSONAble objects for encoding.
+ * log messages and possibly by JSONAble objects for encoding.
  * <p>
  * You can create number formats associated with specific numeric
  * types if you want your numbers encoded in a certain way.
