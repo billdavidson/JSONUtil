@@ -83,9 +83,6 @@ public interface JSONAble
         }catch ( IOException e ){
             // won't happen with the StringWriter.
         }catch ( Exception e ){
-            // if overriding this method, don't worry that you can't call
-            // clearObjStack.  It should have already been called.
-            // this is just paranoia.
             cfg.clearObjStack();
             throw e;
         }

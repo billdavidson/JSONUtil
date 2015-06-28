@@ -1,3 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
 <!--
  Copyright 2015 Bill Davidson
 
@@ -13,6 +15,7 @@
  See the License for the specific language governing permissions and
   limitations under the License.
 -->
+
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -26,17 +29,6 @@
 
   <name>JSONUtil</name>
   <url>http://maven.apache.org</url>
-
-  <licenses>
-    <license>
-      <name>The Apache Software License, Version 2.0</name>
-      <url>/LICENSE</url>
-    </license>
-    <license>
-      <name>The Apache Software Notice, Version 2.0</name>
-      <url>/NOTICE</url>
-    </license>
-  </licenses>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
