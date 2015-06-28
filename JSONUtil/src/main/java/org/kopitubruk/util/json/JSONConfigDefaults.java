@@ -1,5 +1,5 @@
 /*
- * Copyright © 2015 Bill Davidson
+ * Copyright 2015 Bill Davidson
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,11 +52,9 @@ import org.apache.commons.logging.LogFactory;
  * <p>
  * Example for Tomcat in <code>$CATALINA_HOME/conf/Catalina/<i>host</i>/MyApp.xml</code>
  * in order to disable property name validation:
- * <pre><code>
- * &lt;Context path="/MyApp"&gt;
- *   &lt;Environment name="org/kopitubruk/util/json/validatePropertyNames" type="java.lang.Boolean" value="false" override="false" /&gt;
- * &lt;/Context&gt;
- * </code></pre>
+ * <pre>{@code <Context path="/MyApp">
+ *   <Environment name="org/kopitubruk/util/json/validatePropertyNames" type="java.lang.Boolean" value="false" override="false" />
+ * </Context>}</pre>
  * <p>
  * These are the names and their normal defaults if you don't change them.
  * See the setters for these for descriptions of what they do.
@@ -98,6 +96,11 @@ import org.apache.commons.logging.LogFactory;
  * boolean system properties for org.kopitubruk.util.json.useJNDI and/or
  * org.kopitubruk.util.json.registerMBean as false.  System properties
  * may be set on the java command line using the "-D" flag.
+ * <p>
+ * There is some limited logging for access of JNDI and the MBean server.
+ * Most of it is debug, so you won't see it unless you have debug logging
+ * enabled for this package/class.  It might be useful to enable debug
+ * logging for this class if you are having trouble with those.
  *
  * @see Locale
  * @see JSONConfig
@@ -123,12 +126,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     // Other defaults.
     private static volatile Locale locale;
-    private static Map<Class<? extends Number>,NumberFormat> fmtMap;
+    private static volatile Map<Class<? extends Number>,NumberFormat> fmtMap;
     
     // stored for deregistration on unload.
     private static ObjectName mBeanName = null;
     
-    // the singleton.
+    // the singleton, which has no instance data.
     private static JSONConfigDefaults jsonConfigDefaults;
 
     /*
@@ -249,11 +252,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * You should add it to your web.xml for your app like this (assuming
      * you named it org.myDomain.web.app.AppCleanUp).
      * </p>
-     * <pre><code>
-     * &lt;listener&gt;
-     *   &lt;listener-class&gt;org.myDomain.web.app.AppCleanUp&lt;/listener-class&gt;
-     * &lt;/listener&gt;
-     * </code></pre>
+     * <pre>{@code <listener>
+     *   <listener-class>org.myDomain.web.app.AppCleanUp</listener-class>
+     * </listener>}</pre>
      * <p>
      * Note that the logging from this method may not work if the logging is
      * removed/disabled before this method is called.

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2015 Bill Davidson
+ * Copyright 2015 Bill Davidson
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -385,7 +385,7 @@ public class JSONConfig implements Serializable
     }
 
     /**
-     * If true then where possible, undo inline escapes in value strings.
+     * If true then where possible, undo inline escapes in strings.
      * Default is false. When false, escapes in strings are passed through
      * unmodified, including hex escapes, octal escapes and ECMA 6 code point
      * escapes, all of which are not allowed by the JSON standard. When true,

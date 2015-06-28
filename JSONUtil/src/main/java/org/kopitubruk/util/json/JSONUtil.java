@@ -1,5 +1,5 @@
 /*
- * Copyright © 2015 Bill Davidson
+ * Copyright 2015 Bill Davidson
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -779,6 +779,7 @@ public class JSONUtil
     private static String escapeBadIdentifierCharacters( String propertyName, JSONConfig jsonConfig, RuntimeException e )
     {
         if ( propertyName == null || propertyName.length() < 1 || isReservedWord(propertyName) ){
+            // can't escape these.
             jsonConfig.clearObjStack();
             throw e;
         }
@@ -789,16 +790,20 @@ public class JSONUtil
             int codePoint = propertyName.codePointAt(i);
             int charCount = Character.charCount(codePoint);
             if ( codePoint == '_' || codePoint == '$' || Character.isLetter(codePoint) ){
+                // valid start
                 buf.appendCodePoint(codePoint);
             }else if ( i > 0 && (Character.isDigit(codePoint) || ((((1 << Character.NON_SPACING_MARK) |
                        (1 << Character.COMBINING_SPACING_MARK) |
                        (1 << Character.CONNECTOR_PUNCTUATION) ) >> Character.getType(codePoint)) & 1) != 0 ||
                        codePoint == 0x200C || codePoint == 0x200D) ){
+                // valid part.
                 buf.appendCodePoint(codePoint);
             }else if ( useECMA6Codepoints && (codePoint < 0x10 || codePoint > 0xFFFF) ){
+                // ECMA 6 code point escape.
                 // only very low or very high code points see an advantage.
                 buf.append(String.format(CODE_POINT_FMT, codePoint));
             }else{
+                // normal escape.
                 buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i)));
                 if ( charCount > 1 ){
                     buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i+1)));
