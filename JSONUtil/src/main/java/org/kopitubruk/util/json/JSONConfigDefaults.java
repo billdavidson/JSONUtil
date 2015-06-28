@@ -92,10 +92,12 @@ import org.apache.commons.logging.LogFactory;
  * MBean registration by setting a boolean variable named registerMBean to false
  * in the environment as shown above for the flags.
  * <p>
- * You can disable JNDI lookups and/or MBean registration by defining
- * boolean system properties for org.kopitubruk.util.json.useJNDI and/or
- * org.kopitubruk.util.json.registerMBean as false.  System properties
- * may be set on the java command line using the "-D" flag.
+ * You can disable JNDI lookups, MBean registration or logging by defining
+ * boolean system properties for org.kopitubruk.util.json.useJNDI,
+ * org.kopitubruk.util.json.registerMBean or org.kopitubruk.util.json.logging
+ * respectively as false.  System properties may be set on the java command
+ * line using the "-D" flag or possibly programatically if your program has
+ * permission to do it and does so before this class is loaded.
  * <p>
  * There is some limited logging for access of JNDI and the MBean server.
  * Most of it is debug, so you won't see it unless you have debug logging
@@ -127,12 +129,15 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     // Other defaults.
     private static volatile Locale locale;
     private static volatile Map<Class<? extends Number>,NumberFormat> fmtMap;
-    
+
     // stored for deregistration on unload.
     private static ObjectName mBeanName = null;
-    
-    // the singleton, which has no instance data.
+
+    // the singleton, which has no instance data; only MBean methods.
     private static JSONConfigDefaults jsonConfigDefaults;
+
+    // logging.
+    private static final boolean logging;
 
     /*
      * Initialize static data.
@@ -160,10 +165,16 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
         String pkgName = JSONConfig.class.getPackage().getName();
         String registerMBeanName = "registerMBean";
+        String trueStr = Boolean.TRUE.toString();
 
-        // allow disabling JNDI and MBean from the command line.
-        boolean useJNDI = Boolean.parseBoolean(System.getProperty(pkgName+".useJNDI", Boolean.TRUE.toString()));
-        boolean registerMBean = Boolean.parseBoolean(System.getProperty(pkgName+'.'+registerMBeanName, Boolean.TRUE.toString()));
+        // allow disabling JNDI, MBean and logging from the command line.
+        boolean useJNDI = Boolean.parseBoolean(System.getProperty(pkgName+".useJNDI", trueStr));
+        boolean registerMBean = Boolean.parseBoolean(System.getProperty(pkgName+'.'+registerMBeanName, trueStr));
+        logging = Boolean.parseBoolean(System.getProperty(pkgName+'.'+".logging", trueStr));
+
+        if ( logging ){
+            s_log = LogFactory.getLog(JSONConfigDefaults.class);
+        }
 
         if ( useJNDI ){
             // Look for defaults in JNDI.
@@ -197,7 +208,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             }catch ( Exception e ){
                 // Nothing set in JNDI.  Use code defaults.  Not a problem.
                 ResourceBundle bundle = JSONUtil.getBundle(getLocale());
-                s_log.debug(bundle.getString("badJNDIforConfig"), e);
+                if ( logging ){
+                    s_log.debug(bundle.getString("badJNDIforConfig"), e);
+                }
             }
         }
 
@@ -212,7 +225,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 s_log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));
             }catch ( Exception e ){
                 // No MBean server.  Not a problem.
-                s_log.debug(bundle.getString("couldntRegisterMBean"), e);
+                if ( logging ){
+                    s_log.debug(bundle.getString("couldntRegisterMBean"), e);
+                }
             }
         }
     }
@@ -266,14 +281,23 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             try{
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
                 mBeanServer.unregisterMBean(mBeanName);
-                s_log.debug(String.format(bundle.getString("unregistered"), mBeanName));
+                if ( logging ){
+                    s_log.debug(String.format(bundle.getString("unregistered"), mBeanName));
+                }
             }catch ( Exception e ){
-                s_log.error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
+                if ( logging ){
+                    s_log.error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
+                }
             }finally{
                 // don't try again.
                 mBeanName = null;
             }
         }
+    }
+
+    static boolean getLogging()
+    {
+        return logging;
     }
 
     /**
