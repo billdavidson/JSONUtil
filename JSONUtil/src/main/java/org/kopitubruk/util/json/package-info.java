@@ -48,6 +48,12 @@
  * and loop detection, change some of the character escape behavior and even
  * generate certain types of non-standard JSON which may work if you're using
  * a Javascript eval() on it rather than a strict JSON parser.
+ * <p>
+ * This package uses Apache Commons Logging in a few places so it should work
+ * with whatever logging framework you're using, but most of the messages are debug
+ * level so you shouldn't see them unless you enable debug for the package/classes.
+ * They are all related to JNDI lookups or MBean access so if you're having trouble
+ * with those, you may want to enable debug for this package.
  */
 
 package org.kopitubruk.util.json;

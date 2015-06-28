@@ -28,12 +28,15 @@
   </Appenders>
 
   <Loggers>
-    <Root level="error" additivity="false">
+    <Logger name="org.kopitubruk" level="error" additivity="false">
       <AppenderRef ref="console_err" />
-    </Root>
+    </Logger>
     <Logger name="org.kopitubruk" level="debug" additivity="false">
       <AppenderRef ref="console" />
     </Logger>
+    <Root level="error" additivity="false">
+      <AppenderRef ref="console_err" />
+    </Root>
   </Loggers>
 
 </Configuration>
