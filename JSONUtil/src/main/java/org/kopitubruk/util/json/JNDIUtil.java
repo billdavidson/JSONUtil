@@ -33,18 +33,7 @@ import org.apache.commons.logging.LogFactory;
  */
 class JNDIUtil
 {
-    private static Log s_log;
-
-    // logging flag.
-    private static final boolean logging;
-    
-    static {
-        logging = JSONConfigDefaults.getLogging();
-        
-        if ( logging ){
-            s_log = LogFactory.getLog(JNDIUtil.class);
-        }
-    }
+    private static Log s_log = LogFactory.getLog(JNDIUtil.class);
 
     /**
      * Shorthand to look up the java:/comp/env context.
@@ -128,7 +117,7 @@ class JNDIUtil
 
         try{
             obj = ctx.lookup(name);
-            if ( logging && obj != null && s_log.isDebugEnabled() ){
+            if ( JSONConfigDefaults.getLogging() && obj != null && s_log.isDebugEnabled() ){
                 s_log.debug(name+" = "+obj);
             }
         }catch ( NamingException e ){
