@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
-
 import javax.naming.NamingException;
 //import javax.script.ScriptEngine;
 //import javax.script.ScriptEngineManager;
@@ -67,10 +66,10 @@ public class TestJSONUtil
     public static void setUpClass()
     {
         try{
-            String pkgName = JSONUtil.class.getPackage().getName().replaceAll("\\.", "/");
+            String pkgName = JSONUtil.class.getPackage().getName();
 
             //Context ctx =
-            JNDIUtil.createContext("java:/comp/env/"+pkgName);
+            JNDIUtil.createContext("java:/comp/env/"+pkgName.replaceAll("\\.", "/"));
 
             // not needed -- just used to test that the context was usable.
             //ctx.bind("registerMBean", Boolean.FALSE);
@@ -212,7 +211,7 @@ public class TestJSONUtil
             if ( nameIndex == MAX_LENGTH ){
                 jsonObj.clear();
                 jsonObj.put(new String(propertyName,0,nameIndex), 0);
-                // String json = 
+                // String json =
                         JSONUtil.toJSON(jsonObj, cfg);
                 // validateJSON(json);    // this makes this test take a long time to run.
                 assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
