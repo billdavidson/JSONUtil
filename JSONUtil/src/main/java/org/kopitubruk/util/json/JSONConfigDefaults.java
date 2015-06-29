@@ -21,14 +21,14 @@ import java.text.NumberFormat;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-//import java.util.ResourceBundle;
+import java.util.ResourceBundle;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import javax.naming.Context;
 
-//import org.apache.commons.logging.Log;
-//import org.apache.commons.logging.LogFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /**
  * <p>
@@ -137,7 +137,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static JSONConfigDefaults jsonConfigDefaults;
 
     // logging.
-    private static final boolean logging;
+    private static boolean logging;
 
     /*
      * Initialize static data.
@@ -171,6 +171,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         boolean useJNDI = Boolean.parseBoolean(System.getProperty(pkgName+".useJNDI", trueStr));
         boolean registerMBean = Boolean.parseBoolean(System.getProperty(pkgName+'.'+registerMBeanName, trueStr));
         logging = Boolean.parseBoolean(System.getProperty(pkgName+'.'+".logging", trueStr));
+        logging = false;
 
         //if ( logging ){
         //    s_log = LogFactory.getLog(JSONConfigDefaults.class);
@@ -207,16 +208,16 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 }
             }catch ( Exception e ){
                 // Nothing set in JNDI.  Use code defaults.  Not a problem.
-                //ResourceBundle bundle = JSONUtil.getBundle(getLocale());
-                //if ( logging ){
-                //    s_log.debug(bundle.getString("badJNDIforConfig"), e);
-                //}
+                ResourceBundle bundle = JSONUtil.getBundle(getLocale());
+                if ( logging ){
+                    //s_log.debug(bundle.getString("badJNDIforConfig"), e);
+                }
             }
         }
 
         if ( registerMBean ){
             // Register an instance with MBean server if one is available.
-            //ResourceBundle bundle = JSONUtil.getBundle(getLocale());
+            ResourceBundle bundle = JSONUtil.getBundle(getLocale());
             try{
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
 
@@ -226,9 +227,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 //s_log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));
             }catch ( Exception e ){
                 // No MBean server.  Not a problem.
-                //if ( logging ){
-                //    s_log.debug(bundle.getString("couldntRegisterMBean"), e);
-                //}
+                if ( logging ){
+                    //s_log.debug(bundle.getString("couldntRegisterMBean"), e);
+                }
             }
         }
     }
@@ -278,17 +279,17 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public static synchronized void clearMBean()
     {
         if ( mBeanName != null ){
-            //ResourceBundle bundle = JSONUtil.getBundle(getLocale());
+            ResourceBundle bundle = JSONUtil.getBundle(getLocale());
             try{
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
                 mBeanServer.unregisterMBean(mBeanName);
-                //if ( logging ){
-                //    s_log.debug(String.format(bundle.getString("unregistered"), mBeanName));
-                //}
+                if ( logging ){
+                    //s_log.debug(String.format(bundle.getString("unregistered"), mBeanName));
+                }
             }catch ( Exception e ){
-                //if ( logging ){
-                //    s_log.error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
-                //}
+                if ( logging ){
+                    //s_log.error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
+                }
             }finally{
                 // don't try again.
                 mBeanName = null;
