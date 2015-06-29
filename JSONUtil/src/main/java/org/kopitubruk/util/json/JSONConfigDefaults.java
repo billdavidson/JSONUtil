@@ -92,17 +92,17 @@ import org.apache.commons.logging.LogFactory;
  * MBean registration by setting a boolean variable named registerMBean to false
  * in the environment as shown above for the flags.
  * <p>
+ * There is some limited logging for access of JNDI and the MBean server.
+ * Most of it is debug, so you won't see it unless you have debug logging
+ * enabled for this package/class.  It might be useful to enable debug
+ * logging for this class if you are having trouble with those.
+ * <p>
  * You can disable JNDI lookups, MBean registration or logging by defining
  * boolean system properties for org.kopitubruk.util.json.useJNDI,
  * org.kopitubruk.util.json.registerMBean or org.kopitubruk.util.json.logging
  * respectively as false.  System properties may be set on the java command
  * line using the "-D" flag or possibly programatically if your program has
  * permission to do it and does so before this class is loaded.
- * <p>
- * There is some limited logging for access of JNDI and the MBean server.
- * Most of it is debug, so you won't see it unless you have debug logging
- * enabled for this package/class.  It might be useful to enable debug
- * logging for this class if you are having trouble with those.
  *
  * @see Locale
  * @see JSONConfig
