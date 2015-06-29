@@ -21,8 +21,8 @@ import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 
-//import org.apache.commons.logging.Log;
-//import org.apache.commons.logging.LogFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /**
  * Just a little shorthand for JNDI, used by other classes in the package.
@@ -33,7 +33,7 @@ import javax.naming.NamingException;
  */
 class JNDIUtil
 {
-    //private static Log s_log = LogFactory.getLog(JNDIUtil.class);
+    private static Log s_log = LogFactory.getLog(JNDIUtil.class);
 
     /**
      * Shorthand to look up the java:/comp/env context.
@@ -118,7 +118,7 @@ class JNDIUtil
         try{
             obj = ctx.lookup(name);
             if ( JSONConfigDefaults.getLogging() && obj != null /* && s_log.isDebugEnabled() */ ){
-                //s_log.debug(name+" = "+obj);
+                s_log.debug(name+" = "+obj);
             }
         }catch ( NamingException e ){
             obj = null;

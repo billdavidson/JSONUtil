@@ -110,7 +110,7 @@ import org.apache.commons.logging.LogFactory;
  */
 public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 {
-    //private static Log s_log = LogFactory.getLog(JSONConfigDefaults.class);
+    private static Log s_log = LogFactory.getLog(JSONConfigDefaults.class);
 
     // Default flag values.
     private static volatile boolean validatePropertyNames;
@@ -173,9 +173,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         logging = Boolean.parseBoolean(System.getProperty(pkgName+'.'+".logging", trueStr));
         logging = false;
 
-        //if ( logging ){
-        //    s_log = LogFactory.getLog(JSONConfigDefaults.class);
-        //}
+        if ( logging ){
+            s_log = LogFactory.getLog(JSONConfigDefaults.class);
+        }
 
         if ( useJNDI ){
             // Look for defaults in JNDI.
@@ -210,7 +210,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 // Nothing set in JNDI.  Use code defaults.  Not a problem.
                 ResourceBundle bundle = JSONUtil.getBundle(getLocale());
                 if ( logging ){
-                    //s_log.debug(bundle.getString("badJNDIforConfig"), e);
+                    s_log.debug(bundle.getString("badJNDIforConfig"), e);
                 }
             }
         }
@@ -224,11 +224,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 mBeanName = JNDIUtil.getObjectName(jsonConfigDefaults);
                 mBeanServer.registerMBean(jsonConfigDefaults, mBeanName);
 
-                //s_log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));
+                s_log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));
             }catch ( Exception e ){
                 // No MBean server.  Not a problem.
                 if ( logging ){
-                    //s_log.debug(bundle.getString("couldntRegisterMBean"), e);
+                    s_log.debug(bundle.getString("couldntRegisterMBean"), e);
                 }
             }
         }
@@ -284,11 +284,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
                 mBeanServer.unregisterMBean(mBeanName);
                 if ( logging ){
-                    //s_log.debug(String.format(bundle.getString("unregistered"), mBeanName));
+                    s_log.debug(String.format(bundle.getString("unregistered"), mBeanName));
                 }
             }catch ( Exception e ){
                 if ( logging ){
-                    //s_log.error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
+                    s_log.error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
                 }
             }finally{
                 // don't try again.

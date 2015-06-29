@@ -56,7 +56,7 @@ import org.junit.Test;
  */
 public class TestJSONUtil
 {
-    //private static Log s_log = LogFactory.getLog(TestJSONUtil.class);
+    private static Log s_log = LogFactory.getLog(TestJSONUtil.class);
     private static final String FAIL_FMT = "Expected a BadPropertyNameException to be thrown for U+%04X";
 
     /**
@@ -80,7 +80,7 @@ public class TestJSONUtil
             // during the tests.
             JSONConfigDefaults.setLocale(Locale.US);
         }catch ( NamingException ex ){
-            //s_log.error("Couldn't create context", ex);
+            s_log.error("Couldn't create context", ex);
         }
     }
 
@@ -212,7 +212,8 @@ public class TestJSONUtil
             if ( nameIndex == MAX_LENGTH ){
                 jsonObj.clear();
                 jsonObj.put(new String(propertyName,0,nameIndex), 0);
-                String json = JSONUtil.toJSON(jsonObj, cfg);
+                // String json = 
+                        JSONUtil.toJSON(jsonObj, cfg);
                 // validateJSON(json);    // this makes this test take a long time to run.
                 assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
                 nameIndex = 0;
