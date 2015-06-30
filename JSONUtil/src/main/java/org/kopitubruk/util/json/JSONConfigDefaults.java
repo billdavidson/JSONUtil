@@ -37,7 +37,8 @@ import org.apache.commons.logging.LogFactory;
  * clients with MBean support to view and modify the defaults.
  * <p>
  * Keep in mind that affects all new JSONConfig objects created in the
- * same class loader, which could have undesirable side effects depending upon
+ * same class loader, including those created by toJSON methods which
+ * don't take a JSONConfig, which could have undesirable side effects depending upon
  * your app. Use with care, if at all.  All data in this class is static.  The
  * only reason that there is an instance or instance methods is to support
  * MBean access to the defaults.  A few defaults are only available
@@ -50,7 +51,7 @@ import org.apache.commons.logging.LogFactory;
  * in development and testing servers and turn it off in production servers
  * for faster performance, without changing any code.
  * <p>
- * Example for Tomcat in <code>$CATALINA_HOME/conf/Catalina/<i>host</i>/MyApp.xml</code>
+ * Example for Tomcat in <code>$CATALINA_BASE/conf/Catalina/<i>host</i>/MyApp.xml</code>
  * in order to disable property name validation:
  * <pre>{@code <Context path="/MyApp">
  *   <Environment name="org/kopitubruk/util/json/validatePropertyNames" type="java.lang.Boolean" value="false" override="false" />
@@ -436,7 +437,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * If true, then any bad code points in identifiers will be quoted.
+     * If true, then any bad code points in identifiers will be escaped.
      * Default is false.  Accessible via MBean server.
      *
      * @param dflt the escapeBadIdentifierCodePoints to set
@@ -461,8 +462,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Set the default flag for encoding of numeric strings as numbers.
-     * This will affect all new JSONConfig objects created after this call
-     * within the same class loader.  Accessible via MBean server.
+     * Accessible via MBean server.
      *
      * @param dflt If true, then strings that look like numbers will be encoded
      * as numbers.
