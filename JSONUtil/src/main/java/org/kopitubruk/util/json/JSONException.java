@@ -20,8 +20,8 @@ import java.util.Locale;
 /**
  * Holds some redundant code/data for the other exceptions thrown
  * by JSONUtil.  All of the exceptions thrown by this package
- * involve problems with with arguments, which is why this
- * extends IllegalArgumentException.
+ * involve problems with arguments, which is why this extends
+ * IllegalArgumentException.
  * 
  * @author Bill Davidson
  */
@@ -30,7 +30,7 @@ public abstract class JSONException extends IllegalArgumentException
     private Locale locale;
 
     /**
-     * Create a LocalizedIllegalArgumentException with the given JSONConfig.
+     * Create a JSONException with the given JSONConfig.
      *
      * @param jsonConfig the config object.
      */
