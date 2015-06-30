@@ -478,7 +478,7 @@ public class JSONUtil
                         }catch ( RuntimeException e ){
                             if ( allowReservedWords && isReservedWord(propertyName) ){
                                 // OK.
-                            }else if ( escapeBadIdentifierCodePoints ){
+                            }else if ( escapeBadIdentifierCodePoints && e instanceof BadPropertyNameException ){
                                 propertyName = escapeBadIdentifierCharacters(propertyName, jsonConfig, e);
                             }else{
                                 jsonConfig.clearObjStack();
@@ -551,7 +551,7 @@ public class JSONUtil
                 objStack.remove(stackIndex);
             }else{
                 // this should never happen.
-                throw new RuntimeException("loop detection logic failure.");
+                throw new LoopDetectionFailureException(stackIndex, jsonConfig);
             }
         }
     }
