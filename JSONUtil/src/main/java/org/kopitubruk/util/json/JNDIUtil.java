@@ -33,7 +33,30 @@ import org.apache.commons.logging.LogFactory;
  */
 class JNDIUtil
 {
-    private static Log s_log = LogFactory.getLog(JNDIUtil.class);
+    private static volatile Log s_log;
+
+    private static volatile boolean logging;
+
+    static{
+        String pkgName = JNDIUtil.class.getPackage().getName();
+        logging = Boolean.parseBoolean(System.getProperty(pkgName+".logging", Boolean.TRUE.toString()));
+        if ( logging ){
+            s_log = LogFactory.getLog(JNDIUtil.class);
+        }
+    }
+
+    /**
+     * Set the logging flag.
+     *
+     * @param logging if true, then logging will be enabled.
+     */
+    static synchronized void setLogging( boolean logging )
+    {
+        if ( logging && s_log == null ){
+            s_log = LogFactory.getLog(JNDIUtil.class);
+        }
+        JNDIUtil.logging = logging;
+    }
 
     /**
      * Shorthand to look up the java:/comp/env context.
@@ -117,7 +140,7 @@ class JNDIUtil
 
         try{
             obj = ctx.lookup(name);
-            if ( JSONConfigDefaults.getLogging() && obj != null && s_log.isDebugEnabled() ){
+            if ( logging && obj != null && s_log.isDebugEnabled() ){
                 s_log.debug(name+" = "+obj);
             }
         }catch ( NamingException e ){
