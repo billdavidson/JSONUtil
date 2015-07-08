@@ -58,9 +58,9 @@ import java.util.regex.Pattern;
  * </p>
  * <p>
  *   This implementation validates property names by default using the
- *   specification from ECMAScript 5.1.  The validation can be disabled for
- *   faster performance.  See {@link JSONConfig}.  Leaving it on during development
- *   and testing is probably advisable.
+ *   specification from ECMAScript 5.1 and the ECMA JSON standard.  The validation
+ *   can be disabled for faster performance.  See {@link JSONConfig}.  Leaving it
+ *   on during development and testing is probably advisable.
  * </p>
  * <p>
  *   There is some effort to detect loops in the data structure that would cause
@@ -166,7 +166,17 @@ public class JSONUtil
     /**
      * Parse octal escape.
      */
-    private static final Pattern OCTAL_PAT = Pattern.compile("^\\\\([0-7]{1,4})$");
+    private static final Pattern OCTAL_ESC_PAT = Pattern.compile("^\\\\([0-7]{1,4})$");
+
+    /**
+     * Parse a hexadecimal escape.
+     */
+    private static final Pattern HEX_ESC_PAT = Pattern.compile("^\\\\x(\\p{XDigit}{2})$");
+
+    /**
+     * Recognize other character escapes.
+     */
+    private static final Pattern OTHER_ESC_PAT = Pattern.compile("^\\\\[bfnrtv\\\\/'\"]$");
 
     /**
      * Some characters break lines which breaks quotes.  Recognize them so that they
@@ -181,27 +191,12 @@ public class JSONUtil
     /**
      * Parse a Unicode code unit escape.
      */
-    static final Pattern CODE_UNIT_PAT = Pattern.compile("^\\\\u(\\p{XDigit}{4})$");
+    private static final Pattern CODE_UNIT_PAT = Pattern.compile("^\\\\u(\\p{XDigit}{4})$");
 
     /**
-     * Parse an ECMA 6 unicode code point escaoe.
+     * Parse an ECMA 6 Unicode code point escaoe.
      */
-    static final Pattern CODE_POINT_PAT = Pattern.compile("^\\\\u\\{(\\p{XDigit}+)\\}$");
-    
-    /**
-     * Match either a code point or a code unit.
-     */
-    static final Pattern CODE_UNIT_OR_POINT_PAT = Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})");
-
-    /**
-     * Parse a hexadecimal escape.
-     */
-    private static final Pattern HEX_PAT = Pattern.compile("^\\\\x(\\p{XDigit}{2})$");
-
-    /**
-     * Recognize other character escapes.
-     */
-    private static final Pattern OTHER_ESC_PAT = Pattern.compile("^\\\\[bfnrtv\\\\/'\"]$");
+    private static final Pattern CODE_POINT_PAT = Pattern.compile("^\\\\u\\{(\\p{XDigit}+)\\}$");
 
     /**
      * <p>
@@ -249,12 +244,10 @@ public class JSONUtil
     private static final Pattern VALID_JAVASCRIPT_PROPERTY_NAME_PAT =
             Pattern.compile("^([_\\$\\p{L}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})([_\\$\\p{L}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*$");
 
-
     /**
-     * Set of reserved words from ECMAScript 5.1 section 7.6.1.1 and 7.6.1.2.
-     * Some of these are allowed by some implementations, but really should not
-     * be.  Even where allowed, it's a bad practice to use these as property
-     * names.
+     * This is the set of reserved words from ECMAScript 5.1 section 7.6.1.1 and
+     * 7.6.1.2. It's a bad practice to use these as property names and not
+     * permitted by the JSON standard.
      */
     private static final Set<String> RESERVED_WORDS =
             new HashSet<String>(Arrays.asList(
@@ -439,7 +432,7 @@ public class JSONUtil
                 }
 
                 // make a Javascript object with the keys as the property names.
-                
+
                 // validation options.
                 boolean validatePropertyNames = jsonConfig.isValidatePropertyNames();
                 boolean escapeBadIdentifierCodePoints = jsonConfig.isEscapeBadIdentifierCodePoints();
@@ -593,17 +586,12 @@ public class JSONUtil
         if ( propertyValue instanceof Number ){
             Number num = (Number)propertyValue;
             NumberFormat fmt = jsonConfig.getNumberFormat(num.getClass());
-            if ( fmt != null ){
-                String formattedNumber = fmt.format(num, new StringBuffer(), new FieldPosition(0)).toString();
-                if ( isValidJSONNumber(formattedNumber) ){
-                    json.write(formattedNumber);
-                }else{
-                    // formatter made something that's not allowed by the JSON spec.
-                    // treat it as a string.
-                    writeString(formattedNumber, json, jsonConfig);
-                }
+            String numericString = fmt == null ? num.toString() : fmt.format(num, new StringBuffer(), new FieldPosition(0)).toString();
+            if ( isValidJSONNumber(numericString) ){
+                json.write(numericString);
             }else{
-                json.write(num.toString());
+                // something isn't a kosher number for JSON.
+                writeString(numericString, json, jsonConfig);
             }
         }else{
             writeString(propertyValue.toString(), json, jsonConfig);
@@ -861,7 +849,7 @@ public class JSONUtil
                 if ( matcher.find() && matcher.start() == 0 ){
                     unEscape = true;
                     esc = matcher.group(1);
-                    matcher = OCTAL_PAT.matcher(esc);
+                    matcher = OCTAL_ESC_PAT.matcher(esc);
                     if ( matcher.matches() ){
                         String oct = matcher.group(1);
                         char ch = (char)Integer.parseInt(oct, 8);
@@ -879,7 +867,7 @@ public class JSONUtil
                         buf.append((char)Integer.parseInt(matcher.group(1),16));
                     }else if ( OTHER_ESC_PAT.matcher(esc).matches() ){
                         if ( esc.equals("\\v") ){
-                            // Java doesn't understand \v, which is probably why it isn't allowed by JSON.
+                            // Java doesn't understand \v, which is probably why it isn't allowed in JSON.
                             buf.appendCodePoint(0xB);
                         }else{
                             buf.append(String.format(esc));
@@ -889,7 +877,7 @@ public class JSONUtil
                         if ( matcher.matches() ){
                             buf.appendCodePoint(Integer.parseInt(matcher.group(1),16));
                         }else{
-                            matcher = HEX_PAT.matcher(esc);
+                            matcher = HEX_ESC_PAT.matcher(esc);
                             if ( matcher.matches() ){
                                 buf.append((char)Integer.parseInt(matcher.group(1),16));
                             }

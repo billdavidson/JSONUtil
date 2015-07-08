@@ -25,6 +25,12 @@ package org.kopitubruk.util.json;
 public interface JSONConfigDefaultsMBean
 {
     /**
+     * Reset all defaults to their original unmodified values.  This
+     * overrides JNDI and previous MBean changes.
+     */
+    public void setCodeDefaults();
+
+    /**
      * Clear any default number formats.
      */
     public void clearNumberFormats();

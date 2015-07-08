@@ -83,7 +83,7 @@ import org.apache.commons.logging.LogFactory;
  *   <li>allowReservedWordsInIdentifiers = false</li>
  * </ul>
  * <p>
- * It is possible to set the default locale using the name "locale" and
+ * It is possible to set the default locale in JNDI using the name "locale" and
  * a String value that is a valid locale string that will get passed to
  * {@link Locale#forLanguageTag(String)}.
  * <p>
@@ -102,10 +102,9 @@ import org.apache.commons.logging.LogFactory;
  * boolean system properties for org.kopitubruk.util.json.useJNDI,
  * org.kopitubruk.util.json.registerMBean or org.kopitubruk.util.json.logging
  * respectively as false.  System properties may be set on the java command
- * line using the "-D" flag or possibly programatically if your program has
+ * line using the "-D" flag or possibly programmatically if your program has
  * permission to do it and does so before this class is loaded.
  *
- * @see Locale
  * @see JSONConfig
  * @author Bill Davidson
  */
@@ -148,30 +147,16 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         jsonConfigDefaults = new JSONConfigDefaults();
 
         // initial defaults
-        validatePropertyNames = true;
-        detectDataStructureLoops = true;
-        escapeBadIdentifierCodePoints = false;
+        jsonConfigDefaults.setCodeDefaults();
 
-        encodeNumericStringsAsNumbers = false;
-        escapeNonAscii = false;
-        unEscapeWherePossible = false;
-        escapeSurrogates = false;
-
-        quoteIdentifier = true;
-        useECMA6CodePoints = false;
-        allowReservedWordsInIdentifiers = false;
-
-        locale = null;
-        fmtMap = null;
-
-        String pkgName = JSONConfig.class.getPackage().getName();
+        String pkgName = JSONConfigDefaults.class.getPackage().getName();
         String registerMBeanName = "registerMBean";
         String trueStr = Boolean.TRUE.toString();
 
         // allow disabling JNDI, MBean and logging from the command line.
         boolean useJNDI = Boolean.parseBoolean(System.getProperty(pkgName+".useJNDI", trueStr));
         boolean registerMBean = Boolean.parseBoolean(System.getProperty(pkgName+'.'+registerMBeanName, trueStr));
-        logging = Boolean.parseBoolean(System.getProperty(pkgName+'.'+".logging", trueStr));
+        logging = Boolean.parseBoolean(System.getProperty(pkgName+".logging", trueStr));
         logging = false;
 
         if ( logging ){
@@ -179,6 +164,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         }
 
         if ( useJNDI ){
+            JNDIUtil.setLogging(logging);
+
             // Look for defaults in JNDI.
             try{
                 Context ctx = JNDIUtil.getEnvContext(pkgName.replaceAll("\\.", "/"));
@@ -255,7 +242,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * <p>
-     * When this package is used by webapps, and you have an MBean server in your
+     * When this package is used by a webapp, and you have an MBean server in your
      * environment, then you should create a ServletContextListener and call this
      * in its ServletContextListener.contextDestroyed(ServletContextEvent)
      * method to remove the MBean when the webapp is unloaded or reloaded.
@@ -267,7 +254,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * }
      * </code></pre>
      * <p>
-     * You should add it to your web.xml for your app like this (assuming
+     * You should add it to your web.xml for your webapp like this (assuming
      * you named it org.myDomain.web.app.AppCleanUp).
      * </p>
      * <pre>{@code <listener>
@@ -280,7 +267,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public static synchronized void clearMBean()
     {
         if ( mBeanName != null ){
-            ResourceBundle bundle = JSONUtil.getBundle(getLocale());
+            ResourceBundle bundle = null;
+            if ( logging ){
+                bundle = JSONUtil.getBundle(getLocale());
+            }
             try{
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
                 mBeanServer.unregisterMBean(mBeanName);
@@ -296,11 +286,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 mBeanName = null;
             }
         }
-    }
-
-    static boolean getLogging()
-    {
-        return logging;
     }
 
     /**
@@ -343,13 +328,28 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
+     * Add a default number format for a particular type that extends Number.
+     * This will be applied to all new JSONConfig objects that are created after
+     * this in the same class loader.
+     *
+     * @param numericType The object.
+     * @param fmt The number format.
+     */
+    public static void addNumberFormat( Number numericType, NumberFormat fmt )
+    {
+        if ( numericType != null ){
+            addNumberFormat(numericType.getClass(), fmt);
+        }
+    }
+
+    /**
      * Remove the requested class from the default number formats.
      *
      * @param numericClass The class.
      */
     public static synchronized void removeNumberFormat( Class<? extends Number> numericClass )
     {
-        if ( fmtMap != null ){
+        if ( fmtMap != null && numericClass != null ){
             fmtMap.remove(numericClass);
             if ( fmtMap.size() < 1 ){
                 fmtMap = null;
@@ -358,7 +358,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * @return
+     * Get the format map.
+     *
+     * @return the format map.
      */
     static synchronized Map<Class<? extends Number>,NumberFormat> getFormatMap()
     {
@@ -370,6 +372,31 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * by MBean clients which is why they have to be instance methods even
      * though they are only dealing with static data.
      */
+
+    /**
+     * Reset all defaults to their original unmodified values.  This
+     * overrides JNDI and previous MBean changes.
+     */
+    public void setCodeDefaults()
+    {
+        synchronized ( this.getClass() ){
+            validatePropertyNames = true;
+            detectDataStructureLoops = true;
+            escapeBadIdentifierCodePoints = false;
+
+            encodeNumericStringsAsNumbers = false;
+            escapeNonAscii = false;
+            unEscapeWherePossible = false;
+            escapeSurrogates = false;
+
+            quoteIdentifier = true;
+            useECMA6CodePoints = false;
+            allowReservedWordsInIdentifiers = false;
+
+            locale = null;
+            fmtMap = null;
+        }
+    }
 
     /**
      * Clear any default number formats.  Accessible via MBean server.
