@@ -6,3 +6,5 @@
 *.properties text
 LICENSE text
 NOTICE text
+
+*.jar binary
