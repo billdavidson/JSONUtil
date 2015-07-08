@@ -1,5 +1,5 @@
 
-This is a JSON genration library for Java.  It is oriented towards being
+This is a JSON generation library for Java.  It is oriented towards being
 used in web servers and includes several options for validation and
 controling the way that the JSON is generated.  Defaults for those options
 can be set using JNDI or JMX/MBean access which is normally available with
