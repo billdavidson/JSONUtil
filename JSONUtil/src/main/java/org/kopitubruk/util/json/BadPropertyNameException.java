@@ -19,6 +19,7 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.ResourceBundle;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Exception for handling bad Javascript property identifiers for
@@ -28,6 +29,11 @@ import java.util.regex.Matcher;
  */
 public final class BadPropertyNameException extends JSONException
 {
+    /**
+     * Match either a code point or a code unit.
+     */
+    private static final Pattern CODE_UNIT_OR_POINT_PAT = Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})");
+
     /**
      * The bad property name.
      */
@@ -87,7 +93,7 @@ public final class BadPropertyNameException extends JSONException
                 // OK as long as not the starting character.
             }else if ( i > 0 && codePoint == '\\' ){
                 // check for Unicode escape.
-                Matcher matcher = JSONUtil.CODE_UNIT_OR_POINT_PAT.matcher(propertyName.substring(i));
+                Matcher matcher = CODE_UNIT_OR_POINT_PAT.matcher(propertyName.substring(i));
                 if ( matcher.find() && matcher.start() == 0){
                     // Skip the escape.
                     i += matcher.group(1).length() - 1;

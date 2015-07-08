@@ -46,13 +46,13 @@ import java.util.Map;
  *   <li>escapeSurrogates = false</li>
  * </ul>
  * <h3>
- *   Allow generation of certain types of non-standard JSON.  Could
+ *   Allow generation of certain types of non-standard JSON.  This could
  *   cause problems for some things that take JSON.  Defaults are for
  *   standard JSON.  Be careful about changing these.  They should
  *   work fine if the JSON is interpreted by a standard Javascript
  *   eval(), except ECMA 6 code points if your interpreter doesn't
  *   support those.  Going non-default on any of these tends not to
- *   work in strict JSON parsers.
+ *   work in strict JSON parsers such as JQuery.
  * </h3>
  * <ul>
  *   <li>quoteIdentifier = true</li>
@@ -196,17 +196,37 @@ public class JSONConfig implements Serializable
      * or a double for example, getting rid of excess digits caused by rounding
      * problems in floating point numbers.
      *
-     * @param clazz The class.
+     * @param numericClass The class.
      * @param fmt The number format.
      */
-    public synchronized void addNumberFormat( Class<? extends Number> clazz, NumberFormat fmt )
+    public synchronized void addNumberFormat( Class<? extends Number> numericClass, NumberFormat fmt )
     {
-        if ( clazz != null ){
+        if ( numericClass != null ){
             if ( fmtMap == null ){
                 // don't create the map unless it's actually going to be used.
                 fmtMap = new HashMap<>();
             }
-            fmtMap.put(clazz, fmt);
+            fmtMap.put(numericClass, fmt);
+        }
+    }
+
+    /**
+     * Add a number format for a particular type that extends Number. You can
+     * set one format per type that extends Number. All JSON conversions that
+     * use this config will use the given format for output of numbers of the
+     * given class.
+     * <p>
+     * This could allow you to limit the number of digits printed for a float
+     * or a double for example, getting rid of excess digits caused by rounding
+     * problems in floating point numbers.
+     *
+     * @param numericType The object.
+     * @param fmt The number format.
+     */
+    public void addNumberFormat( Number numericType, NumberFormat fmt )
+    {
+        if ( numericType != null ){
+            addNumberFormat(numericType.getClass(), fmt);
         }
     }
 
