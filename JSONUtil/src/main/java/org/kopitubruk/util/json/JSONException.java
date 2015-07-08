@@ -21,7 +21,7 @@ import java.util.Locale;
  * Holds some redundant code/data for the other exceptions thrown
  * by JSONUtil.  All of the exceptions thrown by this package
  * involve problems with arguments, which is why this extends
- * IllegalArgumentException.
+ * IllegalArgumentException.  Also, I prefer unchecked exceptions.
  * 
  * @author Bill Davidson
  */

@@ -108,7 +108,7 @@ public class TestJSONUtil
             for ( int i = 0, j = 0, len = json.length(); i < len && j < 500; j++ ){
                 int codePoint = json.codePointAt(i);
                 int charCount = Character.charCount(codePoint);
-                if ( codePoint < 256 ){
+                if ( codePoint < 256 && codePoint >= ' ' ){
                     if ( lastCode ){
                         buf.append('\n');
                     }
@@ -596,7 +596,7 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
         NumberFormat fmt = NumberFormat.getInstance();
         fmt.setMaximumFractionDigits(3);
-        cfg.addNumberFormat(Float.class, fmt);
+        cfg.addNumberFormat(f, fmt);
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
         assertThat(json, is("{\"x\":1.235}"));
