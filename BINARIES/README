@@ -1,0 +1,6 @@
+
+Binaries for each release are in this directory.
+
+Java 5, Java 6 and Java 7 versions are provided in addition to the
+standard jars which require Java 8.  For example, the Java 7 versions
+will have "java7" in the name of the jar file.
