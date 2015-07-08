@@ -340,15 +340,15 @@ public class JSONUtil
 
     /**
      * <p>
-     *   Append the given value to the given buffer. There is special handling for
+     *   Append the given value to the given writer. There is special handling for
      *   null, {@link Number}s, {@link JSONAble}s, {@link Map}s,
-     *   {@link ResourceBundle}s, {@link Iterable}s and arrays. All other objects
-     *   just get their toString() methods called, surrounded by double quotes
-     *   with internal double quotes escaped.
+     *   {@link ResourceBundle}s, {@link Iterable}s, {@link Enumeration}s and arrays.
+     *   All other objects just get their toString() methods called, surrounded by
+     *   double quotes with internal double quotes escaped.
      * </p>
      * <p>
      *   This method is recursively called on values when handling {@link Map}s,
-     *   {@link Iterable}s, {@link ResourceBundle}s and arrays.
+     *   {@link Iterable}s, {@link Enumeration}s, {@link ResourceBundle}s and arrays.
      * </p>
      *
      * @param propertyValue The value to append.
