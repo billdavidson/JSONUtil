@@ -23,7 +23,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>org.kopitubruk.util</groupId>
-  <artifactId>json</artifactId>
+  <artifactId>JSONUtil</artifactId>
   <version>0.1-java5</version>
   <packaging>jar</packaging>
 
