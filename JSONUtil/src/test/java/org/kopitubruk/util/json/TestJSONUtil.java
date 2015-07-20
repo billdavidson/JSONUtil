@@ -29,12 +29,14 @@ import java.math.BigInteger;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
+import java.util.Set;
 
 import javax.naming.NamingException;
 import javax.script.ScriptEngine;
@@ -129,33 +131,6 @@ public class TestJSONUtil
     }
 
     /**
-     * Check if the given code point is a valid start character for a
-     * Javascript identifier.
-     *
-     * @param codePoint code point to check.
-     * @return true if the codePoint is a valid start character.
-     */
-    private boolean isValidStart( int codePoint )
-    {
-        return codePoint == '_' || codePoint == '$' || Character.isLetter(codePoint);
-    }
-
-    /**
-     * Check if the given code point is a valid part character for a
-     * Javascript identifier.
-     *
-     * @param codePoint code point to check.
-     * @return true if the codePoint is a valid part character.
-     */
-    private boolean isValidPart( int codePoint )
-    {
-        return Character.isDigit(codePoint) || ((((1 << Character.NON_SPACING_MARK) |
-                (1 << Character.COMBINING_SPACING_MARK) |
-                (1 << Character.CONNECTOR_PUNCTUATION) ) >> Character.getType(codePoint)) & 1) != 0 ||
-                codePoint == 0x200C || codePoint == 0x200D;
-    }
-
-    /**
      * Test all characters allowed for property names. Every start character
      * gets tested in the start position and most part characters get tested
      * twice but all at least once.
@@ -182,15 +157,18 @@ public class TestJSONUtil
         ArrayList<Integer> validPart = new ArrayList<>();
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
-            if ( isValidStart(i) ){
+            if ( JSONUtil.isValidIdentifierStart(i) ){
                 validStart.add(i);
-                validPart.add(i);
-            }else if ( isValidPart(i) ){
+            }else if ( JSONUtil.isValidIdentifierPart(i) ){
                 validPart.add(i);
             }
         }
         validStart.trimToSize();
-        validPart.trimToSize();
+        s_log.debug(validStart.size() + " valid start code points");
+        validPart.addAll(validStart);
+        Collections.sort(validPart);
+        s_log.debug(validPart.size() + " valid part code points");
+
 
         final int MAX_LENGTH = 3;
         int[] propertyName = new int[MAX_LENGTH];
@@ -236,7 +214,7 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
-            if ( ! isValidStart(i) ){
+            if ( ! JSONUtil.isValidIdentifierStart(i) ){
                 codePoints[0] = i;
                 testBadIdentifier(codePoints, 0, 1, jsonObj, cfg);
             }
@@ -256,7 +234,7 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
-            if ( ! isValidStart(i) && ! isValidPart(i) && ! (i <= 0xFFFF && Character.isSurrogate((char)i)) ){
+            if ( ! JSONUtil.isValidIdentifierStart(i) && ! JSONUtil.isValidIdentifierPart(i) && ! (i <= 0xFFFF && Character.isSurrogate((char)i)) ){
                 // high surrogates break the test unless they are followed immediately by low surrogates.
                 // just skip them.  anyone who sends bad surrogate pairs deserves what they get.
                 codePoints[j++] = i;
@@ -421,6 +399,59 @@ public class TestJSONUtil
             assertThat(json, is("{\"x\":\""+result+"\"}"));
             assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
         }
+    }
+
+    /**
+     * Test using reserved words in identifiers.
+     *
+     * @throws ScriptException if the JSON doesn't evaluate properly.
+     */
+    @Test
+    public void testReservedWordsInIdentifiers() throws ScriptException
+    {
+        Map<String,Object> jsonObj = new LinkedHashMap<>();
+        JSONConfig cfg = new JSONConfig();
+        cfg.setAllowReservedWordsInIdentifiers(true);
+        Set<String> reservedWords = JSONUtil.getJavascriptReservedWords();
+        for ( String reservedWord : reservedWords ){
+            jsonObj.clear();
+            jsonObj.put(reservedWord, 0);
+
+            // test with allow reserved words.
+            String json = JSONUtil.toJSON(jsonObj, cfg);
+            validateJSON(json);
+            assertThat(json, is("{\""+reservedWord+"\":0}"));
+            assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
+
+            // test with reserved words disallowed.
+            try{
+                JSONUtil.toJSON(jsonObj);
+                fail("Expected BadPropertyNameException for reserved word "+reservedWord);
+            }catch ( BadPropertyNameException e ){
+                String message = e.getMessage();
+                assertThat(message, is(reservedWord+" is a reserved word."));
+                assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
+            }
+        }
+    }
+
+    /**
+     * Test EscapeBadIdentifierCodePoints
+     *
+     * @throws ScriptException if the JSON doesn't evaluate properly.
+     */
+    @Test
+    public void testEscapeBadIdentifierCodePoints() throws ScriptException
+    {
+        Map<String,Object> jsonObj = new LinkedHashMap<>();
+        JSONConfig cfg = new JSONConfig();
+        cfg.setEscapeBadIdentifierCodePoints(true);
+        jsonObj.put("x\u0005", 0);
+
+        String json = JSONUtil.toJSON(jsonObj, cfg);
+        validateJSON(json);
+        assertThat(json, is("{\"x\\u0005\":0}"));
+        assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
     }
 
     /**
