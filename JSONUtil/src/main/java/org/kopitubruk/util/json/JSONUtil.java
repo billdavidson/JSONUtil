@@ -207,8 +207,7 @@ public class JSONUtil
      *   which are allowed to be used in Javascript identifiers. The last I
      *   checked that was over 103,000 code points covering pretty much every
      *   conceivable language. About 101,000 of those are covered just by matching
-     *   \p{L} (any letter). Some care should be used though given that browser
-     *   support for Unicode in Javascript is not always great.
+     *   \p{L} (any letter).
      * </p>
      * <p>
      *   The permitted characters are specified by ECMAScript 5.1, Section 7.6
@@ -428,64 +427,25 @@ public class JSONUtil
 
                 // make a Javascript object with the keys as the property names.
 
-                // validation options.
-                boolean validatePropertyNames = jsonConfig.isValidatePropertyNames();
-                boolean escapeBadIdentifierCodePoints = jsonConfig.isEscapeBadIdentifierCodePoints();
-
-                // escape options.
-                boolean escapeNonAscii = jsonConfig.isEscapeNonAscii();
-                boolean unEscapeWherePossible = jsonConfig.isUnEscapeWherePossible();
-                boolean escapeSurrogates = jsonConfig.isEscapeSurrogates();
-
-                // non-standard JSON options.
                 boolean quoteIdentifier = jsonConfig.isQuoteIdentifier();
-                boolean useECMA6CodePoints = jsonConfig.isUseECMA6CodePoints();
-                boolean allowReservedWords = jsonConfig.isAllowReservedWordsInIdentifiers();
 
                 Set<String> propertyNames = null;
-                if ( validatePropertyNames ){
+                if ( jsonConfig.isValidatePropertyNames() ){
                     propertyNames = new HashSet<>(keys.size());
                 }
 
                 json.write('{');
                 boolean didStart = false;
                 for ( Object key : keys ){
-                    String propertyName = key.toString();
-                    if ( unEscapeWherePossible ){
-                        propertyName = unEscape(propertyName);
-                    }
-                    if ( escapeNonAscii ){
-                        propertyName = escapeNonAscii(propertyName, useECMA6CodePoints);
-                    }else if ( escapeSurrogates ){
-                        propertyName = escapeSurrogates(propertyName, useECMA6CodePoints);
-                    }
-                    if ( validatePropertyNames ){
-                        if ( propertyNames.contains(propertyName) ){
-                            // very unlikely.  two key objects that are not equal would
-                            // have to produce identical toString() results.
-                            throw new DuplicatePropertyNameException(propertyName, jsonConfig);
-                        }
-                        propertyNames.add(propertyName);
-                        try{
-                            checkValidJavascriptPropertyName(propertyName, jsonConfig);
-                        }catch ( RuntimeException e ){
-                            if ( allowReservedWords && isReservedWord(propertyName) ){
-                                // OK.
-                            }else if ( escapeBadIdentifierCodePoints && e instanceof BadPropertyNameException ){
-                                propertyName = escapeBadIdentifierCharacters(propertyName, jsonConfig, e);
-                            }else{
-                                jsonConfig.clearObjStack();
-                                throw e;
-                            }
-                        }
-                    }
-                    // at least some interpreters will choke on surrogate pairs without quotes
-                    boolean doQuote = quoteIdentifier || isReservedWord(propertyName) || hasSurrogates(propertyName);
                     if ( didStart ){
                         json.write(',');
                     }else{
                         didStart = true;
                     }
+                    String propertyName = getEscapedPropertyName(key.toString(), jsonConfig);
+                    propertyName = validatePropertyName(propertyName, jsonConfig, propertyNames);
+                    // at least some interpreters will choke on surrogate pairs without quotes
+                    boolean doQuote = quoteIdentifier || isReservedWord(propertyName) || hasSurrogates(propertyName);
                     if ( doQuote ){
                         json.write('"');
                     }
@@ -571,7 +531,8 @@ public class JSONUtil
             if ( isValidJSONNumber(numericString) ){
                 json.write(numericString);
             }else{
-                // something isn't a kosher number for JSON.
+                // Something isn't a kosher number for JSON, which is more
+                // restrictive than Javascript for numbers.
                 writeString(numericString, json, jsonConfig);
             }
         }else{
@@ -657,6 +618,105 @@ public class JSONUtil
     }
 
     /**
+     * Get the property name with escaping options applied as needed.
+     *
+     * @param propertyName The property name.
+     * @param jsonConfig The config object with the flags.
+     * @return the escaped property name.
+     */
+    private static String getEscapedPropertyName( String propertyName, JSONConfig jsonConfig )
+    {
+        String result = propertyName;
+        if ( jsonConfig.isUnEscapeWherePossible() ){
+            result = unEscape(result);
+        }
+        if ( jsonConfig.isEscapeNonAscii() ){
+            result = escapeNonAscii(result, jsonConfig);
+        }else if ( jsonConfig.isEscapeSurrogates() ){
+            result = escapeSurrogates(result, jsonConfig);
+        }
+        return result;
+    }
+
+    /**
+     * Validate a property name.
+     *
+     * @param propertyName the property name.
+     * @param jsonConfig The JSONConfig obeject to get flags.
+     * @param propertyNames The set of property names.  Used to detect duplicate property names.
+     * @return the propertyName, which could possibly be modified.
+     * @throws BadPropertyNameException if the property name is not a valid Javascript property name.
+     * @throws DuplicatePropertyNameException if the name is already in the propertyNames set.
+     */
+    private static String validatePropertyName( String propertyName, JSONConfig jsonConfig, Set<String> propertyNames )
+    {
+        if ( jsonConfig.isValidatePropertyNames() ){
+            if ( propertyNames.contains(propertyName) ){
+                // very unlikely.  two key objects that are not equal would
+                // have to produce identical toString() results.
+                throw new DuplicatePropertyNameException(propertyName, jsonConfig);
+            }
+            propertyNames.add(propertyName);
+            try{
+                checkValidJavascriptPropertyName(propertyName, jsonConfig);
+            }catch ( RuntimeException e ){
+                if ( jsonConfig.isAllowReservedWordsInIdentifiers() && isReservedWord(propertyName) ){
+                    // OK.
+                }else if ( jsonConfig.isEscapeBadIdentifierCodePoints() && e instanceof BadPropertyNameException ){
+                    // escape bad characters.
+                    propertyName = escapeBadIdentifierCodePoints(propertyName, jsonConfig, e);
+                }else{
+                    jsonConfig.clearObjStack();
+                    throw e;
+                }
+            }
+        }
+        return propertyName;
+    }
+
+    /**
+     * Escape bad identifier code points.
+     *
+     * @param propertyname the name to escape.
+     * @param jsonConfig The config object.
+     * @param e The BadPropertyNameException that caused this to be called.
+     * @return the escaped property name.
+     */
+    private static String escapeBadIdentifierCodePoints( String propertyName, JSONConfig jsonConfig, RuntimeException e )
+    {
+        if ( propertyName == null || propertyName.length() < 1 || isReservedWord(propertyName) ){
+            // can't escape these.
+            jsonConfig.clearObjStack();
+            throw e;
+        }
+        StringBuilder buf = new StringBuilder();
+        int i = 0, len = propertyName.length();
+        boolean useECMA6Codepoints = jsonConfig.isUseECMA6CodePoints();
+        while ( i < len ){
+            int codePoint = propertyName.codePointAt(i);
+            int charCount = Character.charCount(codePoint);
+            if ( isValidIdentifierStart(codePoint) ){
+                buf.appendCodePoint(codePoint);
+            }else if ( i > 0 && isValidIdentifierPart(codePoint) ){
+                buf.appendCodePoint(codePoint);
+            }else if ( useECMA6Codepoints && (codePoint < 0x10 || codePoint > 0xFFFF) ){
+                // ECMA 6 code point escape.
+                // only very low or very high code points see an advantage.
+                buf.append(String.format(CODE_POINT_FMT, codePoint));
+            }else{
+                // normal escape.
+                buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i)));
+                if ( charCount > 1 ){
+                    buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i+1)));
+                }
+            }
+            i += charCount;
+        }
+
+        return buf.toString();
+    }
+
+    /**
      * Return true if the input looks like a valid JSON number.
      *
      * @param numericString the string.
@@ -687,14 +747,15 @@ public class JSONUtil
      * Escape surrogate pairs.
      *
      * @param str The input string.
-     * @param useECMA6CodePoints If true, then ECMA 6 code point escapes will be used.
+     * @param jsonConfig the config object for flags.
      * @return The escaped string.
      */
-    private static String escapeSurrogates( String str, boolean useECMA6CodePoints )
+    private static String escapeSurrogates( String str, JSONConfig jsonConfig )
     {
         if ( hasSurrogates(str) ){
             StringBuilder buf = new StringBuilder();
             int i = 0, len = str.length();
+            boolean useECMA6CodePoints = jsonConfig.isUseECMA6CodePoints();
             while ( i < len ){
                 int codePoint = str.codePointAt(i);
                 int charCount = Character.charCount(codePoint);
@@ -720,13 +781,14 @@ public class JSONUtil
      * Escape non-ascii.
      *
      * @param str The input string.
-     * @param useECMA6CodePoints If true, then ECMA 6 code point escapes will be used.
+     * @param jsonConfig The config object for flags.
      * @return The escaped string.
      */
-    private static String escapeNonAscii( String str, boolean useECMA6CodePoints )
+    private static String escapeNonAscii( String str, JSONConfig jsonConfig )
     {
         StringBuilder buf = new StringBuilder();
         int i = 0, len = str.length();
+        boolean useECMA6CodePoints = jsonConfig.isUseECMA6CodePoints();
         while ( i < len ){
             int codePoint = str.codePointAt(i);
             int charCount = Character.charCount(codePoint);
@@ -744,53 +806,6 @@ public class JSONUtil
             }
             i += charCount;
         }
-        return buf.toString();
-    }
-
-    /**
-     * Escape bad identifier code points.
-     *
-     * @param propertyname the name to escape.
-     * @param jsonConfig The config object.
-     * @param e The BadPropertyNameException that caused this to be called.
-     * @return the escaped property name.
-     */
-    private static String escapeBadIdentifierCharacters( String propertyName, JSONConfig jsonConfig, RuntimeException e )
-    {
-        if ( propertyName == null || propertyName.length() < 1 || isReservedWord(propertyName) ){
-            // can't escape these.
-            jsonConfig.clearObjStack();
-            throw e;
-        }
-        StringBuilder buf = new StringBuilder();
-        int i = 0, len = propertyName.length();
-        boolean useECMA6Codepoints = jsonConfig.isUseECMA6CodePoints();
-        while ( i < len ){
-            int codePoint = propertyName.codePointAt(i);
-            int charCount = Character.charCount(codePoint);
-            if ( codePoint == '_' || codePoint == '$' || Character.isLetter(codePoint) ){
-                // valid start
-                buf.appendCodePoint(codePoint);
-            }else if ( i > 0 && (Character.isDigit(codePoint) || ((((1 << Character.NON_SPACING_MARK) |
-                       (1 << Character.COMBINING_SPACING_MARK) |
-                       (1 << Character.CONNECTOR_PUNCTUATION) ) >> Character.getType(codePoint)) & 1) != 0 ||
-                       codePoint == 0x200C || codePoint == 0x200D) ){
-                // valid part.
-                buf.appendCodePoint(codePoint);
-            }else if ( useECMA6Codepoints && (codePoint < 0x10 || codePoint > 0xFFFF) ){
-                // ECMA 6 code point escape.
-                // only very low or very high code points see an advantage.
-                buf.append(String.format(CODE_POINT_FMT, codePoint));
-            }else{
-                // normal escape.
-                buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i)));
-                if ( charCount > 1 ){
-                    buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i+1)));
-                }
-            }
-            i += charCount;
-        }
-
         return buf.toString();
     }
 
@@ -906,6 +921,34 @@ public class JSONUtil
     public static boolean isReservedWord( String name )
     {
         return RESERVED_WORDS.contains(name);
+    }
+
+    /**
+     * Return true if the codePoint is a valid code point to start an
+     * identifier.
+     *
+     * @param codePoint The code point.
+     * @return true if it's a valid code point to start an identifier.
+     */
+    static boolean isValidIdentifierStart( int codePoint )
+    {
+        return codePoint == '_' || codePoint == '$' || Character.isLetter(codePoint);
+    }
+
+    /**
+     * Return true if the codePoint is a valid code point for part of an
+     * identifier but not the start of an identifier.
+     *
+     * @param codePoint The code point.
+     * @return true if the codePoint is a valid code point for part of an
+     *         identifier but not the start of an identifier.
+     */
+    static boolean isValidIdentifierPart( int codePoint )
+    {
+        return Character.isDigit(codePoint) ||
+                ((((1 << Character.NON_SPACING_MARK) | (1 << Character.COMBINING_SPACING_MARK) |
+                (1 << Character.CONNECTOR_PUNCTUATION) ) >> Character.getType(codePoint)) & 1) != 0 ||
+                codePoint == 0x200C || codePoint == 0x200D;
     }
 
     /**
