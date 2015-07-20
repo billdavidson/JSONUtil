@@ -49,8 +49,10 @@ public final class BadPropertyNameException extends JSONException
     {
         super(jsonConfig);
         this.propertyName = propertyName;
-        // Can't do cfg.clearObjStack() because sometimes BadPropertyNameException is not fatal.
-        // handled in JSONUtil instead.
+        /*
+         * Can't do jsonConfig.clearObjStack() because sometimes
+         * BadPropertyNameException is not fatal. Handled in JSONUtil instead.
+         */
     }
 
     /**
@@ -84,14 +86,11 @@ public final class BadPropertyNameException extends JSONException
         while ( i < propertyName.length() ){
             int codePoint = propertyName.codePointAt(i);
             int cc = Character.charCount(codePoint);
-            if ( codePoint == '_' || codePoint == '$' || Character.isLetter(codePoint) ){
+            if ( JSONUtil.isValidIdentifierStart(codePoint) ){
                 // OK for start or any other character.
-            }else if ( i > 0 && (Character.isDigit(codePoint) || ((((1 << Character.NON_SPACING_MARK) |
-                        (1 << Character.COMBINING_SPACING_MARK) |
-                        (1 << Character.CONNECTOR_PUNCTUATION)) >> Character.getType(codePoint)) & 1) != 0 ||
-                        codePoint == 0x200C || codePoint == 0x200D) ){
+            }else if ( i > 0 && JSONUtil.isValidIdentifierPart(codePoint) ){
                 // OK as long as not the starting character.
-            }else if ( i > 0 && codePoint == '\\' ){
+            }else if ( codePoint == '\\' ){
                 // check for Unicode escape.
                 Matcher matcher = CODE_UNIT_OR_POINT_PAT.matcher(propertyName.substring(i));
                 if ( matcher.find() && matcher.start() == 0){
