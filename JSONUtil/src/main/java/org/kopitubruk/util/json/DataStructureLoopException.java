@@ -35,7 +35,7 @@ public final class DataStructureLoopException extends JSONException
     /**
      * Copy of the object stack.
      */
-    private Object[] objStack;
+    private Object[] objStack = null;
 
     /**
      * Constructor.
@@ -47,8 +47,7 @@ public final class DataStructureLoopException extends JSONException
     {
         super(jsonConfig);
         this.offender = offender;
-        // freeze a copy of the stack because it will be modified
-        // before getMessage() is called.
+        // freeze a copy of the stack.
         List<Object> stack = jsonConfig.getObjStack();
         objStack = stack.toArray(new Object[stack.size()]);
         jsonConfig.clearObjStack();
