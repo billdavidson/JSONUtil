@@ -46,17 +46,19 @@ import java.util.Map;
  *   <li>escapeSurrogates = false</li>
  * </ul>
  * <h3>
- *   Allow generation of certain types of non-standard JSON.  This could
- *   cause problems for some things that take JSON.  Defaults are for
- *   standard JSON.  Be careful about changing these.  They should
+ *   Allow generation of certain types of non-standard JSON.
+ * </h3>
+ * <p>
+ *   This could cause problems for some things that take JSON.  Defaults
+ *   are for standard JSON.  Be careful about changing these.  They should
  *   work fine if the JSON is interpreted by a standard Javascript
- *   eval(), except ECMA 6 code points if your interpreter doesn't
+ *   eval(), except ECMAScript 6 code points if your interpreter doesn't
  *   support those.  Going non-default on any of these tends not to
  *   work in strict JSON parsers such as JQuery.
- * </h3>
+ * </p>
  * <ul>
  *   <li>quoteIdentifier = true</li>
- *   <li>useECMA6CodePoints = false</li>
+ *   <li>useECMA6 = false</li>
  *   <li>allowReservedWordsInIdentifiers = false</li>
  * </ul>
  * <p>
@@ -69,7 +71,7 @@ import java.util.Map;
  * @see JSONConfigDefaults
  * @author Bill Davidson
  */
-public class JSONConfig implements Serializable
+public class JSONConfig implements Serializable, Cloneable
 {
     /**
      * A locale used for error messages and localization by {@link JSONAble}s if
@@ -98,7 +100,7 @@ public class JSONConfig implements Serializable
     private boolean escapeSurrogates;
 
     private boolean quoteIdentifier;
-    private boolean useECMA6CodePoints;
+    private boolean useECMA6;
     private boolean allowReservedWordsInIdentifiers;
 
     /**
@@ -131,7 +133,7 @@ public class JSONConfig implements Serializable
 
         // non-standard JSON options.
         quoteIdentifier = dflt.isQuoteIdentifier();
-        useECMA6CodePoints = dflt.isUseECMA6CodePoints();
+        useECMA6 = dflt.isUseECMA6();
         allowReservedWordsInIdentifiers = dflt.isAllowReservedWordsInIdentifiers();
 
         synchronized ( JSONConfigDefaults.class ){
@@ -163,6 +165,36 @@ public class JSONConfig implements Serializable
         if ( objStack != null ){
             objStack.clear();
         }
+    }
+
+    /**
+     * Return a clone of this object.
+     *
+     * @return a clone of this object.
+     */
+    @Override
+    public JSONConfig clone()
+    {
+        JSONConfig result = new JSONConfig();
+
+        result.locale = locale;
+        result.objStack = objStack == null ? null : new ArrayList<Object>(objStack);
+        result.fmtMap = fmtMap == null ? null : new HashMap<>(fmtMap);
+
+        result.validatePropertyNames = validatePropertyNames;
+        result.detectDataStructureLoops = detectDataStructureLoops;
+        result.escapeBadIdentifierCodePoints = escapeBadIdentifierCodePoints;
+
+        result.encodeNumericStringsAsNumbers = encodeNumericStringsAsNumbers;
+        result.escapeNonAscii = escapeNonAscii;
+        result.unEscapeWherePossible = unEscapeWherePossible;
+        result.escapeSurrogates = escapeSurrogates;
+
+        result.quoteIdentifier = quoteIdentifier;
+        result.useECMA6 = useECMA6;
+        result.allowReservedWordsInIdentifiers = allowReservedWordsInIdentifiers;
+
+        return result;
     }
 
     /**
@@ -283,15 +315,12 @@ public class JSONConfig implements Serializable
      * testing with this set to true but switch to false when you release.
      * <p>
      * When validation is enabled, only code points which are allowed in
-     * identifiers will be permitted as per the ECMAScript 5.1 standard as
+     * identifiers will be permitted as per the ECMAScript 5 or 6 standard as
      * well as disallowing reserved words as per the JSON spec.  It will also
      * check for duplicate property names in the same object, which is possible
      * because keys in maps are not required to be String objects and it's
      * possible (though not likely) for two objects which are not equal to have
      * the same result from a toString() method.
-     * <p>
-     * If this is set to false and you have a map with a null key,
-     * you will get a {@link NullPointerException}.
      *
      * @param validatePropertyNames Set to false to disable property name validation.
      */
@@ -313,7 +342,9 @@ public class JSONConfig implements Serializable
     /**
      * Enable or disable data structure loop detection. Default is true. Do not
      * change this in the middle of a toJSON call, which you could theoretically
-     * do from a JSONAble object. It could break the detection system.
+     * do from a JSONAble object. It could break the detection system and if you
+     * have a loop, you could get recursion until the stack overflows, which
+     * would be bad.
      *
      * @param detectDataStructureLoops If true then JSONUtil will attempt to detect loops in data structures.
      */
@@ -336,10 +367,8 @@ public class JSONConfig implements Serializable
     }
 
     /**
-     * If true, then any bad code points in identifiers will be quoted.
-     * Default is false.  This only works if {@link #isValidatePropertyNames()}
-     * returns true.  If validation is disabled then bad code points can't be
-     * detected and so can't be escaped.
+     * If true, then any bad code points in identifiers will be escaped.
+     * Default is false.
      *
      * @param escapeBadIdentifierCodePoints the escapeBadIdentifierCodePoints to set
      */
@@ -407,13 +436,16 @@ public class JSONConfig implements Serializable
     /**
      * If true then where possible, undo inline escapes in strings.
      * Default is false. When false, escapes in strings are passed through
-     * unmodified, including hex escapes, octal escapes and ECMA 6 code point
+     * unmodified, including hex escapes, octal escapes and ECMAScript 6 code point
      * escapes, all of which are not allowed by the JSON standard. When true,
      * then escapes are converted to UTF-16 before being put through the normal
      * escape process so that unnecessary escapes are removed and escapes that
      * are needed but aren't allowed in the JSON standard are converted to
      * Unicode code unit escapes. This might be useful if you're reading your
      * strings from a file or database that has old style escapes in it.
+     * <p>
+     * Note that this does not apply to property names.  It is only applied
+     * to string values.
      *
      * @param unEscapeWherePossible If true then where possible, undo inline
      *        escapes in strings.
@@ -461,7 +493,7 @@ public class JSONConfig implements Serializable
      * things that read JSON and need 100% compliance with the spec. In
      * particular, JQuery does NOT like it when you leave out the quotes. It
      * wants the quotes according to the JSON spec. Javascript eval() tends to
-     * be just fine with having no quotes. Note that if you use enable using
+     * be just fine with having no quotes. Note that if you enable using
      * keywords as identifiers and use a keyword as an identifier, that will
      * force quotes anyway. If you use characters that require surrogate pairs,
      * that will also force quotes.
@@ -475,26 +507,28 @@ public class JSONConfig implements Serializable
     }
 
     /**
-     * Find out if ECMA 6 code point escapes are enabled.
+     * Find out if ECMAScript 6 code point escapes are enabled.
      *
-     * @return The ECMA 6 escape policy.
+     * @return The ECMAScript 6 policy.
      */
-    public boolean isUseECMA6CodePoints()
+    public boolean isUseECMA6()
     {
-        return useECMA6CodePoints;
+        return useECMA6;
     }
 
     /**
      * If you set this to true, then when the JSONUtil generates Unicode
      * escapes, it will use ECMAScript 6 code point escapes if they are shorter
      * than code unit escapes. This is not standard JSON and not yet widely
-     * supported by Javascript interpreters. Default is false.
+     * supported by Javascript interpreters. It also allows identifiers to have
+     * letter numbers in addition to other letters.  Default is false.
      *
-     * @param useECMA6CodePoints If true, use EMCA 6 code point escapes.
+     * @param useECMA6 If true, use EMCAScript 6 code point escapes and allow
+     * ECMAScript 6 identifier character set.
      */
-    public void setUseECMA6CodePoints( boolean useECMA6CodePoints )
+    public void setUseECMA6( boolean useECMA6 )
     {
-        this.useECMA6CodePoints = useECMA6CodePoints;
+        this.useECMA6 = useECMA6;
     }
 
     /**
