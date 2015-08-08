@@ -23,7 +23,7 @@
  * {@link Map} to be predictable by using a {@link TreeMap} or a
  * {@link LinkedHashMap} which can be useful for debugging. You can also use any
  * {@link Iterable} object or {@link Enumeration} to create a Javascript array or
- * even use an actua array of objects or primitives. In many cases it may be
+ * even use an actual array of objects or primitives. In many cases it may be
  * possible to use existing data structures without modification.
  * <p>
  * There is also an interface provided called {@link JSONAble} which enables
@@ -48,6 +48,11 @@
  * and loop detection, change some of the character escape behavior and even
  * generate certain types of non-standard JSON which may work if you're using
  * a Javascript eval() on it rather than a strict JSON parser.
+ * <p>
+ * ECMAScript 6 support is available by enabling it in {@link JSONConfig}.  This
+ * causes ECMAScript 6 code point escapes to be recognized as well as generated
+ * when it saves characters over code unit escapes.  It also allows a larger set
+ * of characters in identifiers as per the ECMAScript 6 standard.
  * <p>
  * This package uses Apache Commons Logging in a few places so it should work
  * with whatever logging framework you're using, but most of the messages are debug

@@ -39,10 +39,8 @@ class JNDIUtil
 
     static{
         String pkgName = JNDIUtil.class.getPackage().getName();
-        logging = Boolean.parseBoolean(System.getProperty(pkgName+".logging", Boolean.TRUE.toString()));
-        if ( logging ){
-            s_log = LogFactory.getLog(JNDIUtil.class);
-        }
+
+        setLogging(Boolean.parseBoolean(System.getProperty(pkgName+".logging", Boolean.TRUE.toString())));
     }
 
     /**

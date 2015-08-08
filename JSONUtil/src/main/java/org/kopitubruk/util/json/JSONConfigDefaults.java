@@ -51,8 +51,9 @@ import org.apache.commons.logging.LogFactory;
  * in development and testing servers and turn it off in production servers
  * for faster performance, without changing any code.
  * <p>
- * Example for Tomcat in <code>$CATALINA_BASE/conf/Catalina/<i>host</i>/MyApp.xml</code>
- * in order to disable property name validation:
+ * Example for Tomcat, assuming your app is named "MyApp", in 
+ * <code>$CATALINA_BASE/conf/Catalina/<i>host</i>/MyApp.xml</code> in order to
+ * disable property name validation:
  * <pre>{@code <Context path="/MyApp">
  *   <Environment name="org/kopitubruk/util/json/validatePropertyNames" type="java.lang.Boolean" value="false" override="false" />
  * </Context>}</pre>
@@ -73,13 +74,15 @@ import org.apache.commons.logging.LogFactory;
  *   <li>escapeSurrogates = false</li>
  * </ul>
  * <h3>
- *   Allow generation of certain types of non-standard JSON.  Could
- *   cause problems for some things that take JSON.  Defaults are for
- *   standard JSON.  Be careful about changing these.
+ *   Allow generation of certain types of non-standard JSON.
  * </h3>
+ * <p>
+ *   Could cause problems for some things that take JSON.  Defaults are for
+ *   standard JSON.  Be careful about changing these.
+ * </p>
  * <ul>
  *   <li>quoteIdentifier = true</li>
- *   <li>useECMA6CodePoints = false</li>
+ *   <li>useECMA6 = false</li>
  *   <li>allowReservedWordsInIdentifiers = false</li>
  * </ul>
  * <p>
@@ -110,7 +113,7 @@ import org.apache.commons.logging.LogFactory;
  */
 public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 {
-    private static Log s_log = LogFactory.getLog(JSONConfigDefaults.class);
+    private static Log s_log = null;
 
     // Default flag values.
     private static volatile boolean validatePropertyNames;
@@ -123,7 +126,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static volatile boolean escapeSurrogates;
 
     private static volatile boolean quoteIdentifier;
-    private static volatile boolean useECMA6CodePoints;
+    private static volatile boolean useECMA6;
     private static volatile boolean allowReservedWordsInIdentifiers;
 
     // Other defaults.
@@ -164,8 +167,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         }
 
         if ( useJNDI ){
-            JNDIUtil.setLogging(logging);
-
             // Look for defaults in JNDI.
             try{
                 Context ctx = JNDIUtil.getEnvContext(pkgName.replaceAll("\\.", "/"));
@@ -181,7 +182,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 escapeSurrogates = JNDIUtil.getBoolean(ctx, "escapeSurrogates", escapeSurrogates);
 
                 quoteIdentifier = JNDIUtil.getBoolean(ctx, "quoteIdentifier", quoteIdentifier);
-                useECMA6CodePoints = JNDIUtil.getBoolean(ctx, "useECMA6CodePoints", useECMA6CodePoints);
+                useECMA6 = JNDIUtil.getBoolean(ctx, "useECMA6CodePoints", useECMA6);
                 allowReservedWordsInIdentifiers = JNDIUtil.getBoolean(ctx, "allowReservedWordsInIdentifiers", allowReservedWordsInIdentifiers);
 
                 String localeString = JNDIUtil.getString(ctx, "locale", null);
@@ -250,7 +251,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * <pre><code>
      * public void contextDestroyed( ServletContextEvent sce )
      * {
-     *     DefaultJsonConfig.clearMBean();
+     *     JSONConfigDefaults.clearMBean();
      * }
      * </code></pre>
      * <p>
@@ -390,7 +391,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             escapeSurrogates = false;
 
             quoteIdentifier = true;
-            useECMA6CodePoints = false;
+            useECMA6 = false;
             allowReservedWordsInIdentifiers = false;
 
             locale = null;
@@ -598,28 +599,26 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the default escape ECMA 6 code points policy.
+     * Get the default escape ECMAScript 6 code points policy.
      * Accessible via MBean server.
      *
-     * @return The default escape ECMA 6 code points policy.
+     * @return The default escape ECMAScript 6 code points policy.
      */
-    
-    public boolean isUseECMA6CodePoints()
+    public boolean isUseECMA6()
     {
-        return useECMA6CodePoints;
+        return useECMA6;
     }
 
     /**
-     * Set the default flag for using ECMA 6 code points to encode
+     * Set the default flag for using ECMAScript 6 code points to encode
      * Unicode escapes. Accessible via MBean server.
      *
-     * @param dflt if true then ECMA 6 code points
+     * @param dflt if true then ECMAScript 6 code points
      * will be used to encode Unicode escapes as needed.
      */
-    
-    public void setUseECMA6CodePoints( boolean dflt )
+    public void setUseECMA6( boolean dflt )
     {
-        useECMA6CodePoints = dflt;
+        useECMA6 = dflt;
     }
 
     /**
