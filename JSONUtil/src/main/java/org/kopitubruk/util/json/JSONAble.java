@@ -33,6 +33,7 @@ import java.io.Writer;
  *
  * @author Bill Davidson
  */
+@FunctionalInterface
 public interface JSONAble
 {
 
