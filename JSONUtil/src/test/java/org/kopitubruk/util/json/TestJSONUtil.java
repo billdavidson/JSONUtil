@@ -22,8 +22,6 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
-import java.io.IOException;
-import java.io.Writer;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.NumberFormat;
@@ -37,6 +35,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.Vector;
 
 import javax.naming.NamingException;
 import javax.script.ScriptEngine;
@@ -153,13 +152,16 @@ public class TestJSONUtil
     @Test
     public void testValidPropertyNames() throws ScriptException
     {
+        JSONConfig cfg = new JSONConfig();
+        cfg.setQuoteIdentifier(false);
+
         ArrayList<Integer> validStart = new ArrayList<>();
         ArrayList<Integer> validPart = new ArrayList<>();
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
-            if ( JSONUtil.isValidIdentifierStart(i) ){
+            if ( JSONUtil.isValidIdentifierStart(i, cfg) ){
                 validStart.add(i);
-            }else if ( JSONUtil.isValidIdentifierPart(i) ){
+            }else if ( JSONUtil.isValidIdentifierPart(i, cfg) ){
                 validPart.add(i);
             }
         }
@@ -168,7 +170,6 @@ public class TestJSONUtil
         validPart.addAll(validStart);
         Collections.sort(validPart);
         s_log.debug(validPart.size() + " valid part code points");
-
 
         final int MAX_LENGTH = 3;
         int[] propertyName = new int[MAX_LENGTH];
@@ -181,8 +182,7 @@ public class TestJSONUtil
         int startSize = validStart.size();
         int partSize = validPart.size();
         propertyName[nameIndex++] = validStart.get(startIndex++);
-        JSONConfig cfg = new JSONConfig();
-        cfg.setQuoteIdentifier(false);
+
         while ( startIndex < startSize ){
             propertyName[nameIndex++] = validPart.get(partIndex++);
             if ( nameIndex == MAX_LENGTH ){
@@ -214,7 +214,7 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
-            if ( ! JSONUtil.isValidIdentifierStart(i) ){
+            if ( ! JSONUtil.isValidIdentifierStart(i, cfg) ){
                 codePoints[0] = i;
                 testBadIdentifier(codePoints, 0, 1, jsonObj, cfg);
             }
@@ -234,7 +234,7 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
-            if ( ! JSONUtil.isValidIdentifierStart(i) && ! JSONUtil.isValidIdentifierPart(i) && ! (i <= 0xFFFF && Character.isSurrogate((char)i)) ){
+            if ( ! JSONUtil.isValidIdentifierStart(i, cfg) && ! JSONUtil.isValidIdentifierPart(i, cfg) && ! (i <= 0xFFFF && Character.isSurrogate((char)i)) ){
                 // high surrogates break the test unless they are followed immediately by low surrogates.
                 // just skip them.  anyone who sends bad surrogate pairs deserves what they get.
                 codePoints[j++] = i;
@@ -335,7 +335,7 @@ public class TestJSONUtil
     {
         Map<String,Object> jsonObj = new HashMap<>();
         JSONConfig cfg = new JSONConfig();
-        cfg.setUseECMA6CodePoints(true);
+        cfg.setUseECMA6(true);
         cfg.setEscapeNonAscii(true);
         StringBuilder buf = new StringBuilder();
         int codePoint = 0x1F4A9;
@@ -345,7 +345,7 @@ public class TestJSONUtil
         String json = JSONUtil.toJSON(jsonObj, cfg);
         // Nashorn doesn't understand ECMAScript 6 code point escapes.
         //validateJSON(json);
-        assertThat(json, is("{\"x\":\"x\\u{"+String.format("%X", codePoint)+"}\"}"));
+        assertThat(json, is("{\"x\":\"x\\u{1F4A9}\"}"));
         assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
     }
 
@@ -409,7 +409,7 @@ public class TestJSONUtil
     @Test
     public void testReservedWordsInIdentifiers() throws ScriptException
     {
-        Map<String,Object> jsonObj = new LinkedHashMap<>();
+        Map<String,Object> jsonObj = new HashMap<>();
         JSONConfig cfg = new JSONConfig();
         cfg.setAllowReservedWordsInIdentifiers(true);
         Set<String> reservedWords = JSONUtil.getJavascriptReservedWords();
@@ -443,7 +443,7 @@ public class TestJSONUtil
     @Test
     public void testEscapeBadIdentifierCodePoints() throws ScriptException
     {
-        Map<String,Object> jsonObj = new LinkedHashMap<>();
+        Map<String,Object> jsonObj = new HashMap<>();
         JSONConfig cfg = new JSONConfig();
         cfg.setEscapeBadIdentifierCodePoints(true);
         jsonObj.put("x\u0005", 0);
@@ -692,11 +692,24 @@ public class TestJSONUtil
     public void testIterable() throws ScriptException
     {
         Map<String,Object> jsonObj = new HashMap<>();
-        List<Integer> it = new ArrayList<>(3);
-        it.add(1);
-        it.add(2);
-        it.add(3);
-        jsonObj.put("x", it);
+        jsonObj.put("x", Arrays.asList(1,2,3));
+        String json = JSONUtil.toJSON(jsonObj);
+        validateJSON(json);
+        assertThat(json, is("{\"x\":[1,2,3]}"));
+    }
+
+    /**
+     * Test an Enumeration.
+     *
+     * @throws ScriptException if the JSON doesn't evaluate properly.
+     */
+    @Test
+    public void testEnumeration() throws ScriptException
+    {
+        Map<String,Object> jsonObj = new HashMap<>();
+
+        Vector<Integer> list = new Vector<>(Arrays.asList(1,2,3));
+        jsonObj.put("x", list.elements());
         String json = JSONUtil.toJSON(jsonObj);
         validateJSON(json);
         assertThat(json, is("{\"x\":[1,2,3]}"));
@@ -768,21 +781,17 @@ public class TestJSONUtil
         jsonObj.put("d",il);
         Object[] objs = new Object[3];
         objs[0] = null;
-        objs[1] = new JSONAble()
+        objs[1] = (JSONAble)(jsonConfig, json) ->
                       {
-                          @Override
-                          public void toJSON( JSONConfig jsonConfig, Writer json ) throws BadPropertyNameException, DataStructureLoopException, IOException
-                          {
-                              JSONConfig cfg = jsonConfig == null ? new JSONConfig() : jsonConfig;
-                              Map<String,Object> jsonObj = new LinkedHashMap<>();
-                              jsonObj.put("a", 0);
-                              jsonObj.put("b", 2);
-                              int[] ar = {1, 2, 3};
-                              jsonObj.put("x", ar);
+                          JSONConfig cfg = jsonConfig == null ? new JSONConfig() : jsonConfig;
+                          Map<String,Object> stuff = new LinkedHashMap<>();
+                          stuff.put("a", 0);
+                          stuff.put("b", 2);
+                          int[] ar = {1, 2, 3};
+                          stuff.put("x", ar);
 
-                              JSONUtil.toJSON(jsonObj, cfg, json);
-                          }
-                      };
+                          JSONUtil.toJSON(stuff, cfg, json);
+                     };
         objs[2] = il;
         jsonObj.put("e", objs);
 
