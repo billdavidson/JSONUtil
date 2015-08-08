@@ -18,6 +18,7 @@ package org.kopitubruk.util.json;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.ResourceBundle;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,14 +31,10 @@ import java.util.regex.Pattern;
 public final class BadPropertyNameException extends JSONException
 {
     /**
-     * Match either a code point or a code unit.
-     */
-    private static final Pattern CODE_UNIT_OR_POINT_PAT = Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})");
-
-    /**
      * The bad property name.
      */
     private String propertyName;
+    private JSONConfig jsonConfig;
 
     /**
      * Create a new BadIdentifierCharacterException
@@ -49,10 +46,8 @@ public final class BadPropertyNameException extends JSONException
     {
         super(jsonConfig);
         this.propertyName = propertyName;
-        /*
-         * Can't do jsonConfig.clearObjStack() because sometimes
-         * BadPropertyNameException is not fatal. Handled in JSONUtil instead.
-         */
+        this.jsonConfig = jsonConfig.clone();
+        jsonConfig.clearObjStack();
     }
 
     /**
@@ -75,8 +70,11 @@ public final class BadPropertyNameException extends JSONException
         }
 
         // HashSet discards duplicates.
-        LinkedHashSet<Integer> badCodePoints = new LinkedHashSet<>();
+        Set<Integer> badCodePoints = new LinkedHashSet<>();
         boolean badStart = false;
+
+        Pattern unicodeEscapePat = jsonConfig.isUseECMA6() ? JSONUtil.CODE_UNIT_OR_POINT_PAT
+                                                           : JSONUtil.FREE_CODE_UNIT_PAT;
 
         /*
          * Find the bad code points.
@@ -86,19 +84,22 @@ public final class BadPropertyNameException extends JSONException
         while ( i < propertyName.length() ){
             int codePoint = propertyName.codePointAt(i);
             int cc = Character.charCount(codePoint);
-            if ( JSONUtil.isValidIdentifierStart(codePoint) ){
+            if ( JSONUtil.isValidIdentifierStart(codePoint, jsonConfig) ){
                 // OK for start or any other character.
-            }else if ( i > 0 && JSONUtil.isValidIdentifierPart(codePoint) ){
+            }else if ( i > 0 && JSONUtil.isValidIdentifierPart(codePoint, jsonConfig) ){
                 // OK as long as not the starting character.
             }else if ( codePoint == '\\' ){
                 // check for Unicode escape.
-                Matcher matcher = CODE_UNIT_OR_POINT_PAT.matcher(propertyName.substring(i));
-                if ( matcher.find() && matcher.start() == 0){
+                Matcher matcher = unicodeEscapePat.matcher(propertyName.substring(i));
+                if ( matcher.find() && matcher.start() == 0 ){
                     // Skip the escape.
                     i += matcher.group(1).length() - 1;
                 }else{
                     // backslash is only allowed for Unicode escapes.
                     badCodePoints.add(codePoint); 
+                    if ( i == 0 ){
+                        badStart = true;
+                    }
                 }
             }else{
                 // bad character.
