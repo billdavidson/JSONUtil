@@ -43,6 +43,7 @@ public class LoopDetectionFailureException extends JSONException
     {
         super(jsonConfig);
         this.stackIndex = stackIndex;
+        // stack must be non-null or this exception would not be thrown.
         objStackLength = jsonConfig.getObjStack().size();
         jsonConfig.clearObjStack();
     }
@@ -57,6 +58,12 @@ public class LoopDetectionFailureException extends JSONException
     String internalGetMessage( Locale locale )
     {
         ResourceBundle bundle = JSONUtil.getBundle(locale);
+        
+        /*
+         * I considered including contents of the stack here but that
+         * could potentially include sensitive information which could
+         * end up in logs, which would be bad.
+         */
 
         if ( (stackIndex+1) != objStackLength ){
             return String.format(bundle.getString("wrongStackSize"), objStackLength, stackIndex+1);
