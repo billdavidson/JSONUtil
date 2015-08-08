@@ -156,20 +156,21 @@ public interface JSONConfigDefaultsMBean
     public void setQuoteIdentifier( boolean dflt );
 
     /**
-     * Get the default escape ECMA 6 code points policy.
+     * Get the default escape ECMAScript 6 policy.
      *
-     * @return The default escape ECMA 6 code points policy.
+     * @return The default escape ECMAScript 6 policy.
      */
-    public boolean isUseECMA6CodePoints();
+    public boolean isUseECMA6();
 
     /**
-     * Set the default flag for using ECMA 6 code points to encode
-     * Unicode escapes.
+     * Set the default flag for using ECMAScript 6 code points to encode
+     * Unicode escapes and allowing letter numbers in identifiers.
      *
-     * @param dflt if true then ECMA 6 code points
-     * will be used to encode Unicode escapes as needed.
+     * @param dflt if true then ECMAScript 6 code points
+     * will be used to encode Unicode escapes as needed and letter
+     * numbers will be allowed in ID's.
      */
-    public void setUseECMA6CodePoints( boolean dflt );
+    public void setUseECMA6( boolean dflt );
 
     /**
      * Get the default for allowing reserved words in identifiers.
