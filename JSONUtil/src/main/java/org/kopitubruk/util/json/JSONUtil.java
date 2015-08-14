@@ -674,7 +674,7 @@ public class JSONUtil
     {
         String propertyName = key == null ? null : key.toString();
 
-        if ( propertyName == null ){
+        if ( propertyName == null || propertyName.length() == 0 ){
             throw new BadPropertyNameException(propertyName, jsonConfig);
         }
 
