@@ -161,12 +161,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         boolean registerMBean = Boolean.parseBoolean(System.getProperty(pkgName+'.'+registerMBeanName, trueStr));
         logging = Boolean.parseBoolean(System.getProperty(pkgName+".logging", trueStr));
 
-        ResourceBundle bundle = null;
         if ( logging && (useJNDI || registerMBean) ){
             s_log = LogFactory.getLog(JSONConfigDefaults.class);
-            // this will be the default locale for the JVM.
-            bundle = JSONUtil.getBundle(getLocale());
         }
+
+        ResourceBundle bundle = JSONUtil.getBundle(getLocale());
 
         if ( useJNDI ){
             // Look for defaults in JNDI.
