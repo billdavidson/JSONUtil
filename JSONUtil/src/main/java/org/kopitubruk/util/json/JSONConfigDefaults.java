@@ -161,11 +161,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         boolean registerMBean = Boolean.parseBoolean(System.getProperty(pkgName+'.'+registerMBeanName, trueStr));
         logging = Boolean.parseBoolean(System.getProperty(pkgName+".logging", trueStr));
 
-        if ( logging && (useJNDI || registerMBean) ){
-            s_log = LogFactory.getLog(JSONConfigDefaults.class);
+        ResourceBundle bundle = null;
+        if ( useJNDI || registerMBean ){
+            bundle = JSONUtil.getBundle(getLocale());
+            if ( logging ){
+                s_log = LogFactory.getLog(JSONConfigDefaults.class);
+            }
         }
-
-        ResourceBundle bundle = JSONUtil.getBundle(getLocale());
 
         if ( useJNDI ){
             // Look for defaults in JNDI.
@@ -341,7 +343,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the number format for the class of th given numeric type.
+     * Get the number format for the class of the given numeric type.
      *
      * @param num An object that implements {@link Number}.
      * @return A number format or null if one has not been set.
