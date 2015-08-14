@@ -241,7 +241,7 @@ public class TestJSONUtil
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
 
-            if ( ! JSONUtil.isValidIdentifierStart(i, cfg) && ! JSONUtil.isValidIdentifierPart(i, cfg) && ! (i <= 0xFFFF && Character.isSurrogate((char)i)) ){
+            if ( ! JSONUtil.isValidIdentifierStart(i, cfg) && ! JSONUtil.isValidIdentifierPart(i, cfg) && ! (i <= 0xFFFF && JSONUtil.isSurrogate((char)i)) ){
                 // high surrogates break the test unless they are followed immediately by low surrogates.
                 // just skip them.  anyone who sends bad surrogate pairs deserves what they get.
                 codePoints[j++] = i;
@@ -760,12 +760,14 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
 
         cfg.setEncodeNumericStringsAsNumbers(false);
-        String json = JSONUtil.toJSON(bundle, cfg);
+        //String json = 
+                JSONUtil.toJSON(bundle, cfg);
         // validateJSON(json);
         //assertThat(json, is("{\"a\":\"1\",\"b\":\"2\",\"c\":\"3\",\"d\":\"4\",\"e\":\"5\",\"f\":\"6\",\"g\":\"7\",\"h\":\"8\",\"i\":\"9\",\"j\":\"10\",\"k\":\"11\",\"l\":\"12\",\"m\":\"13\",\"n\":\"14\",\"o\":\"15\",\"p\":\"16\",\"q\":\"17\",\"r\":\"18\",\"s\":\"19\",\"t\":\"20\",\"u\":\"21\",\"v\":\"22\",\"w\":\"23\",\"x\":\"24\",\"y\":\"25\",\"z\":\"26\"}"));
 
         cfg.setEncodeNumericStringsAsNumbers(true);
-        json = JSONUtil.toJSON(bundle, cfg);
+        //json = 
+                JSONUtil.toJSON(bundle, cfg);
         // validateJSON(json);
         //assertThat(json, is("{\"a\":1,\"b\":2,\"c\":3,\"d\":4,\"e\":5,\"f\":6,\"g\":7,\"h\":8,\"i\":9,\"j\":10,\"k\":11,\"l\":12,\"m\":13,\"n\":14,\"o\":15,\"p\":16,\"q\":17,\"r\":18,\"s\":19,\"t\":20,\"u\":21,\"v\":22,\"w\":23,\"x\":24,\"y\":25,\"z\":26}"));
 

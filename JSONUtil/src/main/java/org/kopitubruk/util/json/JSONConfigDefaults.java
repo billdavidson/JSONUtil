@@ -160,7 +160,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         boolean useJNDI = Boolean.parseBoolean(System.getProperty(pkgName+".useJNDI", trueStr));
         boolean registerMBean = Boolean.parseBoolean(System.getProperty(pkgName+'.'+registerMBeanName, trueStr));
         logging = Boolean.parseBoolean(System.getProperty(pkgName+".logging", trueStr));
-        logging = false;
 
         if ( logging ){
             s_log = LogFactory.getLog(JSONConfigDefaults.class);
