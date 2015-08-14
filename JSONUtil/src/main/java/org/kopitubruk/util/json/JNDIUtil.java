@@ -40,20 +40,10 @@ class JNDIUtil
     static{
         String pkgName = JNDIUtil.class.getPackage().getName();
 
-        setLogging(Boolean.parseBoolean(System.getProperty(pkgName+".logging", Boolean.TRUE.toString())));
-    }
-
-    /**
-     * Set the logging flag.
-     *
-     * @param logging if true, then logging will be enabled.
-     */
-    static synchronized void setLogging( boolean logging )
-    {
-        if ( logging && s_log == null ){
+        logging = Boolean.parseBoolean(System.getProperty(pkgName+".logging", Boolean.TRUE.toString()));
+        if ( logging ){
             s_log = LogFactory.getLog(JNDIUtil.class);
         }
-        JNDIUtil.logging = logging;
     }
 
     /**
