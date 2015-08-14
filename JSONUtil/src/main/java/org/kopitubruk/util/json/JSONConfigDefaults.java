@@ -51,7 +51,7 @@ import org.apache.commons.logging.LogFactory;
  * in development and testing servers and turn it off in production servers
  * for faster performance, without changing any code.
  * <p>
- * Example for Tomcat, assuming your app is named "MyApp", in 
+ * Example for Tomcat, assuming your app is named "MyApp", in
  * <code>$CATALINA_BASE/conf/Catalina/<i>host</i>/MyApp.xml</code> in order to
  * disable property name validation:
  * <pre>{@code <Context path="/MyApp">
@@ -333,6 +333,28 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         if ( numericType != null ){
             addNumberFormat(numericType.getClass(), fmt);
         }
+    }
+
+    /**
+     * Get the number format for the given class.
+     *
+     * @param numericClass A class.
+     * @return A number format or null if one has not been set.
+     */
+    public static synchronized NumberFormat getNumberFormat( Class<? extends Number> numericClass )
+    {
+        return fmtMap != null ? fmtMap.get(numericClass) : null;
+    }
+
+    /**
+     * Get the number format for the class of th given numeric type.
+     *
+     * @param num An object that implements {@link Number}.
+     * @return A number format or null if one has not been set.
+     */
+    public static NumberFormat getNumberFormat( Number num )
+    {
+        return num != null ? getNumberFormat(num.getClass()) : null;
     }
 
     /**
