@@ -57,7 +57,7 @@ import java.util.regex.Pattern;
  * </p>
  * <p>
  *   This implementation validates property names by default using the
- *   specification from ECMAScript 5.1 and the ECMA JSON standard.  The validation
+ *   specification from ECMAScript and ECMA JSON standards.  The validation
  *   can be disabled for faster performance.  See {@link JSONConfig}.  Leaving it
  *   on during development and testing is probably advisable.
  * </p>
@@ -118,9 +118,9 @@ import java.util.regex.Pattern;
  *   <dt>Any other object</dt>
  *   <dd>
  *     Any other object just gets its toString() method called and it's surrounded
- *     by quotes with escapes used as needed according to the ECMA JSON standard.
- *     Usually this will just be for String objects, but anything that has a
- *     toString() that gives you what you want will work.
+ *     by quotes with escapes used as needed according to the ECMA JSON standard and
+ *     escape options from JSONConfig. Usually this will just be for String objects,
+ *     but anything that has a toString() that gives you what you want will work.
  *   </dd>
  *   <dt>null</dt>
  *   <dd>
@@ -533,10 +533,10 @@ public class JSONUtil
     /**
      * Append a simple property value to the given JSON buffer. This method is
      * used for numbers, strings and any other object that
-     * {@link #appendPropertyValue(Object, Writer, JSONConfig)} doesn't
-     * know about.  There is some risk of infinite recursion if the object
-     * has a toString() method that references objects above this in the
-     * data structure, so be careful about that.
+     * {@link #appendPropertyValue(Object, Writer, JSONConfig)} doesn't know
+     * about. There is some risk of infinite recursion if the object has a
+     * toString() method that references objects above this in the data
+     * structure, so be careful about that.
      *
      * @param propertyValue The value to append.
      * @param json Something to write the JSON data to.
@@ -547,16 +547,18 @@ public class JSONUtil
     {
         if ( propertyValue instanceof Number ){
             Number num = (Number)propertyValue;
-            NumberFormat fmt = jsonConfig.getNumberFormat(num.getClass());
-            String numericString = fmt == null ? num.toString() : fmt.format(num, new StringBuffer(), new FieldPosition(0)).toString();
+            NumberFormat fmt = jsonConfig.getNumberFormat(num);
+            String numericString = fmt == null ? num.toString()
+                                               : fmt.format(num, new StringBuffer(), new FieldPosition(0)).toString();
             if ( isValidJSONNumber(numericString) ){
                 json.write(numericString);
             }else{
                 // Something isn't a kosher number for JSON, which is more
-                // restrictive than Javascript for numbers.
+                // restrictive than ECMAScript for numbers.
                 writeString(numericString, json, jsonConfig);
             }
         }else{
+            // Use the toString() method for the value and write it out as a string.
             writeString(propertyValue.toString(), json, jsonConfig);
         }
     }
@@ -611,22 +613,26 @@ public class JSONUtil
                         }
                         break;
                     default:
+                        // check if it needs to be escaped.
                         boolean doEscape = (escapeNonAscii && codePoint > 127)
                                             || (escapeSurrogates && charCount > 1)
                                             || codePoint < 0x20                     // JSON standard.
                                             || ! Character.isDefined(codePoint)
                                             || FORCE_ESCAPE_PAT.matcher(strValue.substring(i, i+charCount)).find();
                         if ( doEscape ){
+                            // escape it.
                             if ( useECMA6 && (codePoint < 0x10 || codePoint > 0xFFFF) ){
                                 // only very low or very high code points see an advantage.
                                 json.write(String.format(CODE_POINT_FMT, codePoint));
                             }else{
+                                // normal escape.
                                 json.write(String.format(CODE_UNIT_FMT, (int)strValue.charAt(i)));
                                 if ( charCount > 1 ){
                                     json.write(String.format(CODE_UNIT_FMT, (int)strValue.charAt(i+1)));
                                 }
                             }
                         }else{
+                            // Pass it through -- usual case.
                             json.write(strValue.charAt(i));
                             if ( charCount > 1 ){
                                 json.write(strValue.charAt(i+1));
@@ -651,14 +657,10 @@ public class JSONUtil
      */
     private static String getPropertyName( Object key, JSONConfig jsonConfig, Set<String> propertyNames )
     {
-        if ( key == null ){
-            throw new BadPropertyNameException(null, jsonConfig);
-        }
-
-        String propertyName = key.toString();
+        String propertyName = key == null ? null : key.toString();
 
         if ( propertyName == null ){
-            throw new BadPropertyNameException(null, jsonConfig);
+            throw new BadPropertyNameException(propertyName, jsonConfig);
         }
 
         /*
@@ -719,19 +721,19 @@ public class JSONUtil
             }else if ( i > 0 && isValidIdentifierPart(codePoint, jsonConfig) ){
                 buf.appendCodePoint(codePoint);
             }else{
-                // bad code point for an identifier.
+                // Bad code point for an identifier.
                 Matcher matcher = unicodeEscapePat.matcher(propertyName.substring(i));
                 if ( matcher.find() && matcher.start() == 0 ){
-                    // skip unicode escape.
+                    // It's a Unicode escape.  Pass it through.
                     String esc = matcher.group(1);
                     buf.append(esc);
                     i += esc.length() - 1;
                 }else if ( useECMA6 && (codePoint < 0x10 || codePoint > 0xFFFF) ){
-                    // ECMAScript 6 code point escape.
+                    // Use ECMAScript 6 code point escape.
                     // only very low or very high code points see an advantage.
                     buf.append(String.format(CODE_POINT_FMT, codePoint));
                 }else{
-                    // normal escape.
+                    // Use normal escape.
                     buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i)));
                     if ( charCount > 1 ){
                         buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i+1)));
@@ -888,6 +890,7 @@ public class JSONUtil
                     }
                 }
                 if ( unEscape ){
+                    // have an escape that needs to be unescaped.
                     matcher = CODE_UNIT_PAT.matcher(esc);
                     if ( matcher.matches() ){
                         // some risk if escape does bad surrogate pairs.
@@ -928,7 +931,7 @@ public class JSONUtil
     /**
      * Return the resource bundle for this package.
      *
-     * @param locale A locale to use.  May be null.
+     * @param locale A locale to use.
      * @return The resource bundle.
      */
     static ResourceBundle getBundle( Locale locale )
@@ -1004,7 +1007,9 @@ public class JSONUtil
     {
         JSONConfig cfg = jsonConfig != null ? jsonConfig : new JSONConfig();
         Pattern validationPat = cfg.isUseECMA6() ? VALID_ECMA6_PROPERTY_NAME_PAT : VALID_ECMA5_PROPERTY_NAME_PAT;
-        if ( propertyName == null || (isReservedWord(propertyName) && !jsonConfig.isAllowReservedWordsInIdentifiers()) ||
+
+        if ( propertyName == null ||
+                (isReservedWord(propertyName) && !jsonConfig.isAllowReservedWordsInIdentifiers()) ||
                 ! validationPat.matcher(propertyName).matches() ){
             throw new BadPropertyNameException(propertyName, jsonConfig);
         }

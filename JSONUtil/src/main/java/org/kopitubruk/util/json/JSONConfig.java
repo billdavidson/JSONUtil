@@ -274,6 +274,17 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
+     * Get the number format for the class of th given numeric type.
+     *
+     * @param num An object that implements {@link Number}.
+     * @return A number format or null if one has not been set.
+     */
+    public NumberFormat getNumberFormat( Number num )
+    {
+        return num != null ? getNumberFormat(num.getClass()) : null;
+    }
+
+    /**
      * Remove the requested class from the number formats that
      * this config knows about.
      *
