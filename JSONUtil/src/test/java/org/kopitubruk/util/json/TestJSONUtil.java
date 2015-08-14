@@ -238,7 +238,7 @@ public class TestJSONUtil
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
 
-            if ( ! JSONUtil.isValidIdentifierStart(i, cfg) && ! JSONUtil.isValidIdentifierPart(i, cfg) && ! (i <= 0xFFFF && Character.isSurrogate((char)i)) ){
+            if ( ! JSONUtil.isValidIdentifierStart(i, cfg) && ! JSONUtil.isValidIdentifierPart(i, cfg) && ! (i <= 0xFFFF && JSONUtil.isSurrogate((char)i)) ){
                 // high surrogates break the test unless they are followed immediately by low surrogates.
                 // just skip them.  anyone who sends bad surrogate pairs deserves what they get.
                 codePoints[j++] = i;
