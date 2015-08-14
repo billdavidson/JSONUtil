@@ -161,14 +161,33 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         boolean registerMBean = Boolean.parseBoolean(System.getProperty(pkgName+'.'+registerMBeanName, trueStr));
         logging = Boolean.parseBoolean(System.getProperty(pkgName+".logging", trueStr));
 
-        if ( logging ){
+        ResourceBundle bundle = null;
+        if ( logging && (useJNDI || registerMBean) ){
             s_log = LogFactory.getLog(JSONConfigDefaults.class);
+            // this will be the default locale for the JVM.
+            bundle = JSONUtil.getBundle(getLocale());
         }
 
         if ( useJNDI ){
             // Look for defaults in JNDI.
             try{
                 Context ctx = JNDIUtil.getEnvContext(pkgName.replaceAll("\\.", "/"));
+
+                String localeString = JNDIUtil.getString(ctx, "locale", null);
+                if ( localeString != null ){
+                    String[] loc = localeString.split("[-_]");
+                    switch ( loc.length ){
+                        case 1: locale = new Locale(loc[0]); break;
+                        case 2: locale = new Locale(loc[0], loc[1]); break;
+                        default: locale = new Locale(loc[0], loc[1], loc[2]); break;
+                    }
+                    //locale = Locale.forLanguageTag(localeString); // Java 7
+                    if ( logging ){
+                        // possibly changed the locale.  redo the bundle.
+                        bundle = JSONUtil.getBundle(getLocale());
+                    }
+                }
+
                 registerMBean = JNDIUtil.getBoolean(ctx, registerMBeanName, registerMBean);
 
                 validatePropertyNames = JNDIUtil.getBoolean(ctx, "validatePropertyNames", validatePropertyNames);
@@ -183,42 +202,23 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 quoteIdentifier = JNDIUtil.getBoolean(ctx, "quoteIdentifier", quoteIdentifier);
                 useECMA6 = JNDIUtil.getBoolean(ctx, "useECMA6CodePoints", useECMA6);
                 allowReservedWordsInIdentifiers = JNDIUtil.getBoolean(ctx, "allowReservedWordsInIdentifiers", allowReservedWordsInIdentifiers);
-
-                String localeString = JNDIUtil.getString(ctx, "locale", null);
-                if ( localeString != null ){
-                    String[] loc = localeString.split("[-_]");
-                    switch ( loc.length ){
-                        case 1: locale = new Locale(loc[0]); break;
-                        case 2: locale = new Locale(loc[0], loc[1]); break;
-                        default: locale = new Locale(loc[0], loc[1], loc[2]); break;
-                    }
-                    //locale = Locale.forLanguageTag(localeString); // Java 7
-                }
             }catch ( Exception e ){
                 // Nothing set in JNDI.  Use code defaults.  Not a problem.
-                ResourceBundle bundle = JSONUtil.getBundle(getLocale());
-                if ( logging ){
-                    s_log.debug(bundle.getString("badJNDIforConfig"), e);
-                }
+                debug(bundle.getString("badJNDIforConfig"), e);
             }
         }
 
         if ( registerMBean ){
             // Register an instance with MBean server if one is available.
-            ResourceBundle bundle = JSONUtil.getBundle(getLocale());
             try{
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
 
                 mBeanName = JNDIUtil.getObjectName(jsonConfigDefaults);
                 mBeanServer.registerMBean(jsonConfigDefaults, mBeanName);
-                if ( logging ){
-                    s_log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));
-                }
+                debug(String.format(bundle.getString("registeredMbean"), mBeanName));
             }catch ( Exception e ){
                 // No MBean server.  Not a problem.
-                if ( logging ){
-                    s_log.debug(bundle.getString("couldntRegisterMBean"), e);
-                }
+                debug(bundle.getString("couldntRegisterMBean"), e);
             }
         }
     }
@@ -232,9 +232,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Return the JSONConfigDefaults instance.
+     * Return the JSONConfigDefaults singleton instance.
      *
-     * @return the JSONConfigDefaults instance.
+     * @return the JSONConfigDefaults singleton instance.
      */
     public static JSONConfigDefaults getInstance()
     {
@@ -268,20 +268,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public static synchronized void clearMBean()
     {
         if ( mBeanName != null ){
-            ResourceBundle bundle = null;
-            if ( logging ){
-                bundle = JSONUtil.getBundle(getLocale());
-            }
+            ResourceBundle bundle = JSONUtil.getBundle(getLocale());
             try{
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
                 mBeanServer.unregisterMBean(mBeanName);
-                if ( logging ){
-                    s_log.debug(String.format(bundle.getString("unregistered"), mBeanName));
-                }
+                debug(String.format(bundle.getString("unregistered"), mBeanName));
             }catch ( Exception e ){
-                if ( logging ){
-                    s_log.error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
-                }
+                error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
             }finally{
                 // don't try again.
                 mBeanName = null;
@@ -672,6 +665,47 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public void setAllowReservedWordsInIdentifiers( boolean dflt )
     {
         allowReservedWordsInIdentifiers = dflt;
+    }
+
+    /**
+     * Shorthand wrapper around the debug logging to make other code less
+     * awkward.
+     *
+     * @param message the message.
+     * @param t the throwable.
+     */
+    private static void debug( String message, Throwable t )
+    {
+        if ( logging ){
+            s_log.debug(message, t);
+        }
+    }
+
+    /**
+     * Shorthand wrapper around the debug logging to make other code less
+     * awkward.
+     *
+     * @param message the message.
+     */
+    private static void debug( String message )
+    {
+        if ( logging ){
+            s_log.debug(message);
+        }
+    }
+
+    /**
+     * Shorthand wrapper around the error logging to make other code less
+     * awkward.
+     *
+     * @param message the message.
+     * @param t the throwable.
+     */
+    private static void error( String message, Throwable t )
+    {
+        if ( logging ){
+            s_log.error(message, t);
+        }
     }
 
     @SuppressWarnings("javadoc")
