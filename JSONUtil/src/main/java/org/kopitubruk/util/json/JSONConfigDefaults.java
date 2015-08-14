@@ -205,7 +205,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
                 mBeanName = JNDIUtil.getObjectName(jsonConfigDefaults);
                 mBeanServer.registerMBean(jsonConfigDefaults, mBeanName);
-                s_log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));
+                if ( logging ){
+                    s_log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));
+                }
             }catch ( Exception e ){
                 // No MBean server.  Not a problem.
                 if ( logging ){
