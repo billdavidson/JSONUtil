@@ -788,9 +788,15 @@ public class JSONUtil
         return false;
     }
 
+    /**
+     * Replacement since this method wasn't in the JRE until JDK 7.
+     *
+     * @param ch the char to test.
+     * @return true if ch is a surrogate.
+     */
     static boolean isSurrogate( char ch )
     {
-        return ch >= Character.MIN_SURROGATE && ch < (Character.MAX_SURROGATE + 1);
+        return ch >= Character.MIN_SURROGATE && ch < (1 + Character.MAX_SURROGATE);
     }
 
     /**
