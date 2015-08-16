@@ -33,17 +33,20 @@ import org.apache.commons.logging.LogFactory;
  */
 class JNDIUtil
 {
-    private static volatile Log s_log;
+    private static final Log s_log;
 
-    private static volatile boolean logging;
+    private static final boolean logging;
+
+    static String ENV_CONTEXT = "java:/comp/env";
+
+    private static final String TOMCAT_URL_PREFIXES = "org.apache.naming";
+    private static final String TOMCAT_CONTEXT_FACTORY = ".java.javaURLContextFactory";
 
     static{
         String pkgName = JNDIUtil.class.getPackage().getName();
 
         logging = Boolean.parseBoolean(System.getProperty(pkgName+".logging", Boolean.TRUE.toString()));
-        if ( logging ){
-            s_log = LogFactory.getLog(JNDIUtil.class);
-        }
+        s_log = logging ? LogFactory.getLog(JNDIUtil.class) : null;
     }
 
     /**
@@ -54,11 +57,11 @@ class JNDIUtil
      */
     static Context getEnvContext() throws NamingException
     {
-        return (Context)new InitialContext().lookup("java:/comp/env");
+        return (Context)new InitialContext().lookup(ENV_CONTEXT);
     }
 
     /**
-     * Shorthand to look up a context inside java:/comp/env.
+     * Shorthand to look up a context relative to java:/comp/env.
      *
      * @param path The path string for the JNDI context you want. Note that this
      *        is looked up relative to java:/comp/env so that you should not
@@ -139,28 +142,29 @@ class JNDIUtil
 
     /**
      * Create the given context. This is primarily meant for use by JUnit tests
-     * which don't have a JNDI context available. If you use this, you will need
-     * Tomcat's catalina.jar in your runtime class path because it uses Tomcat's
-     * javaURLContextFactory.
+     * which don't have a JNDI context available.
      *
      * @param contextName The full name: "java:/comp/env/..."
+     * @param factory the context factory.
+     * @param prefixes The prefixes for your factory.
      * @return The final subcontext.
      * @throws NamingException If there's a problem.
      */
-    static Context createContext( String contextName ) throws NamingException
+    static Context createContext( String contextName, String factory, String prefixes ) throws NamingException
     {
         InitialContext ctx = null;
         Context result = null;
+        String[] parts = contextName.split("/");
 
         try{
             ctx = new InitialContext();
-            ctx.lookup("java:");
+            ctx.lookup(parts[0]);
         }catch ( NamingException e ){
             /*
-             * No initial context.  Create one.  Uses Tomcat's context factory.
+             * No initial context.  Create one with the given factory/prefixes.
              */
-            System.setProperty(Context.INITIAL_CONTEXT_FACTORY, "org.apache.naming.java.javaURLContextFactory");
-            System.setProperty(Context.URL_PKG_PREFIXES, "org.apache.naming");
+            System.setProperty(Context.INITIAL_CONTEXT_FACTORY, factory);
+            System.setProperty(Context.URL_PKG_PREFIXES, prefixes);
             ctx = new InitialContext();
         }
 
@@ -169,7 +173,7 @@ class JNDIUtil
          */
         StringBuilder ctxNameBuf = new StringBuilder(contextName.length());
         boolean didStart = false;
-        for ( String part : contextName.split("/") ){
+        for ( String part : parts ){
             if ( didStart ){
                 ctxNameBuf.append('/');
             }else{
@@ -184,6 +188,21 @@ class JNDIUtil
             }
         }
 
-        return result != null ? result : (Context)ctx.lookup(contextName);
+        return result != null && result.toString().equals(contextName) ? result : (Context)ctx.lookup(contextName);
+    }
+
+    /**
+     * Create the given context. This is primarily meant for use by JUnit tests
+     * which don't have a JNDI context available. If you use this, you will need
+     * Tomcat's catalina.jar in your runtime class path because it uses Tomcat's
+     * javaURLContextFactory.
+     *
+     * @param contextName The full name: "java:/comp/env/..."
+     * @return The final subcontext.
+     * @throws NamingException If there's a problem.
+     */
+    static Context createContext( String contextName ) throws NamingException
+    {
+        return createContext(contextName, TOMCAT_URL_PREFIXES + TOMCAT_CONTEXT_FACTORY, TOMCAT_URL_PREFIXES);
     }
 }

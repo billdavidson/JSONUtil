@@ -13,3 +13,5 @@
 # Maven working build files.
 /JSONUtil/target/
 
+# gh-pages
+_site
