@@ -71,7 +71,7 @@ public class TestJSONUtil
             String pkgName = JSONUtil.class.getPackage().getName().replaceAll("\\.", "/");
 
             //Context ctx =
-            JNDIUtil.createContext("java:/comp/env/"+pkgName);
+            JNDIUtil.createContext(JNDIUtil.ENV_CONTEXT+"/"+pkgName);
 
             // not needed -- just used to test that the context was usable.
             //ctx.bind("registerMBean", Boolean.FALSE);
