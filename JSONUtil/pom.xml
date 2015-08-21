@@ -24,9 +24,8 @@
 
   <groupId>org.kopitubruk.util</groupId>
   <artifactId>JSONUtil</artifactId>
-  <version>0.2-java5</version>
+  <version>1.0-java5</version>
   <packaging>jar</packaging>
-
   <name>JSONUtil</name>
   <url>http://maven.apache.org</url>
 
