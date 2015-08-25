@@ -15,3 +15,8 @@
 
 # gh-pages
 _site
+
+# nexus-staging-maven-plugin files.
+pom.xml.releaseBackup
+release.properties
+
