@@ -18,3 +18,5 @@ It has JUnit tests for most of the functionality.
 There is a run time dependency on Apache Commons Logging.
 
 Binaries are available [here](http://kopitubruk.org/JSONUtil/#downloads)
+
+Javadoc is available online [here](http://kopitubruk.org/JSONUtil/javadoc)
