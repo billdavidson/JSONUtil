@@ -35,6 +35,14 @@
       <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
     </license>
   </licenses>
+  <developers>
+    <developer>
+      <name>Bill Davidson</name>
+      <email>bill.davidson@gmail.com</email>
+      <organization>Kopitubruk</organization>
+      <organizationUrl>http://kopitubruk.org</organizationUrl>
+    </developer>
+  </developers>
   <scm>
     <connection>scm:git:git@github.com:billdavidson/JSONUtil.git</connection>
     <developerConnection>scm:git:git@github.com:billdavidson/JSONUtil.git</developerConnection>
@@ -111,14 +119,6 @@
       <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
     </repository>
   </distributionManagement>
-
-  <build>
-  
-    <plugins>
-
-
-    </plugins>
-  </build>
 
   <profiles>
     <profile>
