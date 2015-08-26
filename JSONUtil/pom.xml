@@ -36,6 +36,14 @@
       <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
     </license>
   </licenses>
+  <developers>
+    <developer>
+      <name>Bill Davidson</name>
+      <email>bill.davidson@gmail.com</email>
+      <organization>Kopitubruk</organization>
+      <organizationUrl>http://kopitubruk.org</organizationUrl>
+    </developer>
+  </developers>
   <scm>
     <connection>scm:git:git@github.com:billdavidson/JSONUtil.git</connection>
     <developerConnection>scm:git:git@github.com:billdavidson/JSONUtil.git</developerConnection>
@@ -107,30 +115,24 @@
     </repository>
   </distributionManagement>
 
-  <build>
-  
-    <plugins>
-      <plugin>
-        <groupId>org.sonatype.plugins</groupId>
-        <artifactId>nexus-staging-maven-plugin</artifactId>
-        <version>1.6.3</version>
-        <extensions>true</extensions>
-        <configuration>
-          <serverId>ossrh</serverId>
-          <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-          <autoReleaseAfterClose>true</autoReleaseAfterClose>
-        </configuration>
-      </plugin>
-
-    </plugins>
-  </build>
-
   <profiles>
     <profile>
       <id>release</id>
       <build>
 
         <plugins>
+
+          <plugin>
+            <groupId>org.sonatype.plugins</groupId>
+            <artifactId>nexus-staging-maven-plugin</artifactId>
+            <version>1.6.3</version>
+            <extensions>true</extensions>
+            <configuration>
+              <serverId>ossrh</serverId>
+              <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+              <autoReleaseAfterClose>true</autoReleaseAfterClose>
+            </configuration>
+          </plugin>
 
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
