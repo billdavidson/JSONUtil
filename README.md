@@ -15,8 +15,10 @@ Files are included for the Maven project and an Eclipse project.
 
 It has JUnit tests for most of the functionality.
 
-There is a run time dependency on Apache Commons Logging.
+There is a run time dependency on Apache Commons Logging facade.
 
-Binaries are available [here](http://kopitubruk.org/JSONUtil/#downloads)
+Binaries are available [here](https://github.com/billdavidson/JSONUtil/releases)
 
 Javadoc is available online [here](http://kopitubruk.org/JSONUtil/javadoc)
+
+From Maven Central Repository [here](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.kopitubruk.util%22%20AND%20a%3A%22JSONUtil%22)
