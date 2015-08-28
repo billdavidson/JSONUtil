@@ -15,7 +15,9 @@ Files are included for the Maven project and an Eclipse project.
 
 It has JUnit tests for most of the functionality.
 
-There is a run time dependency on Apache Commons Logging facade.
+There is a run time dependency on
+[Apache Commons Logging](http://commons.apache.org/proper/commons-logging/)
+facade.
 
 [Binaries](https://github.com/billdavidson/JSONUtil/releases)
 
