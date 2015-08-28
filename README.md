@@ -21,7 +21,7 @@ There is a run time dependency on Apache Commons Logging facade.
 
 [Javadoc online](http://kopitubruk.org/JSONUtil/javadoc)
 
-[At the Maven Central Repository](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.kopitubruk.util%22%20AND%20a%3A%22JSONUtil%22)
+[JSONUtil at the Maven Central Repository](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.kopitubruk.util%22%20AND%20a%3A%22JSONUtil%22)
 
 [Comments (Disqus)](http://kopitubruk.org/JSONUtil/)
 
