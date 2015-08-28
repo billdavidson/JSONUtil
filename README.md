@@ -1,7 +1,7 @@
 
 This is a JSON generation library for Java.  It is oriented towards being
 used in web servers and includes several options for validation and
-controling the way that the JSON is generated.  Defaults for those options
+controlling the way that the JSON is generated.  Defaults for those options
 can be set using JNDI or JMX/MBean access which is normally available with
 JEE web tier containers.  If you don't have those, a debug log message
 may be generated, but it is harmless.  Those log messages can be supressed
