@@ -1,7 +1,7 @@
 
 This is a JSON generation library for Java.  It is oriented towards being
 used in web servers and includes several options for validation and
-controling the way that the JSON is generated.  Defaults for those options
+controlling the way that the JSON is generated.  Defaults for those options
 can be set using JNDI or JMX/MBean access which is normally available with
 JEE web tier containers.  If you don't have those, a debug log message
 may be generated, but it is harmless.  Those log messages can be supressed
@@ -15,8 +15,16 @@ Files are included for the Maven project and an Eclipse project.
 
 It has JUnit tests for most of the functionality.
 
-There is a run time dependency on Apache Commons Logging.
+There is a run time dependency on
+[Apache Commons Logging](http://commons.apache.org/proper/commons-logging/)
+facade.
 
-Binaries are available [here](http://kopitubruk.org/JSONUtil/#downloads)
+[Binaries](https://github.com/billdavidson/JSONUtil/releases)
 
-Javadoc is available online [here](http://kopitubruk.org/JSONUtil/javadoc)
+[Javadoc online](http://kopitubruk.org/JSONUtil/javadoc)
+
+[JSONUtil at the Maven Central Repository](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.kopitubruk.util%22%20AND%20a%3A%22JSONUtil%22)
+
+[Comments (Disqus)](http://kopitubruk.org/JSONUtil/)
+
+[Report Issues](https://github.com/billdavidson/JSONUtil/issues)
