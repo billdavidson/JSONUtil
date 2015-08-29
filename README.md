@@ -27,4 +27,4 @@ facade.
 
 [Comments (Disqus)](http://kopitubruk.org/JSONUtil/)
 
-[Issues](https://github.com/billdavidson/JSONUtil/issues)
+[Report Issues](https://github.com/billdavidson/JSONUtil/issues)
