@@ -25,6 +25,6 @@ facade.
 
 [JSONUtil at the Maven Central Repository](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.kopitubruk.util%22%20AND%20a%3A%22JSONUtil%22)
 
-[Comments (Disqus)](http://kopitubruk.org/JSONUtil/)
+[Comments (Disqus)](http://kopitubruk.org/JSONUtil/#comments)
 
 [Report Issues](https://github.com/billdavidson/JSONUtil/issues)
