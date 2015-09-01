@@ -147,7 +147,7 @@ public class JSONUtil
      * hexadecimal, NaN or Infinity in JSON.  It also doesn't allow for a "+"
      * sign to start a number.
      */
-    private static final Pattern JAVASCRIPT_NUMBER_PAT = Pattern.compile("^-?((\\d+(\\.\\d+)?)|(\\.\\d+))([eE][-+]?\\d+)?$");
+    private static final Pattern JSON_NUMBER_PAT = Pattern.compile("^-?((\\d+(\\.\\d+)?)|(\\.\\d+))([eE][-+]?\\d+)?$");
 
     /**
      * Check for octal numbers, which aren't allowed in JSON.
@@ -718,21 +718,29 @@ public class JSONUtil
                 buf.appendCodePoint(codePoint);
             }else{
                 // Bad code point for an identifier.
-                Matcher matcher = unicodeEscapePat.matcher(propertyName.substring(i));
-                if ( matcher.find() && matcher.start() == 0 ){
-                    // It's a Unicode escape.  Pass it through.
-                    String esc = matcher.group(1);
-                    buf.append(esc);
-                    i += esc.length() - 1;
-                }else if ( useECMA6 && (codePoint < 0x10 || codePoint > 0xFFFF) ){
-                    // Use ECMAScript 6 code point escape.
-                    // only very low or very high code points see an advantage.
-                    buf.append(String.format(CODE_POINT_FMT, codePoint));
-                }else{
-                    // Use normal escape.
-                    buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i)));
-                    if ( charCount > 1 ){
-                        buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i+1)));
+                boolean doEscape = true;
+                if ( codePoint == '\\' ){
+                    // check for a Unicode escape.
+                    Matcher matcher = unicodeEscapePat.matcher(propertyName.substring(i));
+                    if ( matcher.find() && matcher.start() == 0 ){
+                        // It's a Unicode escape.  Pass it through.
+                        String esc = matcher.group(1);
+                        buf.append(esc);
+                        i += esc.length() - 1;
+                        doEscape = false;
+                    }
+                }
+                if ( doEscape ){
+                    if ( useECMA6 && (codePoint < 0x10 || codePoint > 0xFFFF) ){
+                        // Use ECMAScript 6 code point escape.
+                        // only very low or very high code points see an advantage.
+                        buf.append(String.format(CODE_POINT_FMT, codePoint));
+                    }else{
+                        // Use normal escape.
+                        buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i)));
+                        if ( charCount > 1 ){
+                            buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i+1)));
+                        }
                     }
                 }
             }
@@ -750,7 +758,7 @@ public class JSONUtil
      */
     private static boolean isValidJSONNumber( String numericString )
     {
-        return JAVASCRIPT_NUMBER_PAT.matcher(numericString).matches() && ! OCTAL_NUMBER_PAT.matcher(numericString).matches();
+        return JSON_NUMBER_PAT.matcher(numericString).matches() && ! OCTAL_NUMBER_PAT.matcher(numericString).matches();
     }
 
     /**
