@@ -301,6 +301,19 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
+     * Remove the requested class from the number formats that
+     * this config knows about.
+     *
+     * @param num An object that implements {@link Number}.
+     */
+    public void removeNumberFormat( Number num )
+    {
+        if ( num != null ){
+            removeNumberFormat(num.getClass());
+        }
+    }
+
+    /**
      * Clear all number formats.
      */
     public synchronized void clearNumberFormats()
