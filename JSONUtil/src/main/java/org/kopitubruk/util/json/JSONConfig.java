@@ -178,7 +178,7 @@ public class JSONConfig implements Serializable, Cloneable
         JSONConfig result = new JSONConfig();
 
         result.locale = locale;
-        result.objStack = objStack == null ? null : new ArrayList<Object>(objStack);
+        result.objStack = objStack == null ? null : new ArrayList<>(objStack);
         result.fmtMap = fmtMap == null ? null : new HashMap<>(fmtMap);
 
         result.validatePropertyNames = validatePropertyNames;
@@ -297,6 +297,19 @@ public class JSONConfig implements Serializable, Cloneable
             if ( fmtMap.size() < 1 ){
                 fmtMap = null;
             }
+        }
+    }
+
+    /**
+     * Remove the requested class from the number formats that
+     * this config knows about.
+     *
+     * @param num An object that implements {@link Number}.
+     */
+    public void removeNumberFormat( Number num )
+    {
+        if ( num != null ){
+            removeNumberFormat(num.getClass());
         }
     }
 
