@@ -229,9 +229,7 @@ public class JSONUtil
      *   <li>_ - Underscore</li>
      *   <li>$ - Dollar sign</li>
      *   <li>\p{L} - Any Letter</li>
-     *   <li>\p{Nl} - Any Letter number (ECMAScript 6)</li>
      *   <li>\\u\p{XDigit}{4} - Unicode code unit escape.</li>
-     *   <li>\\u\{\p{XDigit}+\} - Unicode code point escape. (ECMAScript 6)</li>
      * </ul>
      * <p>
      *   Permitted subsequent characters.
@@ -240,7 +238,6 @@ public class JSONUtil
      *   <li>_ - Underscore</li>
      *   <li>$ - Dollar sign</li>
      *   <li>\p{L} - Any Letter</li>
-     *   <li>\p{Nl} - Any Letter number (ECMAScript 6)</li>
      *   <li>\p{Nd} - Any decimal digit</li>
      *   <li>\p{Mn} - Non-Spacing Mark</li>
      *   <li>\p{Mc} - Spacing Combining Mark</li>
@@ -248,14 +245,21 @@ public class JSONUtil
      *   <li>&#92;u200C - Zero Width Non-Joiner</li>
      *   <li>&#92;u200D - Zero Width Joiner</li>
      *   <li>\\u\p{XDigit}{4} - Unicode code unit escape.</li>
-     *   <li>\\u\{\p{XDigit}+\} - Unicode code point escape. (ECMAScript 6)</li>
      * </ul>
      */
     private static final Pattern VALID_ECMA5_PROPERTY_NAME_PAT =
             Pattern.compile("^([_\\$\\p{L}]|\\\\u\\p{XDigit}{4})([_\\$\\p{L}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4})*$");
 
     /**
-     * ECMAScript 6 version of VALID_ECMA5_PROPERTY_NAME_PAT
+     * ECMAScript 6 version of VALID_ECMA5_PROPERTY_NAME_PAT.
+     * <p>
+     *   Permitted starting and subsequent characters not allowed in
+     *   ECMAScript 5 identifiers.
+     * </p>
+     * <ul>
+     *   <li>\p{Nl} - Any Letter Number</li>
+     *   <li>\\u\{\p{XDigit}+\} - Unicode code point escape.</li>
+     * </ul>
      */
     private static final Pattern VALID_ECMA6_PROPERTY_NAME_PAT =
             Pattern.compile("^([_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})([_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*$");
@@ -298,14 +302,14 @@ public class JSONUtil
      * Convert an object to JSON and return it as a {@link String}.
      *
      * @param obj An object to be converted to JSON.
-     * @param jsonConfig A configuration object to use.
+     * @param cfg A configuration object to use.
      * @return A JSON string representation of the object.
      */
-    public static String toJSON( Object obj, JSONConfig jsonConfig )
+    public static String toJSON( Object obj, JSONConfig cfg )
     {
         Writer json = new StringWriter();
         try{
-            toJSON(obj, jsonConfig, json);
+            toJSON(obj, cfg, json);
         }catch ( IOException e ){
             // won't happen because StringWriter is really just a wrapper around a StringBuffer.
         }
@@ -336,18 +340,18 @@ public class JSONUtil
      * sent to the caller.
      *
      * @param obj An object to be converted to JSON.
-     * @param jsonConfig A configuration object to use to set various options.  If null then defaults will be used.
+     * @param cfg A configuration object to use to set various options.  If null then defaults will be used.
      * @param json Something to write the JSON data to.
      * @throws IOException If there is an error on output.
      */
-    public static void toJSON( Object obj, JSONConfig jsonConfig, Writer json ) throws IOException
+    public static void toJSON( Object obj, JSONConfig cfg, Writer json ) throws IOException
     {
-        JSONConfig cfg = jsonConfig == null ? new JSONConfig() : jsonConfig;
+        JSONConfig jcfg = cfg == null ? new JSONConfig() : cfg;
         try{
-            appendPropertyValue(obj, json, cfg);
+            appendPropertyValue(obj, json, jcfg);
         }catch ( Exception e ){
             // in case the original calling code catches the exception and reuses the JSONConfig.
-            cfg.clearObjStack();
+            jcfg.clearObjStack();
             throw e;
         }
     }
@@ -367,17 +371,17 @@ public class JSONUtil
      *
      * @param propertyValue The value to append.
      * @param json Something to write the JSON data to.
-     * @param jsonConfig A configuration object.
+     * @param cfg A configuration object.
      * @throws IOException If there is an error on output.
      */
-    private static void appendPropertyValue( Object propertyValue, Writer json, JSONConfig jsonConfig ) throws IOException
+    private static void appendPropertyValue( Object propertyValue, Writer json, JSONConfig cfg ) throws IOException
     {
         if ( propertyValue == null ){
             json.write(NULL);
         }else if ( isRecursible(propertyValue) ){
-            appendRecursiblePropertyValue(propertyValue, json, jsonConfig);
+            appendRecursiblePropertyValue(propertyValue, json, cfg);
         }else{
-            appendSimplePropertyValue(propertyValue, json, jsonConfig);
+            appendSimplePropertyValue(propertyValue, json, cfg);
         }
     }
 
@@ -403,21 +407,21 @@ public class JSONUtil
      *
      * @param propertyValue The value to append.
      * @param json Something to write the JSON data to.
-     * @param jsonConfig A configuration object to use.
+     * @param cfg A configuration object to use.
      * @throws IOException If there is an error on output.
      */
-    private static void appendRecursiblePropertyValue( Object propertyValue, Writer json, JSONConfig jsonConfig ) throws IOException
+    private static void appendRecursiblePropertyValue( Object propertyValue, Writer json, JSONConfig cfg ) throws IOException
     {
         // check for loops.
         int stackIndex = 0;
         List<Object> objStack = null;
-        boolean detectDataStructureLoops = jsonConfig.isDetectDataStructureLoops();
+        boolean detectDataStructureLoops = cfg.isDetectDataStructureLoops();
         if ( detectDataStructureLoops ){
-            objStack = jsonConfig.getObjStack();
+            objStack = cfg.getObjStack();
             for ( Object o : objStack ){
                 // reference comparison.
                 if ( o == propertyValue ){
-                    throw new DataStructureLoopException(propertyValue, jsonConfig);
+                    throw new DataStructureLoopException(propertyValue, cfg);
                 }
             }
             stackIndex = objStack.size();
@@ -426,7 +430,7 @@ public class JSONUtil
 
         if ( propertyValue instanceof JSONAble ){
             JSONAble jsonAble = (JSONAble)propertyValue;
-            jsonAble.toJSON(jsonConfig, json);
+            jsonAble.toJSON(cfg, json);
         }else{
             boolean isMap = propertyValue instanceof Map;
 
@@ -446,10 +450,10 @@ public class JSONUtil
 
                 // make a Javascript object with the keys as the property names.
 
-                boolean quoteIdentifier = jsonConfig.isQuoteIdentifier();
+                boolean quoteIdentifier = cfg.isQuoteIdentifier();
 
                 Set<String> propertyNames = null;
-                if ( jsonConfig.isValidatePropertyNames() ){
+                if ( cfg.isValidatePropertyNames() ){
                     propertyNames = new HashSet<>(keys.size());
                 }
 
@@ -461,7 +465,7 @@ public class JSONUtil
                     }else{
                         didStart = true;
                     }
-                    String propertyName = getPropertyName(key, jsonConfig, propertyNames);
+                    String propertyName = getPropertyName(key, cfg, propertyNames);
                     boolean doQuote = quoteIdentifier || isReservedWord(propertyName) || hasSurrogates(propertyName);
                     if ( doQuote ){
                         json.write('"');
@@ -472,7 +476,7 @@ public class JSONUtil
                     }
                     json.write(':');
                     Object value = isMap ? map.get(key) : bundle.getObject((String)key);
-                    appendPropertyValue(value, json, jsonConfig);
+                    appendPropertyValue(value, json, cfg);
                 }
                 json.write('}');
             }else{
@@ -487,7 +491,7 @@ public class JSONUtil
                         }else{
                             didStart = true;
                         }
-                        appendPropertyValue(value, json, jsonConfig);
+                        appendPropertyValue(value, json, cfg);
                     }
                 }else if ( propertyValue instanceof Enumeration ){
                     Enumeration<?> enumeration = (Enumeration<?>)propertyValue;
@@ -497,7 +501,7 @@ public class JSONUtil
                         }else{
                             didStart = true;
                         }
-                        appendPropertyValue(enumeration.nextElement(), json, jsonConfig);
+                        appendPropertyValue(enumeration.nextElement(), json, cfg);
                     }
                 }else{
                     // propertyValue.getClass().isArray() == true
@@ -507,7 +511,7 @@ public class JSONUtil
                         if ( i > 0 ){
                             json.write(',');
                         }
-                        appendPropertyValue(Array.get(array, i), json, jsonConfig);
+                        appendPropertyValue(Array.get(array, i), json, cfg);
                     }
                 }
                 json.write(']');
@@ -521,7 +525,7 @@ public class JSONUtil
                 objStack.remove(stackIndex);
             }else{
                 // this should never happen.
-                throw new LoopDetectionFailureException(stackIndex, jsonConfig);
+                throw new LoopDetectionFailureException(stackIndex, cfg);
             }
         }
     }
@@ -536,14 +540,14 @@ public class JSONUtil
      *
      * @param propertyValue The value to append.
      * @param json Something to write the JSON data to.
-     * @param jsonConfig A configuration object to use.
+     * @param cfg A configuration object to use.
      * @throws IOException If there is an error on output.
      */
-    private static void appendSimplePropertyValue( Object propertyValue, Writer json, JSONConfig jsonConfig ) throws IOException
+    private static void appendSimplePropertyValue( Object propertyValue, Writer json, JSONConfig cfg ) throws IOException
     {
         if ( propertyValue instanceof Number ){
             Number num = (Number)propertyValue;
-            NumberFormat fmt = jsonConfig.getNumberFormat(num);
+            NumberFormat fmt = cfg.getNumberFormat(num);
             String numericString = fmt == null ? num.toString()
                                                : fmt.format(num, new StringBuffer(), new FieldPosition(0)).toString();
             if ( isValidJSONNumber(numericString) ){
@@ -551,11 +555,11 @@ public class JSONUtil
             }else{
                 // Something isn't a kosher number for JSON, which is more
                 // restrictive than ECMAScript for numbers.
-                writeString(numericString, json, jsonConfig);
+                writeString(numericString, json, cfg);
             }
         }else{
             // Use the toString() method for the value and write it out as a string.
-            writeString(propertyValue.toString(), json, jsonConfig);
+            writeString(propertyValue.toString(), json, cfg);
         }
     }
 
@@ -564,21 +568,21 @@ public class JSONUtil
      *
      * @param strValue The value to write.
      * @param json Something to write the JSON data to.
-     * @param jsonConfig A configuration object to use.
+     * @param cfg A configuration object to use.
      * @throws IOException If there is an error on output.
      */
-    private static void writeString( String strValue, Writer json, JSONConfig jsonConfig ) throws IOException
+    private static void writeString( String strValue, Writer json, JSONConfig cfg ) throws IOException
     {
-        if ( jsonConfig.isEncodeNumericStringsAsNumbers() && isValidJSONNumber(strValue) ){
+        if ( cfg.isEncodeNumericStringsAsNumbers() && isValidJSONNumber(strValue) ){
             // no quotes.
             json.write(strValue);
         }else{
             // need to do escapes as required by ECMA JSON spec.
             json.write('"');
-            boolean escapeNonAscii = jsonConfig.isEscapeNonAscii();
-            boolean escapeSurrogates = jsonConfig.isEscapeSurrogates();
-            boolean useECMA6 = jsonConfig.isUseECMA6();
-            if ( jsonConfig.isUnEscapeWherePossible() ){
+            boolean escapeNonAscii = cfg.isEscapeNonAscii();
+            boolean escapeSurrogates = cfg.isEscapeSurrogates();
+            boolean useECMA6 = cfg.isUseECMA6();
+            if ( cfg.isUnEscapeWherePossible() ){
                 strValue = unEscape(strValue);
             }
             int i = 0;
@@ -647,16 +651,16 @@ public class JSONUtil
      * and validate the property name.
      *
      * @param key The map/bundle key to become the property name.
-     * @param jsonConfig The config object with the flags.
+     * @param cfg The config object with the flags.
      * @param propertyNames The set of property names.  Used to detect duplicate property names.
      * @return the escaped validated property name.
      */
-    private static String getPropertyName( Object key, JSONConfig jsonConfig, Set<String> propertyNames )
+    private static String getPropertyName( Object key, JSONConfig cfg, Set<String> propertyNames )
     {
         String propertyName = key == null ? null : key.toString();
 
         if ( propertyName == null || propertyName.length() == 0 ){
-            throw new BadPropertyNameException(propertyName, jsonConfig);
+            throw new BadPropertyNameException(propertyName, cfg);
         }
 
         /*
@@ -667,27 +671,27 @@ public class JSONUtil
 
         // handle escaping options.
         try{
-            if ( jsonConfig.isEscapeNonAscii() ){
-                propertyName = escapeNonAscii(propertyName, jsonConfig);
-            }else if ( jsonConfig.isEscapeSurrogates() ){
-                propertyName = escapeSurrogates(propertyName, jsonConfig);
+            if ( cfg.isEscapeNonAscii() ){
+                propertyName = escapeNonAscii(propertyName, cfg);
+            }else if ( cfg.isEscapeSurrogates() ){
+                propertyName = escapeSurrogates(propertyName, cfg);
             }
-            if ( jsonConfig.isEscapeBadIdentifierCodePoints() ){
-                propertyName = escapeBadIdentifierCodePoints(propertyName, jsonConfig);
+            if ( cfg.isEscapeBadIdentifierCodePoints() ){
+                propertyName = escapeBadIdentifierCodePoints(propertyName, cfg);
             }
         }catch ( Exception e ){
-            jsonConfig.clearObjStack();
+            cfg.clearObjStack();
             throw e;
         }
 
         // handle validation.
-        if ( jsonConfig.isValidatePropertyNames() ){
+        if ( cfg.isValidatePropertyNames() ){
             if ( propertyNames.contains(propertyName) ){
                 // very unlikely.  two key objects that are not equal would
                 // have to produce identical toString() results.
-                throw new DuplicatePropertyNameException(propertyName, jsonConfig);
+                throw new DuplicatePropertyNameException(propertyName, cfg);
             }
-            checkValidJavascriptPropertyName(propertyName, jsonConfig);
+            checkValidJavascriptPropertyName(propertyName, cfg);
             propertyNames.add(propertyName);
         }
 
@@ -698,23 +702,23 @@ public class JSONUtil
      * Escape bad identifier code points.
      *
      * @param propertyname the name to escape.
-     * @param jsonConfig The config object.
+     * @param cfg The config object.
      * @return the escaped property name.
      */
-    private static String escapeBadIdentifierCodePoints( String propertyName, JSONConfig jsonConfig )
+    private static String escapeBadIdentifierCodePoints( String propertyName, JSONConfig cfg )
     {
         StringBuilder buf = new StringBuilder();
         int i = 0;
         int len = propertyName.length();
-        boolean useECMA6 = jsonConfig.isUseECMA6();
+        boolean useECMA6 = cfg.isUseECMA6();
         Pattern unicodeEscapePat = useECMA6 ? CODE_UNIT_OR_POINT_PAT : FREE_CODE_UNIT_PAT;
 
         while ( i < len ){
             int codePoint = propertyName.codePointAt(i);
             int charCount = Character.charCount(codePoint);
-            if ( isValidIdentifierStart(codePoint, jsonConfig) ){
+            if ( isValidIdentifierStart(codePoint, cfg) ){
                 buf.appendCodePoint(codePoint);
-            }else if ( i > 0 && isValidIdentifierPart(codePoint, jsonConfig) ){
+            }else if ( i > 0 && isValidIdentifierPart(codePoint, cfg) ){
                 buf.appendCodePoint(codePoint);
             }else{
                 // Bad code point for an identifier.
@@ -781,16 +785,16 @@ public class JSONUtil
      * Escape surrogate pairs.
      *
      * @param str The input string.
-     * @param jsonConfig the config object for flags.
+     * @param cfg the config object for flags.
      * @return The escaped string.
      */
-    private static String escapeSurrogates( String str, JSONConfig jsonConfig )
+    private static String escapeSurrogates( String str, JSONConfig cfg )
     {
         if ( hasSurrogates(str) ){
             StringBuilder buf = new StringBuilder();
             int i = 0;
             int len = str.length();
-            boolean useECMA6 = jsonConfig.isUseECMA6();
+            boolean useECMA6 = cfg.isUseECMA6();
             while ( i < len ){
                 int codePoint = str.codePointAt(i);
                 int charCount = Character.charCount(codePoint);
@@ -816,15 +820,15 @@ public class JSONUtil
      * Escape non-ascii.
      *
      * @param str The input string.
-     * @param jsonConfig The config object for flags.
+     * @param cfg The config object for flags.
      * @return The escaped string.
      */
-    private static String escapeNonAscii( String str, JSONConfig jsonConfig )
+    private static String escapeNonAscii( String str, JSONConfig cfg )
     {
         StringBuilder buf = new StringBuilder();
         int i = 0;
         int len = str.length();
-        boolean useECMA6 = jsonConfig.isUseECMA6();
+        boolean useECMA6 = cfg.isUseECMA6();
         while ( i < len ){
             int codePoint = str.codePointAt(i);
             int charCount = Character.charCount(codePoint);
@@ -966,14 +970,14 @@ public class JSONUtil
      * identifier.
      *
      * @param codePoint The code point.
-     * @param jsonConfig config object used for the ECMA 6 flag.
+     * @param cfg config object used for the ECMA 6 flag.
      * @return true if it's a valid code point to start an identifier.
      */
-    static boolean isValidIdentifierStart( int codePoint, JSONConfig jsonConfig )
+    static boolean isValidIdentifierStart( int codePoint, JSONConfig cfg )
     {
         return codePoint == '_' || codePoint == '$' ||
-                (jsonConfig.isUseECMA6() ? Character.isUnicodeIdentifierStart(codePoint)
-                                         : Character.isLetter(codePoint));
+                (cfg.isUseECMA6() ? Character.isUnicodeIdentifierStart(codePoint)
+                                  : Character.isLetter(codePoint));
     }
 
 
@@ -982,13 +986,13 @@ public class JSONUtil
      * identifier but not the start of an identifier.
      *
      * @param codePoint The code point.
-     * @param jsonConfig config object used for the ECMA 6 flag.
+     * @param cfg config object used for the ECMA 6 flag.
      * @return true if the codePoint is a valid code point for part of an
      *         identifier but not the start of an identifier.
      */
-    static boolean isValidIdentifierPart( int codePoint, JSONConfig jsonConfig )
+    static boolean isValidIdentifierPart( int codePoint, JSONConfig cfg )
     {
-        return jsonConfig.isUseECMA6() ? Character.isUnicodeIdentifierPart(codePoint)
+        return cfg.isUseECMA6() ? Character.isUnicodeIdentifierPart(codePoint)
                                        : (Character.isDigit(codePoint) ||
                 ((((1 << Character.NON_SPACING_MARK) | (1 << Character.COMBINING_SPACING_MARK) |
                 (1 << Character.CONNECTOR_PUNCTUATION) ) >> Character.getType(codePoint)) & 1) != 0 ||
@@ -999,18 +1003,18 @@ public class JSONUtil
      * Checks if the input string represents a valid Javascript property name.
      *
      * @param propertyName A Javascript property name to check.
-     * @param jsonConfig A JSONConfig to use for locale.
+     * @param cfg A JSONConfig to use for locale.
      * @throws BadPropertyNameException If the propertyName is not a valid Javascript property name.
      */
-    public static void checkValidJavascriptPropertyName( String propertyName, JSONConfig jsonConfig ) throws BadPropertyNameException
+    public static void checkValidJavascriptPropertyName( String propertyName, JSONConfig cfg ) throws BadPropertyNameException
     {
-        JSONConfig cfg = jsonConfig != null ? jsonConfig : new JSONConfig();
-        Pattern validationPat = cfg.isUseECMA6() ? VALID_ECMA6_PROPERTY_NAME_PAT : VALID_ECMA5_PROPERTY_NAME_PAT;
+        JSONConfig jcfg = cfg != null ? cfg : new JSONConfig();
+        Pattern validationPat = jcfg.isUseECMA6() ? VALID_ECMA6_PROPERTY_NAME_PAT : VALID_ECMA5_PROPERTY_NAME_PAT;
 
         if ( propertyName == null ||
-                (isReservedWord(propertyName) && !jsonConfig.isAllowReservedWordsInIdentifiers()) ||
+                (isReservedWord(propertyName) && !jcfg.isAllowReservedWordsInIdentifiers()) ||
                 ! validationPat.matcher(propertyName).matches() ){
-            throw new BadPropertyNameException(propertyName, jsonConfig);
+            throw new BadPropertyNameException(propertyName, jcfg);
         }
     }
 
