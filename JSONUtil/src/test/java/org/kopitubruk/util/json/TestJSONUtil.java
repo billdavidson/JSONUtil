@@ -471,6 +471,17 @@ public class TestJSONUtil
         assertNotEquals(oldDefLoc, loc);
     }
 
+    @Test
+    public void testBoolean() throws ScriptException
+    {
+        Map<String,Object> jsonObj = new LinkedHashMap<>();
+        jsonObj.put("t", true);
+        jsonObj.put("f", false);
+        String json = JSONUtil.toJSON(jsonObj);
+        validateJSON(json);
+        assertThat(json, is("{\"t\":true,\"f\":false}"));
+    }
+
     /**
      * Test a byte value.
      *

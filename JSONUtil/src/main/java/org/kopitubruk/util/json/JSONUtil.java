@@ -122,6 +122,10 @@ import java.util.regex.Pattern;
  *     escape options from JSONConfig. Usually this will just be for String objects,
  *     but anything that has a toString() that gives you what you want will work.
  *   </dd>
+ *   <dt>Boolean's</dt>
+ *   <dd>
+ *     Encoded as boolean literals.
+ *   </dd>
  *   <dt>null</dt>
  *   <dd>
  *     Encoded as the Javascript literal null.
@@ -361,6 +365,7 @@ public class JSONUtil
      *   Append the given value to the given writer. There is special handling for
      *   null, {@link Number}s, {@link JSONAble}s, {@link Map}s,
      *   {@link ResourceBundle}s, {@link Iterable}s, {@link Enumeration}s and arrays.
+     *   Booleans and null are encoded as Javascript literals.
      *   All other objects just get their toString() methods called, surrounded by
      *   double quotes with internal double quotes escaped.
      * </p>
@@ -378,6 +383,8 @@ public class JSONUtil
     {
         if ( propertyValue == null ){
             json.write(NULL);
+        }else if ( propertyValue instanceof Boolean ){
+            json.write(propertyValue.toString());
         }else if ( isRecursible(propertyValue) ){
             appendRecursiblePropertyValue(propertyValue, json, cfg);
         }else{
