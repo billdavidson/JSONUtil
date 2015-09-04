@@ -476,7 +476,7 @@ public class TestJSONUtil
     @Test
     public void testBoolean() throws ScriptException
     {
-        Map<String,Object> jsonObj = new LinkedHashMap<>();
+        Map<String,Object> jsonObj = new LinkedHashMap<String,Object>();
         jsonObj.put("t", true);
         jsonObj.put("f", false);
         String json = JSONUtil.toJSON(jsonObj);
