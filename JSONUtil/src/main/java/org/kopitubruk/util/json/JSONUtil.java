@@ -387,8 +387,6 @@ public class JSONUtil
     {
         if ( propertyValue == null ){
             json.write(NULL);
-        }else if ( propertyValue instanceof Boolean ){
-            json.write(propertyValue.toString());
         }else if ( isRecursible(propertyValue) ){
             appendRecursiblePropertyValue(propertyValue, json, cfg);
         }else{
@@ -568,6 +566,9 @@ public class JSONUtil
                 // restrictive than ECMAScript for numbers.
                 writeString(numericString, json, cfg);
             }
+        }else if ( propertyValue instanceof Boolean ){
+            // boolean values go literal -- no quotes.
+            json.write(propertyValue.toString());
         }else{
             // Use the toString() method for the value and write it out as a string.
             writeString(propertyValue.toString(), json, cfg);

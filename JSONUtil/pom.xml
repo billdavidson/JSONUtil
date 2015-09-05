@@ -24,7 +24,7 @@
 
   <groupId>org.kopitubruk.util</groupId>
   <artifactId>JSONUtil</artifactId>
-  <version>1.1-java6</version>
+  <version>1.1.1-java6</version>
   <packaging>jar</packaging>
   <name>JSONUtil</name>
   <description>A library for generating JSON</description>
@@ -47,7 +47,7 @@
     <connection>scm:git:git@github.com:billdavidson/JSONUtil.git</connection>
     <developerConnection>scm:git:git@github.com:billdavidson/JSONUtil.git</developerConnection>
     <url>git@github.com:billdavidson/JSONUtil.git</url>
-    <tag>JSONUtil-1.1-java6</tag>
+    <tag>JSONUtil-1.1.1-java6</tag>
   </scm>
 
   <properties>
@@ -116,22 +116,10 @@
 
   <profiles>
     <profile>
-      <id>release</id>
+      <id>prerelease</id>
       <build>
 
         <plugins>
-
-          <plugin>
-            <groupId>org.sonatype.plugins</groupId>
-            <artifactId>nexus-staging-maven-plugin</artifactId>
-            <version>1.6.3</version>
-            <extensions>true</extensions>
-            <configuration>
-              <serverId>ossrh</serverId>
-              <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-              <autoReleaseAfterClose>true</autoReleaseAfterClose>
-            </configuration>
-          </plugin>
 
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
@@ -159,6 +147,29 @@
                 </goals>
               </execution>
             </executions>
+          </plugin>
+
+        </plugins>
+
+      </build>
+    </profile>
+
+    <profile>
+      <id>release</id>
+      <build>
+
+        <plugins>
+
+          <plugin>
+            <groupId>org.sonatype.plugins</groupId>
+            <artifactId>nexus-staging-maven-plugin</artifactId>
+            <version>1.6.3</version>
+            <extensions>true</extensions>
+            <configuration>
+              <serverId>ossrh</serverId>
+              <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+              <autoReleaseAfterClose>true</autoReleaseAfterClose>
+            </configuration>
           </plugin>
 
           <plugin>
