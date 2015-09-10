@@ -15,8 +15,8 @@
  */
 
 /**
- * Provides utilities to convert objects into JSON. The JSONUtil class is an
- * alternative to the org.json package.
+ * Provides utilities to convert objects into JSON and parse JSON into Java
+ * objects. The JSONUtil class is an alternative to the org.json package.
  * <p>
  * Instead of creating its own maps for objects or lists for arrays, this package
  * allows you to use any {@link Map} you like, allowing for iterations on your
@@ -59,6 +59,11 @@
  * level so you shouldn't see them unless you enable debug for the package/classes.
  * They are all related to JNDI lookups or MBean access so if you're having trouble
  * with those, you may want to enable debug for this package.
+ * <p>
+ * The JSONParser class parses JSON data.  It converts Javascript objects into
+ * {@link LinkedHashMap}s and Javascript arrays into {@link ArrayList}s.  It's
+ * a "loose" parser in that it accepts valid Javascript syntax for objects and
+ * arrays, numbers and strings so it is less strict than the JSON standard.
  */
 
 package org.kopitubruk.util.json;
