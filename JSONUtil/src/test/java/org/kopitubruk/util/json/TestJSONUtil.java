@@ -431,7 +431,19 @@ public class TestJSONUtil
     {        
         Object obj = JSONParser.parseJSON("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37e24,\"c\":Infinity,\"d\":NaN,\"e\":[1,2,3,{\"a\":4}]}");
         JSONUtil.toJSON(obj);
- 
+        
+        JSONParser.parseJSON("foo");
+        JSONParser.parseJSON("2.37e24");
+
+        obj = JSONParser.parseJSON("Infinity");
+        assert(Double.isInfinite((Double)obj));
+
+        obj = JSONParser.parseJSON("false");
+        assertEquals(obj, Boolean.FALSE);
+
+        obj = JSONParser.parseJSON("null");
+        assertEquals(obj, null);
+
         try{
             JSONParser.parseJSON("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37e24,\"c\":&*^,\"d\":NaN,\"e\":[1,2,3,{\"a\":4}]}");
             fail("Expected JSONParserException for bad data");
