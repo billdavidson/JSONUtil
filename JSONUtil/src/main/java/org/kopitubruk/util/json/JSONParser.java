@@ -139,14 +139,22 @@ public class JSONParser
     public static Object parseJSON( String json, JSONConfig cfg )
     {
         JSONConfig jcfg = cfg == null ? new JSONConfig() : cfg;
+        
+        try {
+            Queue<Token> tokens = tokenize(json, jcfg);
 
-        Queue<Token> tokens = tokenize(json, jcfg);
+            if ( tokens.size() < 1 ){
+                return null;
+            }
 
-        if ( tokens.size() < 1 ){
-            return null;
+            return parseTokens(tokens, tokens.remove(), jcfg);
+        }catch ( RuntimeException e ){
+            if ( e instanceof JSONException ){
+                throw e;
+            }else{
+                throw new JSONParserException(e);
+            }
         }
-
-        return parseTokens(tokens, tokens.remove(), jcfg);
     }
 
     /**

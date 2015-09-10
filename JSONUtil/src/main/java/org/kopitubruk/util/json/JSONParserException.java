@@ -32,6 +32,7 @@ public class JSONParserException extends JSONException
     private TokenType expectedTokenType = null;
     private TokenType tokenType = null;
     private int index = 0;
+    private RuntimeException e = null;
 
     /**
      * Constructor for bad data in JSON string.
@@ -69,6 +70,16 @@ public class JSONParserException extends JSONException
         tokenType = tt;
     }
 
+    /**
+     * Wrapper for other RuntimeExceptions thrown by Java API.
+     *
+     * @param e the exception
+     */
+    JSONParserException( RuntimeException e )
+    {
+        super(e);
+    }
+
     /* (non-Javadoc)
      * @see org.kopitubruk.util.json.JSONException#internalGetMessage(java.util.Locale)
      */
@@ -88,6 +99,8 @@ public class JSONParserException extends JSONException
                 default:
                     return String.format(bundle.getString("expectedValue"), String.valueOf(tokenType));
             }
+        }else if ( e != null ){
+            return e.getLocalizedMessage();
         }else{
             String str = badData;
             int pos = 10;
