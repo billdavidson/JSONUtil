@@ -1,10 +1,10 @@
 
-This is a JSON generation library for Java.  It is oriented towards being
-used in web servers and includes several options for validation and
-controlling the way that the JSON is generated.  Defaults for those options
+This is a JSON generation and parsing library for Java.  It is oriented
+towards being used in web servers and includes several options for validation
+and controlling the way that the JSON is generated.  Defaults for those options
 can be set using JNDI or JMX/MBean access which is normally available with
 JEE web tier containers.  If you don't have those, a debug log message
-may be generated, but it is harmless.  Those log messages can be supressed
+may be generated, but it is harmless.  Those log messages can be suppressed
 by setting system properties on the java command line.
 
 The trunk branch requires Java 8, but there are branches for Java 5,
@@ -17,7 +17,8 @@ It has JUnit tests for most of the functionality.
 
 There is a run time dependency on
 [Apache Commons Logging](http://commons.apache.org/proper/commons-logging/)
-facade.
+facade so that it should work with whatever logging framework you already
+use.
 
 [Binaries](https://github.com/billdavidson/JSONUtil/releases)
 
