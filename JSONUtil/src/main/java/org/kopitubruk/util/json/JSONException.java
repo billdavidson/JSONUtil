@@ -22,7 +22,7 @@ import java.util.Locale;
  * by JSONUtil.  All of the exceptions thrown by this package
  * involve problems with arguments, which is why this extends
  * IllegalArgumentException.  Also, I prefer unchecked exceptions.
- * 
+ *
  * @author Bill Davidson
  */
 public abstract class JSONException extends IllegalArgumentException
@@ -38,6 +38,16 @@ public abstract class JSONException extends IllegalArgumentException
     {
         super();
         setLocale(jsonConfig.getLocale());
+    }
+
+    /**
+     * Wrapper for other RuntimeExceptions thrown by Java API.
+     *
+     * @param e the exception
+     */
+    JSONException( RuntimeException e )
+    {
+        super(e);
     }
 
     /**
