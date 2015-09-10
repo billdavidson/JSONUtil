@@ -143,7 +143,7 @@ public class JSONUtil
     /*
      * Multi-use strings.
      */
-    private static final String NULL = "null";
+    static final String NULL = "null";
     private static final String CODE_UNIT_FMT = "\\u%04X";
     private static final String CODE_POINT_FMT = "\\u{%X}";
 
@@ -165,12 +165,12 @@ public class JSONUtil
      * person who makes those strings in the first place.
      */
     private static final Pattern ESC_PAT =
-            Pattern.compile("^(\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\}|\\\\x\\p{XDigit}{2}|\\\\[0-7]{1,4}|\\\\[bfnrtv\\\\/'\"])");
+            Pattern.compile("^(\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\}|\\\\x\\p{XDigit}{2}|\\\\[0-3]?[0-7]{1,2}|\\\\[bfnrtv\\\\/'\"])");
 
     /**
      * Parse octal escape.
      */
-    private static final Pattern OCTAL_ESC_PAT = Pattern.compile("^\\\\([0-7]{1,4})$");
+    private static final Pattern OCTAL_ESC_PAT = Pattern.compile("^\\\\([0-3]?[0-7]{1,2})$");
 
     /**
      * Parse a hexadecimal escape.
@@ -322,8 +322,14 @@ public class JSONUtil
     }
 
     /**
-     * Convert an object to JSON and write it to the given {@link Writer}.
-     * All options will be default.
+     * Convert an object to JSON and write it to the given {@link Writer}. All
+     * options will be default. Using a {@link Writer} may be preferable in
+     * servlets, particularly if the data is large because it can use a lot less
+     * memory than a {@link java.lang.StringBuffer} by sending the data to the
+     * browser via a {@link java.io.BufferedWriter} on the output stream as it
+     * is being generated. The downside of that is that you could have an error
+     * after data begins being sent, which could result in corrupted partial
+     * data being sent to the caller.
      *
      * @param obj An object to be converted to JSON.
      * @param json Something to write the JSON data to.
@@ -340,12 +346,12 @@ public class JSONUtil
      * is large because it can use a lot less memory than a
      * {@link java.lang.StringBuffer} by sending the data to the browser via a
      * {@link java.io.BufferedWriter} on the output stream as it is being
-     * generated.  The downside of that is that you could have an error after
-     * data begins being sent, which could result in corrupted partial data being
-     * sent to the caller.
+     * generated. The downside of that is that you could have an error after
+     * data begins being sent, which could result in corrupted partial data
+     * being sent to the caller.
      *
      * @param obj An object to be converted to JSON.
-     * @param cfg A configuration object to use to set various options.  If null then defaults will be used.
+     * @param cfg A configuration object to use to set various options. If null then defaults will be used.
      * @param json Something to write the JSON data to.
      * @throws IOException If there is an error on output.
      */
@@ -449,6 +455,7 @@ public class JSONUtil
                 Map<?,?> map = null;
                 ResourceBundle bundle = null;
                 Set<?> keys;
+                Set<String> propertyNames = null;
 
                 if ( isMap ){
                     map = (Map<?,?>)propertyValue;
@@ -458,15 +465,12 @@ public class JSONUtil
                     keys = enumerationToSet(bundle.getKeys());
                 }
 
-                // make a Javascript object with the keys as the property names.
-
                 boolean quoteIdentifier = cfg.isQuoteIdentifier();
-
-                Set<String> propertyNames = null;
                 if ( cfg.isValidatePropertyNames() ){
                     propertyNames = new HashSet<String>(keys.size());
                 }
 
+                // make a Javascript object with the keys as the property names.
                 json.write('{');
                 boolean didStart = false;
                 for ( Object key : keys ){
@@ -898,7 +902,7 @@ public class JSONUtil
      * @param strValue Input string.
      * @return Unescaped string.
      */
-    private static String unEscape( String strValue )
+    static String unEscape( String strValue )
     {
         if ( strValue.indexOf('\\') < 0 ){
             // nothing to do.
@@ -913,24 +917,10 @@ public class JSONUtil
             int charCount = Character.charCount(codePoint);
             if ( codePoint == '\\' ){
                 // check for escapes.
-                boolean unEscape = false;
                 String esc = null;
                 Matcher matcher = ESC_PAT.matcher(strValue.substring(i));
                 if ( matcher.find() && matcher.start() == 0 ){
-                    unEscape = true;
                     esc = matcher.group(1);
-                    matcher = OCTAL_ESC_PAT.matcher(esc);
-                    if ( matcher.matches() ){
-                        String oct = matcher.group(1);
-                        char ch = (char)Integer.parseInt(oct, 8);
-                        if ( ch > 0xFF ){
-                            unEscape = false;
-                        }else{
-                            buf.append(ch);
-                        }
-                    }
-                }
-                if ( unEscape ){
                     // have an escape that needs to be unescaped.
                     matcher = CODE_UNIT_PAT.matcher(esc);
                     if ( matcher.matches() ){
@@ -951,8 +941,13 @@ public class JSONUtil
                             matcher = HEX_ESC_PAT.matcher(esc);
                             if ( matcher.matches() ){
                                 buf.append((char)Integer.parseInt(matcher.group(1),16));
+                            }else{
+                                matcher = OCTAL_ESC_PAT.matcher(esc);
+                                matcher.matches();          // always true at this point.
+                                String oct = matcher.group(1);
+                                char ch = (char)Integer.parseInt(oct, 8);
+                                buf.append(ch);
                             }
-                            // else octal, already handled.
                         }
                     }
                     i += esc.length() - 1;
