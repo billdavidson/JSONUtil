@@ -381,7 +381,7 @@ public class TestJSONUtil
     public void testUnEscape() throws ScriptException
     {
         Map<String,Object> jsonObj = new HashMap<>();
-        String[] strs = { "a\\u0041", "b\\x41", "c\\101", "d\\u{41}", "e\\v"};
+        String[] strs = { "a\\u0041", "b\\x41", "d\\u{41}", "e\\v"};
         JSONConfig cfg = new JSONConfig();
         cfg.setUnEscapeWherePossible(true);
         for ( String str : strs ){
@@ -398,6 +398,44 @@ public class TestJSONUtil
             String result = firstChar + (firstChar != 'e' ? "A" : "\\u000B");
             assertThat(json, is("{\"x\":\""+result+"\"}"));
             assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
+        }
+
+        // test octal unescape.
+        for ( int i = 0; i < 256; i++ ){
+            jsonObj.clear();
+            jsonObj.put("x", String.format("a\\%o", i));
+            String result;
+            switch ( i ){
+                case '"':  result = "a\\\""; break;
+                case '/':  result = "a\\/"; break;
+                case '\b': result = "a\\b"; break;
+                case '\f': result = "a\\f"; break;
+                case '\n': result = "a\\n"; break;
+                case '\r': result = "a\\r"; break;
+                case '\t': result = "a\\t"; break;
+                case '\\': result = "a\\\\"; break;
+                default:
+                    result = i < 0x20 ? String.format("a\\u%04X", i) : String.format("a%c", (char)i);
+                    break;
+            }
+            String json = JSONUtil.toJSON(jsonObj, cfg);
+            assertThat(json, is("{\"x\":\""+result+"\"}"));
+        }
+    }
+
+    /**
+     * Test the parser.
+     */
+    @Test
+    public void testParser()
+    {        
+        Object obj = JSONParser.parseJSON("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37e24,\"c\":Infinity,\"d\":NaN,\"e\":[1,2,3,{\"a\":4}]}");
+        JSONUtil.toJSON(obj);
+ 
+        try{
+            JSONParser.parseJSON("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37e24,\"c\":&*^,\"d\":NaN,\"e\":[1,2,3,{\"a\":4}]}");
+            fail("Expected JSONParserException for bad data");
+        }catch ( JSONParserException e ){
         }
     }
 
