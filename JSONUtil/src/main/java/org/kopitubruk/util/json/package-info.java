@@ -69,6 +69,7 @@
 package org.kopitubruk.util.json;
 
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.Map;
