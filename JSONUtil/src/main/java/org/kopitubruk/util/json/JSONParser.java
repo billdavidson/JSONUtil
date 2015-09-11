@@ -240,17 +240,17 @@ public class JSONParser
                 return Double.parseDouble(token.value);
             case INTEGER_NUMBER:
                 if ( token.value.startsWith("0x") ){
-                    return Long.parseLong(token.value.substring(2), 16);
+                    return Long.valueOf(token.value.substring(2), 16);
                 }else if ( OCTAL_PAT.matcher(token.value).matches() ){
-                    return Long.parseLong(token.value, 8);
+                    return Long.valueOf(token.value, 8);
                 }else{
-                    return Long.parseLong(token.value);
+                    return Long.valueOf(token.value);
                 }
             case LITERAL:
                 if ( token.value.equals(JSONUtil.NULL) ){
                     return null;
                 }else{
-                    return Boolean.parseBoolean(token.value);
+                    return Boolean.valueOf(token.value);
                 }
             case START_OBJECT:
             case START_ARRAY:
