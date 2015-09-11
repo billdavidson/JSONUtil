@@ -152,7 +152,7 @@ public class JSONParser
             if ( e instanceof JSONException ){
                 throw e;
             }else{
-                throw new JSONParserException(e);
+                throw new JSONParserException(e, jcfg);
             }
         }
     }

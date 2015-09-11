@@ -32,22 +32,24 @@ public abstract class JSONException extends IllegalArgumentException
     /**
      * Create a JSONException with the given JSONConfig.
      *
-     * @param jsonConfig the config object.
+     * @param cfg the config object.
      */
-    JSONException( JSONConfig jsonConfig )
+    JSONException( JSONConfig cfg )
     {
         super();
-        setLocale(jsonConfig.getLocale());
+        setLocale(cfg.getLocale());
     }
 
     /**
      * Wrapper for other RuntimeExceptions thrown by Java API.
      *
      * @param e the exception
+     * @param cfg the config object.
      */
-    JSONException( RuntimeException e )
+    JSONException( RuntimeException e, JSONConfig cfg )
     {
         super(e);
+        setLocale(cfg.getLocale());
     }
 
     /**

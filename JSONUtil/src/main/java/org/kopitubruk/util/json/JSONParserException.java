@@ -38,6 +38,7 @@ public class JSONParserException extends JSONException
      * Constructor for bad data in JSON string.
      *
      * @param bd The start of the bad data.
+     * @param cfg The config object.
      */
     JSONParserException( String bd, int idx, JSONConfig cfg )
     {
@@ -50,6 +51,7 @@ public class JSONParserException extends JSONException
      * Constructor for unclosed quote.
      *
      * @param q the quote character.
+     * @param cfg The config object.
      */
     JSONParserException( char q, JSONConfig cfg )
     {
@@ -62,6 +64,7 @@ public class JSONParserException extends JSONException
      *
      * @param ett expected token type.
      * @param tt actual token type.
+     * @param cfg The config object.
      */
     JSONParserException( TokenType ett, TokenType tt, JSONConfig cfg )
     {
@@ -74,10 +77,11 @@ public class JSONParserException extends JSONException
      * Wrapper for other RuntimeExceptions thrown by Java API.
      *
      * @param e the exception
+     * @param cfg The config object.
      */
-    JSONParserException( RuntimeException e )
+    JSONParserException( RuntimeException e, JSONConfig cfg )
     {
-        super(e);
+        super(e, cfg);
     }
 
     /* (non-Javadoc)
