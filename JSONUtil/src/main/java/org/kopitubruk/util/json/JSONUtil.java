@@ -151,7 +151,7 @@ public class JSONUtil
      * hexadecimal, NaN or Infinity in JSON.  It also doesn't allow for a "+"
      * sign to start a number.
      */
-    private static final Pattern JSON_NUMBER_PAT = Pattern.compile("^-?((\\d+(\\.\\d+)?)|(\\.\\d+))([eE][-+]?\\d+)?$");
+    private static final Pattern JSON_NUMBER_PAT = Pattern.compile("^-?(?:(?:\\d+(?:\\.\\d+)?)|(?:\\.\\d+))(?:[eE][-+]?\\d+)?$");
 
     /**
      * Check for octal numbers, which aren't allowed in JSON.
@@ -161,10 +161,11 @@ public class JSONUtil
     /**
      * Check for escapes.  This is used to pass escape sequences through
      * unchanged.  Some are illegal for JSON, but that's an issue for the
-     * person who makes those strings in the first place.
+     * person who makes those strings in the first place.  It is also used
+     * by {@link #unEscape(String)} to find escapes.
      */
     private static final Pattern ESC_PAT =
-            Pattern.compile("^(\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\}|\\\\x\\p{XDigit}{2}|\\\\[0-3]?[0-7]{1,2}|\\\\[bfnrtv\\\\/'\"])");
+            Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\}|\\\\x\\p{XDigit}{2}|\\\\[0-3]?[0-7]{1,2}|\\\\[bfnrtv\\\\/'\"])");
 
     /**
      * Parse octal escape.
@@ -252,12 +253,12 @@ public class JSONUtil
      * </ul>
      */
     private static final Pattern VALID_ECMA5_PROPERTY_NAME_PAT =
-            Pattern.compile("^([_\\$\\p{L}]|\\\\u\\p{XDigit}{4})([_\\$\\p{L}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4})*$");
+            Pattern.compile("^(?:[_\\$\\p{L}]|\\\\u\\p{XDigit}{4})(?:[_\\$\\p{L}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4})*$");
 
     /**
      * ECMAScript 6 version of VALID_ECMA5_PROPERTY_NAME_PAT.
      * <p>
-     *   Permitted starting and subsequent characters not allowed in
+     *   Adds permitted starting and subsequent characters not allowed in
      *   ECMAScript 5 identifiers.
      * </p>
      * <ul>
@@ -266,7 +267,7 @@ public class JSONUtil
      * </ul>
      */
     private static final Pattern VALID_ECMA6_PROPERTY_NAME_PAT =
-            Pattern.compile("^([_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})([_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*$");
+            Pattern.compile("^(?:[_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})(?:[_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*$");
 
     /**
      * This is the set of reserved words from ECMAScript 6. It's a bad practice
@@ -613,8 +614,8 @@ public class JSONUtil
                     case '\t': json.append('\\').write('t'); break;
                     case '\\':
                         // check for escapes.
-                        Matcher matcher = ESC_PAT.matcher(strValue.substring(i));
-                        if ( matcher.find() && matcher.start() == 0 ){
+                        Matcher matcher = ESC_PAT.matcher(strValue);
+                        if ( matcher.find(i) && matcher.start() == i ){
                             // pass it through unchanged.
                             String esc = matcher.group(1);
                             json.write(esc);
@@ -888,8 +889,8 @@ public class JSONUtil
             if ( codePoint == '\\' ){
                 // check for escapes.
                 String esc = null;
-                Matcher matcher = ESC_PAT.matcher(strValue.substring(i));
-                if ( matcher.find() && matcher.start() == 0 ){
+                Matcher matcher = ESC_PAT.matcher(strValue);
+                if ( matcher.find(i) && matcher.start() == i ){
                     esc = matcher.group(1);
                     // have an escape that needs to be unescaped.
                     matcher = CODE_UNIT_PAT.matcher(esc);

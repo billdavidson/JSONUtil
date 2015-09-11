@@ -64,21 +64,20 @@ public class JSONParser
     /**
      * Recognize unquoted id's
      */
-    private static final Pattern BARE_ID_PAT =
-            Pattern.compile("(([_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})" +
-                             "([_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*)\\b");
+    private static final Pattern UNQUOTED_ID_PAT =
+            Pattern.compile("((?:[_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})(?:[_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*)\\b");
 
     /**
      * Recognize Javascript floating point.
      */
     private static final Pattern JAVASCRIPT_FLOATING_POINT_PAT =
-            Pattern.compile("([-+]?((\\d+\\.\\d+|\\.\\d+)([eE][-+]?\\d+)?|Infinity)|NaN)\\b");
+            Pattern.compile("((?:[-+]?(?:(?:\\d+\\.\\d+|\\.\\d+)(?:[eE][-+]?\\d+)?|Infinity))|NaN)\\b");
 
     /**
      * Recognize Javascript integers.
      */
     private static final Pattern JAVASCRIPT_INTEGER_PAT =
-            Pattern.compile("([-+]?(\\d+|0x[\\da-fA-F]+))\\b");
+            Pattern.compile("([-+]?(?:\\d+|0x[\\da-fA-F]+))\\b");
 
     /**
      * Types of tokens in a JSON input string.
@@ -94,7 +93,8 @@ public class JSONParser
         STRING,
         FLOATING_POINT_NUMBER,
         INTEGER_NUMBER,
-        LITERAL
+        LITERAL,
+        UNQUOTED_ID
     }
 
     /**
@@ -172,7 +172,7 @@ public class JSONParser
                 nextToken = tokens.remove();
                 while ( tokens.size() > 0 ){
                     // need an identifier
-                    if ( nextToken.tokenType == TokenType.STRING ){
+                    if ( nextToken.tokenType == TokenType.STRING || nextToken.tokenType == TokenType.UNQUOTED_ID ){
                         // got an identifier.
                         String key = nextToken.value;
                         // need a colon
@@ -343,10 +343,10 @@ public class JSONParser
                                     // ignore white space outside of strings.
                                     i += matcher.group(1).length() - 1;
                                 }else{
-                                    matcher = BARE_ID_PAT.matcher(json);
+                                    matcher = UNQUOTED_ID_PAT.matcher(json);
                                     if ( matcher.find(i) && matcher.start() == i ){
                                         String id = matcher.group(1);
-                                        result.add(new Token(TokenType.STRING, JSONUtil.unEscape(id)));
+                                        result.add(new Token(TokenType.UNQUOTED_ID, JSONUtil.unEscape(id)));
                                         i += id.length() - 1;
                                     }else{
                                         throw new JSONParserException(json, i, cfg);
