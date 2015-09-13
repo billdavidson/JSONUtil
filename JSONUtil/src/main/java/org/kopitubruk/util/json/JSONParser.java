@@ -43,6 +43,7 @@ import java.util.regex.Pattern;
  * converted to {@link Long}.
  *
  * @author Bill Davidson
+ * @since 1.2
  */
 public class JSONParser
 {

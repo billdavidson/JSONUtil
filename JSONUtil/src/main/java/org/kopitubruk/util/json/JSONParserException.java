@@ -24,6 +24,7 @@ import static org.kopitubruk.util.json.JSONParser.TokenType;
  * Exception for problems parsing JSON.
  *
  * @author Bill Davidson
+ * @since 1.2
  */
 public class JSONParserException extends JSONException
 {
