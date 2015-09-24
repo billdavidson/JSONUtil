@@ -76,9 +76,6 @@ public interface JSONAble
             toJSON(cfg, json);
         }catch ( IOException e ){
             // won't happen with the StringWriter.
-        }catch ( Exception e ){
-            cfg.clearObjStack();
-            throw e;
         }
         cfg = null;
         return json.toString();

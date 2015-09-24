@@ -35,22 +35,19 @@ public final class DataStructureLoopException extends JSONException
     /**
      * Copy of the object stack.
      */
-    private Object[] objStack = null;
+    private List<Object> objStack = null;
 
     /**
      * Constructor.
      *
      * @param offender The offending object.
-     * @param jsonConfig Used to create the error message.
+     * @param cld the call data.
      */
-    DataStructureLoopException( Object offender, JSONConfig jsonConfig )
+    DataStructureLoopException( Object offender, JSONCallData cld )
     {
-        super(jsonConfig);
+        super(cld);
         this.offender = offender;
-        // freeze a copy of the stack.
-        List<Object> stack = jsonConfig.getObjStack();
-        objStack = stack.toArray(new Object[stack.size()]);
-        jsonConfig.clearObjStack();
+        objStack = cld.getObjStack();
     }
 
     /**
@@ -67,8 +64,8 @@ public final class DataStructureLoopException extends JSONException
         message.append(String.format(bundle.getString("dataStructureLoop"), getClassName(offender)));
 
         // show the stack and indicate which object is duplicated.
-        for ( int i = 0; i < objStack.length; i++ ){
-            Object currentObject = objStack[i];
+        for ( int i = 0; i < objStack.size(); i++ ){
+            Object currentObject = objStack.get(i);
             message.append("\n\t").append(i).append(' ')
                    .append(getClassName(currentObject));
             if ( offender == currentObject ){
