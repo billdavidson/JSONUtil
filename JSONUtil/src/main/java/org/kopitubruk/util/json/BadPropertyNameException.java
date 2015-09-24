@@ -34,20 +34,19 @@ public final class BadPropertyNameException extends JSONException
      * The bad property name.
      */
     private String propertyName;
-    private JSONConfig jsonConfig;
+    private JSONConfig cfg;
 
     /**
      * Create a new BadIdentifierCharacterException
      *
      * @param propertyName The offending property name.
-     * @param jsonConfig Used to get a locale for messages.
+     * @param  cld the call data.
      */
-    BadPropertyNameException( String propertyName, JSONConfig jsonConfig )
+    BadPropertyNameException( String propertyName, JSONCallData cld )
     {
-        super(jsonConfig);
+        super(cld);
         this.propertyName = propertyName;
-        this.jsonConfig = jsonConfig.clone();
-        jsonConfig.clearObjStack();
+        this.cfg = cld.getJSONConfig().clone();
     }
 
     /**
@@ -73,8 +72,8 @@ public final class BadPropertyNameException extends JSONException
         Set<Integer> badCodePoints = new LinkedHashSet<Integer>();
         boolean badStart = false;
 
-        Pattern unicodeEscapePat = jsonConfig.isUseECMA6() ? JSONUtil.CODE_UNIT_OR_POINT_PAT
-                                                           : JSONUtil.FREE_CODE_UNIT_PAT;
+        Pattern unicodeEscapePat = cfg.isUseECMA6() ? JSONUtil.CODE_UNIT_OR_POINT_PAT
+                                                    : JSONUtil.FREE_CODE_UNIT_PAT;
 
         /*
          * Find the bad code points.
@@ -84,9 +83,9 @@ public final class BadPropertyNameException extends JSONException
         while ( i < propertyName.length() ){
             int codePoint = propertyName.codePointAt(i);
             int cc = Character.charCount(codePoint);
-            if ( JSONUtil.isValidIdentifierStart(codePoint, jsonConfig) ){
+            if ( JSONUtil.isValidIdentifierStart(codePoint, cfg) ){
                 // OK for start or any other character.
-            }else if ( i > 0 && JSONUtil.isValidIdentifierPart(codePoint, jsonConfig) ){
+            }else if ( i > 0 && JSONUtil.isValidIdentifierPart(codePoint, cfg) ){
                 // OK as long as not the starting character.
             }else if ( codePoint == '\\' ){
                 // check for Unicode escape.

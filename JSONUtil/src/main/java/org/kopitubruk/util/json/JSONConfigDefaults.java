@@ -18,6 +18,7 @@ package org.kopitubruk.util.json;
 import java.io.Serializable;
 import java.lang.management.ManagementFactory;
 import java.text.NumberFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -72,6 +73,7 @@ import org.apache.commons.logging.LogFactory;
  *   <li>escapeNonAscii = false</li>
  *   <li>unEscapeWherePossible = false</li>
  *   <li>escapeSurrogates = false</li>
+     <li>encodeDatesAsStrings = false</li>
  * </ul>
  * <h3>
  *   Allow generation of certain types of non-standard JSON.
@@ -84,6 +86,7 @@ import org.apache.commons.logging.LogFactory;
  *   <li>quoteIdentifier = true</li>
  *   <li>useECMA6 = false</li>
  *   <li>allowReservedWordsInIdentifiers = false</li>
+ *   <li>encodeDatesAsObjects = false</li>
  * </ul>
  * <p>
  * It is possible to set the default locale in JNDI using the name "locale" and
@@ -124,10 +127,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static volatile boolean escapeNonAscii;
     private static volatile boolean unEscapeWherePossible;
     private static volatile boolean escapeSurrogates;
+    private static volatile boolean encodeDatesAsStrings;
 
     private static volatile boolean quoteIdentifier;
     private static volatile boolean useECMA6;
     private static volatile boolean allowReservedWordsInIdentifiers;
+    private static volatile boolean encodeDatesAsObjects;
 
     // Other defaults.
     private static volatile Locale locale;
@@ -203,6 +208,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 quoteIdentifier = JNDIUtil.getBoolean(ctx, "quoteIdentifier", quoteIdentifier);
                 useECMA6 = JNDIUtil.getBoolean(ctx, "useECMA6CodePoints", useECMA6);
                 allowReservedWordsInIdentifiers = JNDIUtil.getBoolean(ctx, "allowReservedWordsInIdentifiers", allowReservedWordsInIdentifiers);
+                jsonConfigDefaults.setEncodeDatesAsObjects(JNDIUtil.getBoolean(ctx, "encodeDatesAsObjects", encodeDatesAsObjects));
+                jsonConfigDefaults.setEncodeDatesAsStrings(JNDIUtil.getBoolean(ctx, "encodeDatesAsStrings", encodeDatesAsStrings));
             }catch ( Exception e ){
                 // Nothing set in JNDI.  Use code defaults.  Not a problem.
                 debug(bundle.getString("badJNDIforConfig"), e);
@@ -406,10 +413,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             escapeNonAscii = false;
             unEscapeWherePossible = false;
             escapeSurrogates = false;
+            encodeDatesAsStrings = false;
 
             quoteIdentifier = true;
             useECMA6 = false;
             allowReservedWordsInIdentifiers = false;
+            encodeDatesAsObjects = false;
 
             locale = null;
             fmtMap = null;
@@ -598,6 +607,32 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
+     * Get the encode dates as strings policy.
+     *
+     * @return the encodeDatesAsStrings policy.
+     */
+    @Override
+    public boolean isEncodeDatesAsStrings()
+    {
+        return encodeDatesAsStrings;
+    }
+
+    /**
+     * If true, then {@link Date} objects will be encoded as
+     * ISO 8601 date strings.
+     *
+     * @param encodeDatesAsStrings the encodeDatesAsStrings to set
+     */
+    @Override
+    public synchronized void setEncodeDatesAsStrings( boolean dflt )
+    {
+        encodeDatesAsStrings = dflt;
+        if ( encodeDatesAsStrings ){
+            encodeDatesAsObjects = false;
+        }
+    }
+
+    /**
      * Get the default quote identifier policy.
      *
      * @return The default quote identifier policy.
@@ -666,6 +701,32 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public void setAllowReservedWordsInIdentifiers( boolean dflt )
     {
         allowReservedWordsInIdentifiers = dflt;
+    }
+
+    /**
+     * Get the encode dates as objects policy.
+     *
+     * @return the encodeDatesAsObjects policy.
+     */
+    @Override
+    public boolean isEncodeDatesAsObjects()
+    {
+        return encodeDatesAsObjects;
+    }
+
+    /**
+     * If true, then {@link Date} objects will be encoded as
+     * Javascript dates, using new Date().
+     *
+     * @param dflt the encodeDatesAsObjects to set
+     */
+    @Override
+    public synchronized void setEncodeDatesAsObjects( boolean dflt )
+    {
+        encodeDatesAsObjects = dflt;
+        if ( encodeDatesAsObjects ){
+            encodeDatesAsStrings = false;
+        }
     }
 
     /**

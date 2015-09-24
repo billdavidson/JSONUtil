@@ -15,6 +15,8 @@
  */
 package org.kopitubruk.util.json;
 
+import java.util.Date;
+
 /**
  * MBean interface for JSONConfigDefaults to expose its methods to view and
  * modify the defaults at run time when this library is used with a MBean
@@ -140,6 +142,21 @@ public interface JSONConfigDefaultsMBean
     public void setEscapeSurrogates( boolean dflt );
 
     /**
+     * Get the encode dates as strings policy.
+     *
+     * @return the encodeDatesAsStrings policy.
+     */
+    public boolean isEncodeDatesAsStrings();
+
+    /**
+     * If true, then {@link Date} objects will be encoded as
+     * ISO 8601 date strings.
+     *
+     * @param dflt the encodeDatesAsStrings to set
+     */
+    public void setEncodeDatesAsStrings( boolean dflt );
+
+    /**
      * Get the default quote identifier policy.
      *
      * @return The default quote identifier policy.
@@ -185,4 +202,19 @@ public interface JSONConfigDefaultsMBean
      * @param dflt the defaultAllowReservedWordsInIdentifiers to set
      */
     public void setAllowReservedWordsInIdentifiers( boolean dflt );
+    
+    /**
+     * Get the encode dates policy.
+     *
+     * @return the encodeDatesAsObjects policy.
+     */
+    public boolean isEncodeDatesAsObjects();
+
+    /**
+     * If true, then {@link Date} objects will be encoded as
+     * Javascript dates, using new Date().
+     *
+     * @param dflt the encodeDatesAsObjects to set
+     */
+    public void setEncodeDatesAsObjects( boolean dflt );
 }

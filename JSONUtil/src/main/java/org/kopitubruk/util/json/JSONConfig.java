@@ -17,9 +17,8 @@ package org.kopitubruk.util.json;
 
 import java.io.Serializable;
 import java.text.NumberFormat;
-import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -44,6 +43,7 @@ import java.util.Map;
  *   <li>escapeNonAscii = false</li>
  *   <li>unEscapeWherePossible = false</li>
  *   <li>escapeSurrogates = false</li>
+ *   <li>encodeDatesAsStrings = false</li>
  * </ul>
  * <h3>
  *   Allow generation of certain types of non-standard JSON.
@@ -60,6 +60,7 @@ import java.util.Map;
  *   <li>quoteIdentifier = true</li>
  *   <li>useECMA6 = false</li>
  *   <li>allowReservedWordsInIdentifiers = false</li>
+ *   <li>encodeDatesAsObjects = false</li>
  * </ul>
  * <p>
  * You can change the locale being used for error messages and
@@ -67,6 +68,13 @@ import java.util.Map;
  * <p>
  * You can create number formats associated with specific numeric
  * types if you want your numbers encoded in a certain way.
+ * <p>
+ * This class thread safe.  If you use custom number formats,
+ * they are wrapped in a synchronization on the format object
+ * by JSONUtil.  If those formats are used by any other code
+ * you have that could run in a different thread at the same
+ * time, then you should synchronize on those format objects
+ * as well.
  *
  * @see JSONConfigDefaults
  * @author Bill Davidson
@@ -77,31 +85,28 @@ public class JSONConfig implements Serializable, Cloneable
      * A locale used for error messages and localization by {@link JSONAble}s if
      * applicable.
      */
-    private Locale locale;
-
-    /**
-     * Used by JSONUtil to detect data structure loops.
-     */
-    private List<Object> objStack;
+    private volatile Locale locale;
 
     /**
      * Optional number formats mapped from different number types.
      */
-    private Map<Class<? extends Number>,NumberFormat> fmtMap;
+    private volatile Map<Class<? extends Number>,NumberFormat> fmtMap;
 
     // various flags.  see their setters.
-    private boolean validatePropertyNames;
-    private boolean detectDataStructureLoops;
-    private boolean escapeBadIdentifierCodePoints;
+    private volatile boolean validatePropertyNames;
+    private volatile boolean detectDataStructureLoops;
+    private volatile boolean escapeBadIdentifierCodePoints;
 
-    private boolean encodeNumericStringsAsNumbers;
-    private boolean escapeNonAscii;
-    private boolean unEscapeWherePossible;
-    private boolean escapeSurrogates;
+    private volatile boolean encodeNumericStringsAsNumbers;
+    private volatile boolean escapeNonAscii;
+    private volatile boolean unEscapeWherePossible;
+    private volatile boolean escapeSurrogates;
+    private volatile boolean encodeDatesAsStrings;
 
-    private boolean quoteIdentifier;
-    private boolean useECMA6;
-    private boolean allowReservedWordsInIdentifiers;
+    private volatile boolean quoteIdentifier;
+    private volatile boolean useECMA6;
+    private volatile boolean allowReservedWordsInIdentifiers;
+    private volatile boolean encodeDatesAsObjects;
 
     /**
      * Create a JSONConfig
@@ -125,16 +130,18 @@ public class JSONConfig implements Serializable, Cloneable
         detectDataStructureLoops = dflt.isDetectDataStructureLoops();
         escapeBadIdentifierCodePoints = dflt.isEscapeBadIdentifierCodePoints();
 
-        // various escape options.
+        // various alternate encoding options.
         encodeNumericStringsAsNumbers = dflt.isEncodeNumericStringsAsNumbers();
         escapeNonAscii = dflt.isEscapeNonAscii();
         unEscapeWherePossible = dflt.isUnEscapeWherePossible();
         escapeSurrogates = dflt.isEscapeSurrogates();
+        encodeDatesAsStrings = dflt.isEncodeDatesAsStrings();
 
         // non-standard JSON options.
         quoteIdentifier = dflt.isQuoteIdentifier();
         useECMA6 = dflt.isUseECMA6();
         allowReservedWordsInIdentifiers = dflt.isAllowReservedWordsInIdentifiers();
+        encodeDatesAsObjects = dflt.isEncodeDatesAsObjects();
 
         synchronized ( JSONConfigDefaults.class ){
             Map<Class<? extends Number>,NumberFormat> defMap = JSONConfigDefaults.getFormatMap();
@@ -142,29 +149,6 @@ public class JSONConfig implements Serializable, Cloneable
         }
 
         setLocale(locale);
-
-        objStack = detectDataStructureLoops ? new ArrayList<Object>() : null;
-    }
-
-    /**
-     * Get the object stack. Used only by JSONUtil for data structure loop
-     * detection.
-     *
-     * @return the objStack
-     */
-    List<Object> getObjStack()
-    {
-        return objStack;
-    }
-
-    /**
-     * Clear the objStack.
-     */
-    void clearObjStack()
-    {
-        if ( objStack != null ){
-            objStack.clear();
-        }
     }
 
     /**
@@ -178,7 +162,6 @@ public class JSONConfig implements Serializable, Cloneable
         JSONConfig result = new JSONConfig();
 
         result.locale = locale;
-        result.objStack = objStack == null ? null : new ArrayList<Object>(objStack);
         result.fmtMap = fmtMap == null ? null : new HashMap<Class<? extends Number>,NumberFormat>(fmtMap);
 
         result.validatePropertyNames = validatePropertyNames;
@@ -374,9 +357,6 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public void setDetectDataStructureLoops( boolean detectDataStructureLoops )
     {
-        if ( detectDataStructureLoops && objStack == null ){
-            objStack = new ArrayList<Object>();
-        }
         this.detectDataStructureLoops = detectDataStructureLoops;
     }
 
@@ -500,6 +480,31 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
+     * Get the encode dates as strings policy.
+     *
+     * @return the encodeDatesAsStrings policy.
+     */
+    public boolean isEncodeDatesAsStrings()
+    {
+        return encodeDatesAsStrings;
+    }
+
+    /**
+     * If true, then {@link Date} objects will be encoded as
+     * ISO 8601 date strings.  If you set this to true, then
+     * encodeDatesAsObjects will be set to false.
+     *
+     * @param encodeDatesAsStrings the encodeDatesAsStrings to set
+     */
+    public synchronized void setEncodeDatesAsStrings( boolean encodeDatesAsStrings )
+    {
+        this.encodeDatesAsStrings = encodeDatesAsStrings;
+        if ( encodeDatesAsStrings ){
+            encodeDatesAsObjects = false;
+        }
+    }
+
+    /**
      * Find out what the identifier quote policy is.
      *
      * @return If true, then all identifiers will be quoted.
@@ -574,6 +579,32 @@ public class JSONConfig implements Serializable, Cloneable
     public void setAllowReservedWordsInIdentifiers( boolean allowReservedWordsInIdentifiers )
     {
         this.allowReservedWordsInIdentifiers = allowReservedWordsInIdentifiers;
+    }
+
+    /**
+     * Get the encode dates policy.
+     *
+     * @return the encodeDates policy.
+     */
+    public boolean isEncodeDatesAsObjects()
+    {
+        return encodeDatesAsObjects;
+    }
+
+    /**
+     * If true, then {@link Date} objects will be encoded as
+     * Javascript dates, using new Date(dateString).  If you
+     * set this to true, then encodeDatesAsStrings will be
+     * set to false.
+     *
+     * @param encodeDatesAsObjects the encodeDates to set
+     */
+    public synchronized void setEncodeDatesAsObjects( boolean encodeDatesAsObjects )
+    {
+        this.encodeDatesAsObjects = encodeDatesAsObjects;
+        if ( encodeDatesAsObjects ){
+            encodeDatesAsStrings = false;
+        }
     }
 
     @SuppressWarnings("javadoc")

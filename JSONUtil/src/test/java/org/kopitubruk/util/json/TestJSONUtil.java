@@ -26,10 +26,14 @@ import java.io.IOException;
 import java.io.Writer;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.text.DateFormat;
 import java.text.NumberFormat;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,6 +41,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.Vector;
 
 import javax.naming.NamingException;
@@ -90,7 +95,8 @@ public class TestJSONUtil
     /**
      * Javascript engine to be used to validate JSON. Nashorn (Java 8) supports
      * ECMAScript 5.1. Java 7 uses Rhino 1.7, which supports something roughly
-     * close to ECMAScript 3.
+     * close to ECMAScript 3.  Java 6 uses Rhino 1.6r2 which is also close to
+     * ECMAScript 3.
      */
     private final ScriptEngine engine = new ScriptEngineManager().getEngineByExtension("js");
 
@@ -193,7 +199,6 @@ public class TestJSONUtil
                 jsonObj.put(new String(propertyName,0,nameIndex), 0);
                 String json = JSONUtil.toJSON(jsonObj, cfg);
                 validateJSON(json);    // this makes this test take a long time to run.
-                assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
                 nameIndex = 0;
                 if ( startIndex < startSize ){
                     // start new string.
@@ -273,7 +278,6 @@ public class TestJSONUtil
             for ( int i = start; i < end; i++ ){
                 assertThat(message, containsString(String.format("Code point U+%04X", codePoints[i])));
             }
-            assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
         }
     }
 
@@ -297,7 +301,6 @@ public class TestJSONUtil
                 if ( j == codePoints.length/2 ){
                     jsonObj.put("x", new String(codePoints,0,j));
                     validateJSON(JSONUtil.toJSON(jsonObj, cfg));
-                    assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
                     j = 0;
                 }
             }
@@ -305,7 +308,6 @@ public class TestJSONUtil
         if ( j > 0 ){
             jsonObj.put("x", new String(codePoints,0,j));
             validateJSON(JSONUtil.toJSON(jsonObj, cfg));
-            assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
         }
     }
 
@@ -350,7 +352,6 @@ public class TestJSONUtil
         // Nashorn doesn't understand ECMAScript 6 code point escapes.
         //validateJSON(json);
         assertThat(json, is("{\"x\":\"x\\u{1F4A9}\"}"));
-        assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
     }
 
     /**
@@ -401,7 +402,6 @@ public class TestJSONUtil
             // \v unescaped will be re-escaped as a Unicode code unit.
             String result = firstChar + (firstChar != 'e' ? "A" : "\\u000B");
             assertThat(json, is("{\"x\":\""+result+"\"}"));
-            assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
         }
 
         // test octal unescape.
@@ -429,14 +429,16 @@ public class TestJSONUtil
 
     /**
      * Test the parser.
+     *
+     * @throws ParseException for parsing problems.
      */
     @Test
-    public void testParser()
-    {        
+    public void testParser() throws ParseException
+    {
         Object obj = JSONParser.parseJSON("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37e24,\"c\":Infinity,\"d\":NaN,\"e\":[1,2,3,{\"a\":4}]}");
         JSONUtil.toJSON(obj);
-        
-        JSONParser.parseJSON("foo");
+
+        JSONParser.parseJSON("'foo'");
         JSONParser.parseJSON("2.37e24");
 
         obj = JSONParser.parseJSON("Infinity");
@@ -447,6 +449,33 @@ public class TestJSONUtil
 
         obj = JSONParser.parseJSON("null");
         assertEquals(obj, null);
+
+        // parse various forms of date strings.
+        JSONConfig cfg = new JSONConfig();
+        cfg.setEncodeDatesAsStrings(true);
+        JSONCallData cld = new JSONCallData(cfg);
+        DateFormat fmt = cld.getDateFormatter();
+
+        Date dt = (Date)JSONParser.parseJSON("new Date(\"2015-09-16T14:08:34.034Z\")", cfg);
+        assertEquals("2015-09-16T14:08:34.034Z", fmt.format(dt));
+
+        dt = (Date)JSONParser.parseJSON("\"2015-09-16T14:08:34.034Z\"", cfg);
+        assertEquals("2015-09-16T14:08:34.034Z", fmt.format(dt));
+
+        dt = (Date)JSONParser.parseJSON("\"2015-09-16T14:08:34.034+01\"", cfg);
+        assertEquals("2015-09-16T14:08:34.034Z", fmt.format(dt));
+
+        dt = (Date)JSONParser.parseJSON("\"2015-09-16T14:08:34.034+01:30\"", cfg);
+        assertEquals("2015-09-16T12:38:34.034Z", fmt.format(dt));
+
+        dt = (Date)JSONParser.parseJSON("\"2015-09-16T14:08:34\"", cfg);
+        assertEquals("2015-09-16T14:08:34.034Z", fmt.format(dt));
+
+        dt = (Date)JSONParser.parseJSON("\"2015-09-16T14:08:34+01:30\"", cfg);
+        assertEquals("2015-09-16T12:38:34.034Z", fmt.format(dt));
+
+        dt = (Date)JSONParser.parseJSON("new Date(\"Tuesday, April 12, 1952 3:30:42pm PST\")", cfg);
+        assertEquals("1952-04-12T08:00:00.000Z", fmt.format(dt));
 
         try{
             JSONParser.parseJSON("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37e24,\"c\":&*^,\"d\":NaN,\"e\":[1,2,3,{\"a\":4}]}");
@@ -475,7 +504,6 @@ public class TestJSONUtil
             String json = JSONUtil.toJSON(jsonObj, cfg);
             validateJSON(json);
             assertThat(json, is("{\""+reservedWord+"\":0}"));
-            assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
 
             // test with reserved words disallowed.
             try{
@@ -484,7 +512,6 @@ public class TestJSONUtil
             }catch ( BadPropertyNameException e ){
                 String message = e.getMessage();
                 assertThat(message, is(reservedWord+" is a reserved word."));
-                assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
             }
         }
     }
@@ -505,7 +532,6 @@ public class TestJSONUtil
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
         assertThat(json, is("{\"x\\u0005\":0}"));
-        assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
     }
 
     /**
@@ -523,6 +549,47 @@ public class TestJSONUtil
         assertNotEquals(oldDefLoc, loc);
     }
 
+    /**
+     * Test dates.
+     *
+     * @throws ScriptException  if the JSON doesn't evaluate properly.
+     */
+    @Test
+    public void testDate() throws ScriptException
+    {
+        JSONConfig cfg = new JSONConfig();
+        cfg.setEncodeDatesAsObjects(true);
+        Map<String,Object> jsonObj = new LinkedHashMap<String,Object>();
+        Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        cal.set(2015, 8, 16, 14, 8, 34);
+        cal.set(Calendar.MILLISECOND, 34);
+        jsonObj.put("t", cal.getTime());
+        String json = JSONUtil.toJSON(jsonObj, cfg);
+        /* Java 6 uses Rhino 1.6r2, which doesn't understand ISO 8601.
+        String extra = ";\nvar t = x.t;\n" +
+                "java.lang.System.out.println(t.toString());\n" +
+                "if ( t.getUTCFullYear() != 2015 ){ throw ('bad year '+t.getUTCFullYear()); }\n"  +
+                "if ( t.getUTCMonth() != 8 ){ throw ('bad month '+t.getUTCMonth()); }\n" +
+                "if ( t.getUTCDate() != 16 ){ throw ('bad day '+t.getUTCDate()); }\n" +
+                "if ( t.getUTCHours() != 14 ){ throw ('bad hours '+t.getUTCHours()); }\n" +
+                "if ( t.getUTCMinutes() != 8 ){ throw ('bad minutes '+t.getUTCMinutes()); }\n" +
+                "if ( t.getUTCSeconds() != 34 ){ throw ('bad seconds '+t.getUTCSeconds()); }\n" +
+                "if ( t.getUTCMilliseconds() != 34 ){ throw ('bad millseconds '+t.getUTCMilliseconds()); }";
+        */
+        validateJSON(json);
+        assertThat(json, is("{\"t\":new Date(\"2015-09-16T14:08:34.034Z\")}"));
+        
+        cfg.setEncodeDatesAsStrings(true);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        validateJSON(json);
+        assertThat(json, is("{\"t\":\"2015-09-16T14:08:34.034Z\"}"));
+    }
+
+    /**
+     * Test booleans.
+     *
+     * @throws ScriptException  if the JSON doesn't evaluate properly.
+     */
     @Test
     public void testBoolean() throws ScriptException
     {
@@ -696,7 +763,6 @@ public class TestJSONUtil
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
         assertThat(json, is("{\"x\":1.235}"));
-        assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
     }
 
     /**
@@ -800,7 +866,6 @@ public class TestJSONUtil
             fail("Expected a DataStructureLoopException to be thrown");
         }catch ( DataStructureLoopException e ){
             assertThat(e.getMessage(), containsString("java.util.HashMap includes itself which would cause infinite recursion."));
-            assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
         }
     }
 
@@ -825,8 +890,6 @@ public class TestJSONUtil
         json = JSONUtil.toJSON(bundle, cfg);
         validateJSON(json);
         //assertThat(json, is("{\"a\":1,\"b\":2,\"c\":3,\"d\":4,\"e\":5,\"f\":6,\"g\":7,\"h\":8,\"i\":9,\"j\":10,\"k\":11,\"l\":12,\"m\":13,\"n\":14,\"o\":15,\"p\":16,\"q\":17,\"r\":18,\"s\":19,\"t\":20,\"u\":21,\"v\":22,\"w\":23,\"x\":24,\"y\":25,\"z\":26}"));
-
-        assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
     }
 
     /**
@@ -885,7 +948,6 @@ public class TestJSONUtil
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
         assertThat(json, is("{\"a\":1,\"b\":\"x\",\"c\":[\"1\",\"2\",\"3\"],\"d\":[\"1\",\"2\",\"3\"],\"e\":[null,{\"a\":0,\"b\":2,\"x\":[1,2,3]},[\"1\",\"2\",\"3\"]]}"));
-        assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
     }
 
     /**
@@ -904,7 +966,6 @@ public class TestJSONUtil
             fail("Expected a DuplicatePropertyNameException to be thrown");
         }catch ( DuplicatePropertyNameException e ){
             assertThat(e.getMessage(), is("Property x occurs twice in the same object."));
-            assertEquals("Object stack not cleared.", cfg.getObjStack().size(), 0);
         }
     }
 
