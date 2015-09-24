@@ -38,11 +38,10 @@ public final class DuplicatePropertyNameException extends JSONException
      * @param duplicateName The duplicated property name.
      * @param jsonConfig Used to get Locale for {@link #getLocalizedMessage()}.
      */
-    DuplicatePropertyNameException( String duplicateName, JSONConfig jsonConfig )
+    DuplicatePropertyNameException( String duplicateName, JSONCallData cld )
     {
-        super(jsonConfig);
+        super(cld);
         this.duplicateName = duplicateName;
-        jsonConfig.clearObjStack();
     }
 
     /**

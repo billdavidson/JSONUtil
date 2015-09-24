@@ -34,10 +34,10 @@ public abstract class JSONException extends IllegalArgumentException
      *
      * @param cfg the config object.
      */
-    JSONException( JSONConfig cfg )
+    JSONException( JSONCallData cld )
     {
         super();
-        setLocale(cfg.getLocale());
+        setLocale(cld.getJSONConfig().getLocale());
     }
 
     /**
@@ -46,10 +46,10 @@ public abstract class JSONException extends IllegalArgumentException
      * @param e the exception
      * @param cfg the config object.
      */
-    JSONException( RuntimeException e, JSONConfig cfg )
+    JSONException( RuntimeException e, JSONCallData cld )
     {
         super(e);
-        setLocale(cfg.getLocale());
+        setLocale(cld.getJSONConfig().getLocale());
     }
 
     /**

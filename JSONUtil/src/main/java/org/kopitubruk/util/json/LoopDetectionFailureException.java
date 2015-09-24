@@ -39,13 +39,12 @@ public class LoopDetectionFailureException extends JSONException
      * @param stackIndex The index that the propertyValue was supposed to be.
      * @param jsonConfig The config object for locale and object stack.
      */
-    LoopDetectionFailureException( int stackIndex, JSONConfig jsonConfig )
+    LoopDetectionFailureException( int stackIndex, JSONCallData cld )
     {
-        super(jsonConfig);
+        super(cld);
         this.stackIndex = stackIndex;
         // stack must be non-null or this exception would not be thrown.
-        objStackLength = jsonConfig.getObjStack().size();
-        jsonConfig.clearObjStack();
+        objStackLength = cld.getObjStack().size();
     }
 
     /**
