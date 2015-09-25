@@ -101,7 +101,9 @@ public class JSONParser
     /**
      * Used to convert time zones because Java 6 doesn't support ISO 8601 time zones.
      */
-    private static final Pattern TZ_PAT = Pattern.compile("^(.+)([-+]\\d{2})(?::(\\d{2})|Z)$");
+    private static final Pattern TZ_PAT = Pattern.compile("^(.+)(([-+]\\d{2})(?::(\\d{2}))?|Z)$");
+    
+    private static final Pattern ISO8601_PAT = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([,\\.]\\d+)?$");
 
     /**
      * Types of tokens in a JSON input string.
@@ -450,9 +452,10 @@ public class JSONParser
      */
     private static Date parseDate( String inputStr, JSONCallData cld ) throws ParseException
     {
-        // try the ISO 8601 formatters.
+        // Java 6 and earlier don't support ISO 8601 time zones.
         String dateStr = fixTimeZone(inputStr);
 
+        // try the ISO 8601 formatters.
         for ( DateFormat fmt : cld.getDateFormatters() ){
             try{
                 return fmt.parse(dateStr);
@@ -486,17 +489,25 @@ public class JSONParser
      */
     private static String fixTimeZone( String inputStr )
     {
+        // ^(.+)(([-+]\d{2})(?::(\d{2}))?|Z)$
+        String zeroOffset = "+0000";
         Matcher matcher = TZ_PAT.matcher(inputStr);
         if ( matcher.find() ){
-            String zone = matcher.group(3);
-            if ( zone == null ){
-                zone = "";
-            }else if ( "Z".equals(zone) ){
-                zone = "+0000";
+            String zone = matcher.group(2);
+            if ( "Z".equals(zone) ){
+                zone = zeroOffset;
+            }else{
+                String minute = matcher.group(4);
+                zone = matcher.group(3) + ( minute != null ? minute : "00" );
             }
-            return matcher.group(1) + matcher.group(2) + zone;
+            return matcher.group(1) + zone;
         }else{
-            return inputStr;
+            matcher = ISO8601_PAT.matcher(inputStr);
+            if ( matcher.matches() ){
+                return inputStr + zeroOffset;
+            }else{
+                return inputStr;
+            }
         }
     }
 

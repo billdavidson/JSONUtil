@@ -467,7 +467,7 @@ public class TestJSONUtil
         assertEquals("2015-09-16T14:08:34.034Z", fmt.format(dt));
 
         dt = (Date)JSONParser.parseJSON("\"2015-09-16T14:08:34.034+01\"", cfg);
-        assertEquals("2015-09-16T14:08:34.034Z", fmt.format(dt));
+        assertEquals("2015-09-16T13:08:34.034Z", fmt.format(dt));
 
         dt = (Date)JSONParser.parseJSON("\"2015-09-16T14:08:34.034+01:30\"", cfg);
         assertEquals("2015-09-16T12:38:34.034Z", fmt.format(dt));
