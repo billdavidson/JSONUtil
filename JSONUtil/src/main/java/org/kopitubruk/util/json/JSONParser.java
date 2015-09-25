@@ -143,7 +143,7 @@ public class JSONParser
      *
      * @param json the string of JSON data.
      * @return The object containing the parsed data.
-     * @throws ParseException
+     * @throws ParseException If there's a problem parsing dates.
      */
     public static Object parseJSON( String json ) throws ParseException
     {
@@ -156,7 +156,7 @@ public class JSONParser
      * @param json the string of JSON data.
      * @param cfg The config object.
      * @return The object containing the parsed data.
-     * @throws ParseException
+     * @throws ParseException If there's a problem parsing dates.
      */
     public static Object parseJSON( String json, JSONConfig cfg ) throws ParseException
     {

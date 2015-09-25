@@ -615,7 +615,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * If true, then {@link Date} objects will be encoded as
      * ISO 8601 date strings.
      *
-     * @param encodeDatesAsStrings the encodeDatesAsStrings to set
+     * @param dflt the encodeDatesAsStrings to set
      */
     @Override
     public synchronized void setEncodeDatesAsStrings( boolean dflt )
