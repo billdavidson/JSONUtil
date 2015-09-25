@@ -24,7 +24,7 @@
 
   <groupId>org.kopitubruk.util</groupId>
   <artifactId>JSONUtil</artifactId>
-  <version>1.2-java7</version>
+  <version>1.3-java7</version>
   <packaging>jar</packaging>
   <name>JSONUtil</name>
   <description>A library for generating JSON</description>
@@ -47,7 +47,7 @@
     <connection>scm:git:git@github.com:billdavidson/JSONUtil.git</connection>
     <developerConnection>scm:git:git@github.com:billdavidson/JSONUtil.git</developerConnection>
     <url>git@github.com:billdavidson/JSONUtil.git</url>
-    <tag>JSONUtil-1.2-java7</tag>
+    <tag>JSONUtil-1.3-java7</tag>
   </scm>
 
   <properties>
