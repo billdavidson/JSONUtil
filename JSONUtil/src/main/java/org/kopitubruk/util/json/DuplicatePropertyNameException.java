@@ -36,11 +36,11 @@ public final class DuplicatePropertyNameException extends JSONException
      * Constructor.
      *
      * @param duplicateName The duplicated property name.
-     * @param jsonConfig Used to get Locale for {@link #getLocalizedMessage()}.
+     * @param cfg Used to get Locale for {@link #getLocalizedMessage()}.
      */
-    DuplicatePropertyNameException( String duplicateName, JSONCallData cld )
+    DuplicatePropertyNameException( String duplicateName, JSONConfig cfg )
     {
-        super(cld);
+        super(cfg);
         this.duplicateName = duplicateName;
     }
 
@@ -50,6 +50,7 @@ public final class DuplicatePropertyNameException extends JSONException
      * @param locale the locale.
      * @return The message.
      */
+    @Override
     String internalGetMessage( Locale locale )
     {
         ResourceBundle bundle = JSONUtil.getBundle(locale);
@@ -57,6 +58,5 @@ public final class DuplicatePropertyNameException extends JSONException
         return String.format(bundle.getString("duplicateName"), duplicateName);
     }
 
-    @SuppressWarnings("javadoc")
     private static final long serialVersionUID = 1L;
 }
