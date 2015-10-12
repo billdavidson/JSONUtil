@@ -39,11 +39,12 @@ public class JSONParserException extends JSONException
      * Constructor for bad data in JSON string.
      *
      * @param bd The start of the bad data.
-     * @param cld The call data.
+     * @param idx The exact index of the bad data.
+     * @param cfg The config object.
      */
-    JSONParserException( String bd, int idx, JSONCallData cld )
+    JSONParserException( String bd, int idx, JSONConfig cfg )
     {
-        super(cld);
+        super(cfg);
         badData = bd;
         index = idx;
     }
@@ -52,11 +53,11 @@ public class JSONParserException extends JSONException
      * Constructor for unclosed quote.
      *
      * @param q the quote character.
-     * @param cld The call data.
+     * @param cfg The config object.
      */
-    JSONParserException( char q, JSONCallData cld )
+    JSONParserException( char q, JSONConfig cfg )
     {
-        super(cld);
+        super(cfg);
         quote = q;
     }
 
@@ -65,11 +66,11 @@ public class JSONParserException extends JSONException
      *
      * @param ett expected token type.
      * @param tt actual token type.
-     * @param cld The call data.
+     * @param cfg The config object.
      */
-    JSONParserException( TokenType ett, TokenType tt, JSONCallData cld )
+    JSONParserException( TokenType ett, TokenType tt, JSONConfig cfg )
     {
-        super(cld);
+        super(cfg);
         expectedTokenType = ett;
         tokenType = tt;
     }
@@ -78,11 +79,11 @@ public class JSONParserException extends JSONException
      * Wrapper for other RuntimeExceptions thrown by Java API.
      *
      * @param e the exception
-     * @param cld The call data.
+     * @param cfg The config object.
      */
-    JSONParserException( RuntimeException e, JSONCallData cld )
+    JSONParserException( Exception e, JSONConfig cfg )
     {
-        super(e, cld);
+        super(e, cfg);
     }
 
     /* (non-Javadoc)
@@ -129,6 +130,5 @@ public class JSONParserException extends JSONException
         }
     }
 
-    @SuppressWarnings("javadoc")
     private static final long serialVersionUID = 1L;
 }

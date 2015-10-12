@@ -40,13 +40,13 @@ public final class BadPropertyNameException extends JSONException
      * Create a new BadIdentifierCharacterException
      *
      * @param propertyName The offending property name.
-     * @param  cld the call data.
+     * @param cfg the config object.
      */
-    BadPropertyNameException( String propertyName, JSONCallData cld )
+    BadPropertyNameException( String propertyName, JSONConfig cfg)
     {
-        super(cld);
+        super(cfg);
         this.propertyName = propertyName;
-        this.cfg = cld.getJSONConfig().clone();
+        this.cfg = cfg.clone();
     }
 
     /**
@@ -56,6 +56,7 @@ public final class BadPropertyNameException extends JSONException
      * @param locale If non-null, use for the bundle for error messages.
      * @return The message.
      */
+    @Override
     String internalGetMessage( Locale locale )
     {
         ResourceBundle bundle = JSONUtil.getBundle(locale);
@@ -95,7 +96,7 @@ public final class BadPropertyNameException extends JSONException
                     i += matcher.group(1).length() - 1;
                 }else{
                     // backslash is only allowed for Unicode escapes.
-                    badCodePoints.add(codePoint); 
+                    badCodePoints.add(codePoint);
                     if ( i == 0 ){
                         badStart = true;
                     }
@@ -139,6 +140,5 @@ public final class BadPropertyNameException extends JSONException
         return message.toString();
     }
 
-    @SuppressWarnings("javadoc")
     private static final long serialVersionUID = 1L;
 }

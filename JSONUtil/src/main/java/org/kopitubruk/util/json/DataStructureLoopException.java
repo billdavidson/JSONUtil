@@ -35,19 +35,20 @@ public final class DataStructureLoopException extends JSONException
     /**
      * Copy of the object stack.
      */
-    private List<Object> objStack = null;
+    private Object[] objStack = null;
 
     /**
      * Constructor.
      *
      * @param offender The offending object.
-     * @param cld the call data.
+     * @param cfg the config object
      */
-    DataStructureLoopException( Object offender, JSONCallData cld )
+    DataStructureLoopException( Object offender, JSONConfig cfg )
     {
-        super(cld);
+        super(cfg);
         this.offender = offender;
-        objStack = cld.getObjStack();
+        List<Object> stk = cfg.getObjStack();
+        objStack = stk.toArray(new Object[stk.size()]);
     }
 
     /**
@@ -56,6 +57,7 @@ public final class DataStructureLoopException extends JSONException
      * @param locale the locale.
      * @return The message.
      */
+    @Override
     String internalGetMessage( Locale locale )
     {
         ResourceBundle bundle = JSONUtil.getBundle(locale);
@@ -64,8 +66,8 @@ public final class DataStructureLoopException extends JSONException
         message.append(String.format(bundle.getString("dataStructureLoop"), getClassName(offender)));
 
         // show the stack and indicate which object is duplicated.
-        for ( int i = 0; i < objStack.size(); i++ ){
-            Object currentObject = objStack.get(i);
+        for ( int i = 0; i < objStack.length; i++ ){
+            Object currentObject = objStack[i];
             message.append("\n\t").append(i).append(' ')
                    .append(getClassName(currentObject));
             if ( offender == currentObject ){
@@ -91,6 +93,5 @@ public final class DataStructureLoopException extends JSONException
         return name;
     }
 
-    @SuppressWarnings("javadoc")
     private static final long serialVersionUID = 1L;
 }
