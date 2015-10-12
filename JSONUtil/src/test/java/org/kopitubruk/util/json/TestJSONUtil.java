@@ -20,6 +20,7 @@ import static org.hamcrest.core.StringContains.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
@@ -29,6 +30,7 @@ import java.math.BigInteger;
 import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -433,25 +435,28 @@ public class TestJSONUtil
     public void testParser() throws ParseException
     {
         Object obj = JSONParser.parseJSON("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37e24,\"c\":Infinity,\"d\":NaN,\"e\":[1,2,3,{\"a\":4}]}");
-        JSONUtil.toJSON(obj);
+        String json = JSONUtil.toJSON(obj);
+        assertEquals("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37E24,\"c\":\"Infinity\",\"d\":\"NaN\",\"e\":[1,2,3,{\"a\":4}]}", json);
 
-        JSONParser.parseJSON("'foo'");
-        JSONParser.parseJSON("2.37e24");
+        obj = JSONParser.parseJSON("'foo'");
+        assertEquals("foo", obj);
+
+        obj = JSONParser.parseJSON("2.37e24");
+        assertEquals(2.37e24, obj);
 
         obj = JSONParser.parseJSON("Infinity");
-        assert(Double.isInfinite((Double)obj));
+        assertTrue(Double.isInfinite((Double)obj));
 
         obj = JSONParser.parseJSON("false");
-        assertEquals(obj, Boolean.FALSE);
+        assertEquals(Boolean.FALSE, obj);
 
         obj = JSONParser.parseJSON("null");
-        assertEquals(obj, null);
+        assertEquals(null, obj);
 
         // parse various forms of date strings.
         JSONConfig cfg = new JSONConfig();
         cfg.setEncodeDatesAsStrings(true);
-        JSONCallData cld = new JSONCallData(cfg);
-        DateFormat fmt = cld.getDateFormatter();
+        DateFormat fmt = cfg.getDateGenFormat();
 
         Date dt = (Date)JSONParser.parseJSON("new Date(\"2015-09-16T14:08:34.034Z\")", cfg);
         assertEquals("2015-09-16T14:08:34.034Z", fmt.format(dt));
@@ -473,6 +478,18 @@ public class TestJSONUtil
 
         dt = (Date)JSONParser.parseJSON("new Date(\"Tuesday, April 12, 1952\")", cfg);
         assertEquals("1952-04-12T08:00:00.000Z", fmt.format(dt));
+
+        // custom formats.
+        DateFormat nfmt = new SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss Z", Locale.US);
+        nfmt.setTimeZone(TimeZone.getTimeZone("US/Eastern"));
+        cfg.setDateGenFormat(nfmt);
+        cfg.addDateParseFormat("yyyy.MM.dd G 'at' HH:mm:ss z");
+        dt = (Date)JSONParser.parseJSON("\"2001.07.04 AD at 12:08:56 EDT\"", cfg);
+        assertEquals("Wed, 4 Jul 2001 12:08:56 -0400", nfmt.format(dt));
+
+        // test that the old one still works.
+        dt = (Date)JSONParser.parseJSON("\"2015-09-16T14:08:34+01:30\"", cfg);
+        assertEquals("2015-09-16T12:38:34.034Z", fmt.format(dt));
 
         try{
             JSONParser.parseJSON("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37e24,\"c\":&*^,\"d\":NaN,\"e\":[1,2,3,{\"a\":4}]}");
@@ -549,7 +566,7 @@ public class TestJSONUtil
     /**
      * Test dates.
      *
-     * @throws ScriptException  if the JSON doesn't evaluate properly.
+     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testDate() throws ScriptException
@@ -572,7 +589,7 @@ public class TestJSONUtil
                 "if ( t.getUTCMilliseconds() != 34 ){ throw ('bad millseconds '+t.getUTCMilliseconds()); }";
         validateJSON(json + extra);
         assertThat(json, is("{\"t\":new Date(\"2015-09-16T14:08:34.034Z\")}"));
-        
+
         cfg.setEncodeDatesAsStrings(true);
         json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
@@ -582,7 +599,7 @@ public class TestJSONUtil
     /**
      * Test booleans.
      *
-     * @throws ScriptException  if the JSON doesn't evaluate properly.
+     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testBoolean() throws ScriptException

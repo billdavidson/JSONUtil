@@ -15,7 +15,9 @@
  */
 package org.kopitubruk.util.json;
 
+import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 
 /**
  * MBean interface for JSONConfigDefaults to expose its methods to view and
@@ -33,9 +35,40 @@ public interface JSONConfigDefaultsMBean
     public void setCodeDefaults();
 
     /**
+     * Set the default locale for new JSONConfig objects to use.
+     *
+     * @param loc A language tag suitable for use by {@link Locale#forLanguageTag(String)}.
+     */
+    public void setLocale( String loc );
+
+    /**
      * Clear any default number formats.
      */
     public void clearNumberFormats();
+
+    /**
+     * Set the date format used for date string generation.
+     *
+     * @param fmt passed to the constructor for {@link SimpleDateFormat#SimpleDateFormat(String)}
+     */
+    public void setDateGenFormat( String fmt );
+
+    /**
+     * Clear date generation format.
+     */
+    public void clearDateGenFormat();
+
+    /**
+     * Add a date parsing format to the list of date parsing formats.
+     *
+     * @param fmt Passed to {@link SimpleDateFormat#SimpleDateFormat(String,Locale)}.
+     */
+    public void addDateParseFormat( String fmt );
+
+    /**
+     * Clear any date parse formats.
+     */
+    public void clearDateParseFormats();
 
     /**
      * Get the default validate property names policy.
@@ -202,7 +235,7 @@ public interface JSONConfigDefaultsMBean
      * @param dflt the defaultAllowReservedWordsInIdentifiers to set
      */
     public void setAllowReservedWordsInIdentifiers( boolean dflt );
-    
+
     /**
      * Get the encode dates policy.
      *

@@ -64,7 +64,7 @@ class JNDIUtil
      * Shorthand to look up a context relative to java:/comp/env.
      *
      * @param path The path string for the JNDI context you want. Note that this
-     *        is looked up relative to java:/comp/env so that you should not
+     *        is looked up relative to java:/comp/env so you should not
      *        include that part.
      * @return The context.
      * @throws NamingException If there's a problem.

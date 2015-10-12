@@ -17,12 +17,19 @@ package org.kopitubruk.util.json;
 
 import java.io.Serializable;
 import java.lang.management.ManagementFactory;
+import java.text.DateFormat;
 import java.text.NumberFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
+import java.util.Map.Entry;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
@@ -91,13 +98,26 @@ import org.apache.commons.logging.LogFactory;
  * <p>
  * It is possible to set the default locale in JNDI using the name "locale" and
  * a String value that is a valid locale string that will get passed to
- * {@link Locale#forLanguageTag(String)}.
+ * {@link Locale#forLanguageTag(String)}.  If you don't do this, then the
+ * default locale will be whatever is provided by the JVM.
+ * <p>
+ * You can set the default date generation format using the name "dateGenFormat"
+ * and a String value that will be passed to
+ * {@link SimpleDateFormat#SimpleDateFormat(String, Locale)} using the locale
+ * from {@link #getLocale()}.
+ * <p>
+ * You can set up to 16 default date parsing formats using the names
+ * "dateParseFormat0" through "dateParseFormat15" using String values as with
+ * "dateGenFormat" described above.  They will be added in numeric order of
+ * the name.
  * <p>
  * It is possible to see and modify the default values of all of the boolean
  * flags at runtime if you have a JMX client with MBean support connected to
- * your server.  It will be in org.kopitubruk.util.json.JSONConfig.  You can disable
- * MBean registration by setting a boolean variable named registerMBean to false
- * in the environment as shown above for the flags.
+ * your server.  It will be in org.kopitubruk.util.json.JSONConfigDefaults.  You
+ * can disable MBean registration by setting a boolean variable named registerMBean
+ * to false in the environment as shown above for the flags.  See also the
+ * {@link #clearMBean()} method for information on how to remove the MBean from
+ * your server when your app is unloaded or reloaded.
  * <p>
  * There is some limited logging for access of JNDI and the MBean server.
  * Most of it is debug, so you won't see it unless you have debug logging
@@ -136,7 +156,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     // Other defaults.
     private static volatile Locale locale;
-    private static volatile Map<Class<? extends Number>,NumberFormat> fmtMap;
+    private static volatile Map<Class<? extends Number>,NumberFormat> numberFormatMap;
+    private static volatile DateFormat dateGenFormat;
+    private static volatile List<DateFormat> dateParseFormats;
 
     // stored for deregistration on unload.
     private static ObjectName mBeanName = null;
@@ -154,10 +176,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         // the singleton.
         jsonConfigDefaults = new JSONConfigDefaults();
 
-        // initial defaults
-        jsonConfigDefaults.setCodeDefaults();
+        // annoying that there's no static equivalent to "this".
+        Class<?> thisClass = jsonConfigDefaults.getClass();
 
-        String pkgName = JSONConfigDefaults.class.getPackage().getName();
+        String pkgName = thisClass.getPackage().getName();
         String registerMBeanName = "registerMBean";
         String trueStr = Boolean.TRUE.toString();
 
@@ -170,7 +192,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         if ( useJNDI || registerMBean ){
             bundle = JSONUtil.getBundle(getLocale());
             if ( logging ){
-                s_log = LogFactory.getLog(JSONConfigDefaults.class);
+                s_log = LogFactory.getLog(thisClass);
             }
         }
 
@@ -179,31 +201,49 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             try{
                 Context ctx = JNDIUtil.getEnvContext(pkgName.replaceAll("\\.", "/"));
 
-                String localeString = JNDIUtil.getString(ctx, "locale", null);
-                if ( localeString != null ){
-                    setLocale(Locale.forLanguageTag(localeString));
+                // locale.
+                String languageTag = JNDIUtil.getString(ctx, "locale", null);
+                if ( languageTag != null ){
+                    jsonConfigDefaults.setLocale(languageTag);
                     if ( logging ){
                         // possibly changed the locale.  redo the bundle.
                         bundle = JSONUtil.getBundle(getLocale());
                     }
                 }
 
+                // date generation format.
+                String dgf = JNDIUtil.getString(ctx, "dateGenFormat", null);
+                if ( dgf != null ){
+                    jsonConfigDefaults.setDateGenFormat(dgf);
+                }
+
+                // date parse formats.
+                for ( int i = 0; i < 16; i++ ){
+                    String dpf = JNDIUtil.getString(ctx, "dateParseFormat" + i, null);
+                    if ( dpf != null ){
+                        jsonConfigDefaults.addDateParseFormat(dpf);
+                    }
+                }
+
                 registerMBean = JNDIUtil.getBoolean(ctx, registerMBeanName, registerMBean);
 
+                // validation flags.
                 validatePropertyNames = JNDIUtil.getBoolean(ctx, "validatePropertyNames", validatePropertyNames);
                 detectDataStructureLoops = JNDIUtil.getBoolean(ctx, "detectDataStructureLoops", detectDataStructureLoops);
                 escapeBadIdentifierCodePoints = JNDIUtil.getBoolean(ctx, "escapeBadIdentifierCodePoints", escapeBadIdentifierCodePoints);
 
+                // safe alternate encoding options.
                 encodeNumericStringsAsNumbers = JNDIUtil.getBoolean(ctx, "encodeNumericStringsAsNumbers", encodeNumericStringsAsNumbers);
                 escapeNonAscii = JNDIUtil.getBoolean(ctx, "escapeNonAscii", escapeNonAscii);
                 unEscapeWherePossible = JNDIUtil.getBoolean(ctx, "unEscapeWherePossible", unEscapeWherePossible);
                 escapeSurrogates = JNDIUtil.getBoolean(ctx, "escapeSurrogates", escapeSurrogates);
+                jsonConfigDefaults.setEncodeDatesAsStrings(JNDIUtil.getBoolean(ctx, "encodeDatesAsStrings", encodeDatesAsStrings));
 
+                // non-standard encoding options.
                 quoteIdentifier = JNDIUtil.getBoolean(ctx, "quoteIdentifier", quoteIdentifier);
                 useECMA6 = JNDIUtil.getBoolean(ctx, "useECMA6CodePoints", useECMA6);
                 allowReservedWordsInIdentifiers = JNDIUtil.getBoolean(ctx, "allowReservedWordsInIdentifiers", allowReservedWordsInIdentifiers);
                 jsonConfigDefaults.setEncodeDatesAsObjects(JNDIUtil.getBoolean(ctx, "encodeDatesAsObjects", encodeDatesAsObjects));
-                jsonConfigDefaults.setEncodeDatesAsStrings(JNDIUtil.getBoolean(ctx, "encodeDatesAsStrings", encodeDatesAsStrings));
             }catch ( Exception e ){
                 // Nothing set in JNDI.  Use code defaults.  Not a problem.
                 debug(bundle.getString("badJNDIforConfig"), e);
@@ -226,14 +266,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * This class should only be instantiated by the static block.  All others
-     * should use {@link #getInstance()} to get that instance.
-     */
-    private JSONConfigDefaults()
-    {
-    }
-
-    /**
      * Return the JSONConfigDefaults singleton instance.
      *
      * @return the JSONConfigDefaults singleton instance.
@@ -244,6 +276,45 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
+     * This class should only be instantiated by the static block.  All others
+     * should use {@link #getInstance()} to get that instance.
+     */
+    private JSONConfigDefaults()
+    {
+        setCodeDefaults();
+    }
+
+    /**
+     * Reset all defaults to their original unmodified values.  This
+     * overrides JNDI and previous MBean changes.
+     */
+    @Override
+    public void setCodeDefaults()
+    {
+        synchronized ( this.getClass() ){
+            validatePropertyNames = true;
+            detectDataStructureLoops = true;
+            escapeBadIdentifierCodePoints = false;
+
+            encodeNumericStringsAsNumbers = false;
+            escapeNonAscii = false;
+            unEscapeWherePossible = false;
+            escapeSurrogates = false;
+            encodeDatesAsStrings = false;
+
+            quoteIdentifier = true;
+            useECMA6 = false;
+            allowReservedWordsInIdentifiers = false;
+            encodeDatesAsObjects = false;
+
+            locale = null;
+            numberFormatMap = null;
+            dateGenFormat = null;
+            dateParseFormats = null;
+        }
+    }
+
+    /**
      * <p>
      * When this package is used by a webapp, and you have an MBean server in your
      * environment, then you should create a ServletContextListener and call this
@@ -251,9 +322,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * method to remove the MBean when the webapp is unloaded or reloaded.
      * </p>
      * <pre><code>
-     * public void contextDestroyed( ServletContextEvent sce )
+     * public class AppCleanUp implements ServletContextListener
      * {
-     *     JSONConfigDefaults.clearMBean();
+     *     public void contextDestroyed( ServletContextEvent sce )
+     *     {
+     *         JSONConfigDefaults.clearMBean();
+     *     }
      * }
      * </code></pre>
      * <p>
@@ -297,45 +371,36 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     /**
      * Set a default locale for new JSONConfig objects to use.
      *
-     * @param locale the default locale.
+     * @param loc the default locale.
      */
-    public static synchronized void setLocale( Locale locale )
+    public static synchronized void setLocale( Locale loc )
     {
-        JSONConfigDefaults.locale = locale;
+        locale = loc;
     }
 
     /**
-     * Add a default number format for a particular type that extends Number.
-     * This will be applied to all new JSONConfig objects that are created after
-     * this in the same class loader.
+     * Set the default locale for new JSONConfig objects to use.
      *
-     * @param numericClass The class.
-     * @param fmt The number format.
+     * @param languageTag A language tag suitable for use by {@link Locale#forLanguageTag(String)}.
      */
-    public static synchronized void addNumberFormat( Class<? extends Number> numericClass, NumberFormat fmt )
+    @Override
+    public void setLocale( String languageTag )
     {
-        if ( numericClass != null ){
-            if ( fmtMap == null ){
-                // don't create the map unless it's actually going to be used.
-                fmtMap = new HashMap<>();
-            }
-            fmtMap.put(numericClass, fmt);
+        if ( languageTag != null ){
+            setLocale(Locale.forLanguageTag(languageTag));
+        }else{
+            setLocale((Locale)null);
         }
     }
 
     /**
-     * Add a default number format for a particular type that extends Number.
-     * This will be applied to all new JSONConfig objects that are created after
-     * this in the same class loader.
+     * Get the number format map.
      *
-     * @param numericType The object.
-     * @param fmt The number format.
+     * @return the number format map.
      */
-    public static void addNumberFormat( Number numericType, NumberFormat fmt )
+    static Map<Class<? extends Number>,NumberFormat> getNumberFormatMap()
     {
-        if ( numericType != null ){
-            addNumberFormat(numericType.getClass(), fmt);
-        }
+        return numberFormatMap;
     }
 
     /**
@@ -346,7 +411,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      */
     public static synchronized NumberFormat getNumberFormat( Class<? extends Number> numericClass )
     {
-        return fmtMap != null ? fmtMap.get(numericClass) : null;
+        return numberFormatMap != null ? numberFormatMap.get(numericClass) : null;
     }
 
     /**
@@ -361,72 +426,299 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
+     * Add a default number format for a particular type that extends Number.
+     * This will be applied to all new JSONConfig objects that are created after
+     * this in the same class loader.  The format is cloned for thread safety.
+     *
+     * @param numericClass The class.
+     * @param fmt The number format.
+     */
+    public static void addNumberFormat( Class<? extends Number> numericClass, NumberFormat fmt )
+    {
+        if ( numericClass != null ){
+            if ( fmt == null ){
+                removeNumberFormat(numericClass);
+            }else{
+                Map<Class<? extends Number>,NumberFormat> numFmtMap = new HashMap<>(2);
+                numFmtMap.put(numericClass, fmt);
+                addNumberFormats(numFmtMap);
+            }
+        }
+    }
+
+    /**
+     * Add a default number format for a particular type that extends Number.
+     * This will be applied to all new JSONConfig objects that are created after
+     * this in the same class loader.  The format is cloned for thread safety.
+     *
+     * @param numericType The object.
+     * @param fmt The number format.
+     */
+    public static void addNumberFormat( Number numericType, NumberFormat fmt )
+    {
+        if ( numericType != null ){
+            addNumberFormat(numericType.getClass(), fmt);
+        }
+    }
+
+    /**
+     * Add a map of number formats to the current map of number formats.
+     * The formats are cloned for thread safety.
+     *
+     * @param numFmtMap The input map.
+     * @since 1.4
+     */
+    public static synchronized void addNumberFormats( Map<Class<? extends Number>,NumberFormat> numFmtMap )
+    {
+        numberFormatMap = mergeFormatMaps(numberFormatMap, numFmtMap);
+    }
+
+    /**
+     * Merge two maps of number formats and clone the formats of the
+     * source map as they are merged into the destination map.
+     *
+     * @param dest The destination map to be added to.
+     * @param src The source map to add.
+     * @return The merged map.
+     */
+    static Map<Class<? extends Number>,NumberFormat> mergeFormatMaps(
+                                Map<Class<? extends Number>,NumberFormat> dest,
+                                Map<Class<? extends Number>,NumberFormat> src )
+    {
+        Map<Class<? extends Number>,NumberFormat> result = dest;
+
+        if ( src != null ){
+            if ( result == null ){
+                result = new HashMap<>(src);
+                List<Class<? extends Number>> badKeys = null;
+                // clone the formats.
+                for ( Entry<Class<? extends Number>,NumberFormat> entry : result.entrySet() ){
+                    if ( entry.getKey() != null && entry.getValue() != null ){
+                        entry.setValue((NumberFormat)entry.getValue().clone());
+                    }else{
+                        // a pox on anyone who causes this to happen.
+                        if ( badKeys == null ){
+                            badKeys = new ArrayList<>();
+                        }
+                        badKeys.add(entry.getKey());
+                    }
+                }
+                if ( badKeys != null ){
+                    // clean out the bad keys.
+                    for ( Class<? extends Number> numericClass : badKeys ){
+                        result.remove(numericClass);
+                    }
+                    if ( result.size() < 1 ){
+                        result = null;
+                    }else{
+                        result = new HashMap<>(result);
+                    }
+                }
+            }else{
+                int size = result.size();
+                for ( Entry<Class<? extends Number>,NumberFormat> entry : src.entrySet() ){
+                    // only use good entries.
+                    if ( entry.getKey() != null && entry.getValue() != null ){
+                        result.put(entry.getKey(), (NumberFormat)entry.getValue().clone());
+                    }
+                }
+                if ( result.size() > size ){
+                    result = new HashMap<>(result);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
      * Remove the requested class from the default number formats.
      *
      * @param numericClass The class.
      */
     public static synchronized void removeNumberFormat( Class<? extends Number> numericClass )
     {
-        if ( fmtMap != null && numericClass != null ){
-            fmtMap.remove(numericClass);
-            if ( fmtMap.size() < 1 ){
-                fmtMap = null;
+        if ( numberFormatMap != null && numericClass != null ){
+            int size = numberFormatMap.size();
+            numberFormatMap.remove(numericClass);
+            if ( numberFormatMap.size() < 1 ){
+                numberFormatMap = null;
+            }else if ( numberFormatMap.size() < size ){
+                numberFormatMap = new HashMap<>(numberFormatMap);
             }
         }
     }
 
     /**
-     * Get the format map.
+     * Remove the requested class from the default number formats.
      *
-     * @return the format map.
+     * @param num An object that implements {@link Number}.
      */
-    static synchronized Map<Class<? extends Number>,NumberFormat> getFormatMap()
+    public static void removeNumberFormat( Number num )
     {
-        return fmtMap;
-    }
-
-    /*
-     * The rest are all JSONConfigDefaultsMBean interface methods for usage
-     * by MBean clients which is why they have to be instance methods even
-     * though they are only dealing with static data.
-     */
-
-    /**
-     * Reset all defaults to their original unmodified values.  This
-     * overrides JNDI and previous MBean changes.
-     */
-    @Override
-    public void setCodeDefaults()
-    {
-        synchronized ( this.getClass() ){
-            validatePropertyNames = true;
-            detectDataStructureLoops = true;
-            escapeBadIdentifierCodePoints = false;
-
-            encodeNumericStringsAsNumbers = false;
-            escapeNonAscii = false;
-            unEscapeWherePossible = false;
-            escapeSurrogates = false;
-            encodeDatesAsStrings = false;
-
-            quoteIdentifier = true;
-            useECMA6 = false;
-            allowReservedWordsInIdentifiers = false;
-            encodeDatesAsObjects = false;
-
-            locale = null;
-            fmtMap = null;
+        if ( num != null ){
+            removeNumberFormat(num.getClass());
         }
     }
 
     /**
      * Clear any default number formats.  Accessible via MBean server.
+     * 
+     * @since 1.4
      */
     @Override
     public void clearNumberFormats()
     {
         synchronized ( this.getClass() ){
-            fmtMap = null;
+            numberFormatMap = null;
+        }
+    }
+
+    /**
+     * Get the date string generation format.
+     *
+     * @return the dateFormat
+     * @since 1.4
+     */
+    static DateFormat getDateGenFormat()
+    {
+        return dateGenFormat;
+    }
+
+    /**
+     * Set the date string generation format.
+     *
+     * @param fmt the dateFormat to set
+     * @since 1.4
+     */
+    public static synchronized void setDateGenFormat( DateFormat fmt )
+    {
+        dateGenFormat = fmt;
+    }
+
+    /**
+     * Set the date format used for date string generation. Accessible via MBean
+     * server.
+     *
+     * @param fmt passed to the constructor for
+     * {@link SimpleDateFormat#SimpleDateFormat(String,Locale)} using
+     * the result of {@link #getLocale()}.
+     * @since 1.4
+     */
+    @Override
+    public void setDateGenFormat( String fmt )
+    {
+        if ( fmt != null ){
+            setDateGenFormat(new SimpleDateFormat(fmt, getLocale()));
+        }else{
+            setDateGenFormat((DateFormat)null);
+        }
+    }
+
+    /**
+     * Clear date generation format.  Accessible via MBean server.
+     *
+     * @since 1.4
+     */
+    @Override
+    public void clearDateGenFormat()
+    {
+        synchronized ( this.getClass() ){
+            dateGenFormat = null;
+        }
+    }
+
+    /**
+     * Get the list of date parsing formats.
+     *
+     * @return the list of date parsing formats.
+     * @since 1.4
+     */
+    static List<DateFormat> getDateParseFormats()
+    {
+        return dateParseFormats;
+    }
+
+    /**
+     * Add a date parsing format to the list of parsing formats.  When
+     * parsing date strings, they will be used in the same order that
+     * they were added.
+     *
+     * @param fmt A date parsing format.
+     * @since 1.4
+     */
+    public static void addDateParseFormat( DateFormat fmt )
+    {
+        if ( fmt != null ){
+            addDateParseFormats(Arrays.asList(fmt));
+        }
+    }
+
+    /**
+     * Add a date parsing format to the list of date parsing formats. Accessible
+     * via MBean server.
+     *
+     * @param fmt Passed to
+     * {@link SimpleDateFormat#SimpleDateFormat(String,Locale)} using
+     * the result of {@link #getLocale()}.
+     * @since 1.4
+     */
+    @Override
+    public void addDateParseFormat( String fmt )
+    {
+        addDateParseFormat(new SimpleDateFormat(fmt, getLocale()));
+    }
+
+    /**
+     * Add a collection of date parsing format to the list of date parsing formats.
+     *
+     * @param fmts A collection of date parsing formats.
+     * @since 1.4
+     */
+    public static synchronized void addDateParseFormats( Collection<? extends DateFormat> fmts )
+    {
+        dateParseFormats = addDateParseFormats(dateParseFormats, fmts);
+    }
+    
+    /**
+     * Add the source collection of formats to the destination list of formats.
+     *
+     * @param dest The destination list.
+     * @param src The source list.
+     * @return The new list of formats.
+     */
+    static List<DateFormat> addDateParseFormats( List<DateFormat> dest, Collection<? extends DateFormat> src )
+    {
+        List<DateFormat> result = dest;
+
+        if ( src != null ){
+            if ( result == null ){
+                result = new ArrayList<>(src.size());
+            }else{
+                List<DateFormat> tmp = new ArrayList<>(result.size() + src.size());
+                tmp.addAll(result);
+                result = tmp;
+            }
+
+            // DateFormat's are not thread safe.
+            for ( DateFormat fmt : src ){
+                if ( fmt != null ){
+                    result.add((DateFormat)fmt.clone());
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Clear any date parse formats.
+     */
+    @Override
+    public void clearDateParseFormats()
+    {
+        synchronized ( this.getClass() ){
+            dateParseFormats = null;
         }
     }
 
@@ -452,7 +744,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void setValidatePropertyNames( boolean dflt )
     {
-        validatePropertyNames = dflt;
+        synchronized ( this.getClass() ){
+            validatePropertyNames = dflt;
+        }
     }
 
     /**
@@ -477,7 +771,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void setDetectDataStructureLoops( boolean dflt )
     {
-         detectDataStructureLoops = dflt;
+        synchronized ( this.getClass() ){
+            detectDataStructureLoops = dflt;
+        }
     }
 
     /**
@@ -501,7 +797,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void setEscapeBadIdentifierCodePoints( boolean dflt )
     {
-        escapeBadIdentifierCodePoints = dflt;
+        synchronized ( this.getClass() ){
+            escapeBadIdentifierCodePoints = dflt;
+        }
     }
 
     /**
@@ -526,7 +824,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void setEncodeNumericStringsAsNumbers( boolean dflt )
     {
-        encodeNumericStringsAsNumbers = dflt;
+        synchronized ( this.getClass() ){
+            encodeNumericStringsAsNumbers = dflt;
+        }
     }
 
     /**
@@ -551,7 +851,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void setEscapeNonAscii( boolean dflt )
     {
-        escapeNonAscii = dflt;
+        synchronized ( this.getClass() ){
+            escapeNonAscii = dflt;
+        }
     }
 
     /**
@@ -575,7 +877,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void setUnEscapeWherePossible( boolean dflt )
     {
-        unEscapeWherePossible = dflt;
+        synchronized ( this.getClass() ){
+            unEscapeWherePossible = dflt;
+        }
     }
 
     /**
@@ -597,7 +901,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void setEscapeSurrogates( boolean dflt )
     {
-        escapeSurrogates = dflt;
+        synchronized ( this.getClass() ){
+            escapeSurrogates = dflt;
+        }
     }
 
     /**
@@ -615,14 +921,16 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * If true, then {@link Date} objects will be encoded as
      * ISO 8601 date strings.
      *
-     * @param encodeDatesAsStrings the encodeDatesAsStrings to set
+     * @param dflt the encodeDatesAsStrings to set
      */
     @Override
     public synchronized void setEncodeDatesAsStrings( boolean dflt )
     {
-        encodeDatesAsStrings = dflt;
-        if ( encodeDatesAsStrings ){
-            encodeDatesAsObjects = false;
+        synchronized ( this.getClass() ){
+            encodeDatesAsStrings = dflt;
+            if ( encodeDatesAsStrings ){
+                encodeDatesAsObjects = false;
+            }
         }
     }
 
@@ -647,7 +955,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void setQuoteIdentifier( boolean dflt )
     {
-        quoteIdentifier = dflt;
+        synchronized ( this.getClass() ){
+            quoteIdentifier = dflt;
+        }
     }
 
     /**
@@ -672,7 +982,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void setUseECMA6( boolean dflt )
     {
-        useECMA6 = dflt;
+        synchronized ( this.getClass() ){
+            useECMA6 = dflt;
+        }
     }
 
     /**
@@ -694,7 +1006,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void setAllowReservedWordsInIdentifiers( boolean dflt )
     {
-        allowReservedWordsInIdentifiers = dflt;
+        synchronized ( this.getClass() ){
+            allowReservedWordsInIdentifiers = dflt;
+        }
     }
 
     /**
@@ -717,9 +1031,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public synchronized void setEncodeDatesAsObjects( boolean dflt )
     {
-        encodeDatesAsObjects = dflt;
-        if ( encodeDatesAsObjects ){
-            encodeDatesAsStrings = false;
+        synchronized ( this.getClass() ){
+            encodeDatesAsObjects = dflt;
+            if ( encodeDatesAsObjects ){
+                encodeDatesAsStrings = false;
+            }
         }
     }
 
@@ -764,6 +1080,5 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         }
     }
 
-    @SuppressWarnings("javadoc")
     private static final long serialVersionUID = 1L;
 }

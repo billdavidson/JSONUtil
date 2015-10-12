@@ -16,11 +16,19 @@
 package org.kopitubruk.util.json;
 
 import java.io.Serializable;
+import java.text.DateFormat;
 import java.text.NumberFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
+import java.util.Map.Entry;
 
 /**
  * A configuration object for JSONUtil to control various encoding options.
@@ -69,44 +77,67 @@ import java.util.Map;
  * You can create number formats associated with specific numeric
  * types if you want your numbers encoded in a certain way.
  * <p>
- * This class thread safe.  If you use custom number formats,
- * they are wrapped in a synchronization on the format object
- * by JSONUtil.  If those formats are used by any other code
- * you have that could run in a different thread at the same
- * time, then you should synchronize on those format objects
- * as well.
+ * If you've enabled special date handling options, you can change
+ * the way date strings are generated and the way that they are
+ * parsed.
+ * <p>
+ * This class NOT thread safe.  There are issues with the loop
+ * detection logic and any custom number or date formats used.  Never
+ * share objects of this class between threads.
  *
  * @see JSONConfigDefaults
  * @author Bill Davidson
  */
 public class JSONConfig implements Serializable, Cloneable
 {
+    private static TimeZone UTC_TIME_ZONE = TimeZone.getTimeZone("UTC");
+
     /**
      * A locale used for error messages and localization by {@link JSONAble}s if
      * applicable.
      */
-    private volatile Locale locale;
+    private Locale locale;
+
+    /**
+     * Used by JSONUtil to detect data structure loops.
+     */
+    private List<Object> objStack;
 
     /**
      * Optional number formats mapped from different number types.
      */
-    private volatile Map<Class<? extends Number>,NumberFormat> fmtMap;
+    private Map<Class<? extends Number>,NumberFormat> numberFormatMap;
+
+    /**
+     * A date formatter when encoding Dates.
+     */
+    private DateFormat dateGenFormat;
+
+    /**
+     * Custom date parsing formats.
+     */
+    private List<DateFormat> customDateParseFormats = null;
+
+    /**
+     * Custom date parsing formats plus ISO 8601 parsing formats.
+     */
+    private List<DateFormat> dateParseFormats = null;
 
     // various flags.  see their setters.
-    private volatile boolean validatePropertyNames;
-    private volatile boolean detectDataStructureLoops;
-    private volatile boolean escapeBadIdentifierCodePoints;
+    private boolean validatePropertyNames;
+    private boolean detectDataStructureLoops;
+    private boolean escapeBadIdentifierCodePoints;
 
-    private volatile boolean encodeNumericStringsAsNumbers;
-    private volatile boolean escapeNonAscii;
-    private volatile boolean unEscapeWherePossible;
-    private volatile boolean escapeSurrogates;
-    private volatile boolean encodeDatesAsStrings;
+    private boolean encodeNumericStringsAsNumbers;
+    private boolean escapeNonAscii;
+    private boolean unEscapeWherePossible;
+    private boolean escapeSurrogates;
+    private boolean encodeDatesAsStrings;
 
-    private volatile boolean quoteIdentifier;
-    private volatile boolean useECMA6;
-    private volatile boolean allowReservedWordsInIdentifiers;
-    private volatile boolean encodeDatesAsObjects;
+    private boolean quoteIdentifier;
+    private boolean useECMA6;
+    private boolean allowReservedWordsInIdentifiers;
+    private boolean encodeDatesAsObjects;
 
     /**
      * Create a JSONConfig
@@ -123,32 +154,36 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public JSONConfig( Locale locale )
     {
-        JSONConfigDefaults dflt = JSONConfigDefaults.getInstance();
-
-        // validation options.
-        validatePropertyNames = dflt.isValidatePropertyNames();
-        detectDataStructureLoops = dflt.isDetectDataStructureLoops();
-        escapeBadIdentifierCodePoints = dflt.isEscapeBadIdentifierCodePoints();
-
-        // various alternate encoding options.
-        encodeNumericStringsAsNumbers = dflt.isEncodeNumericStringsAsNumbers();
-        escapeNonAscii = dflt.isEscapeNonAscii();
-        unEscapeWherePossible = dflt.isUnEscapeWherePossible();
-        escapeSurrogates = dflt.isEscapeSurrogates();
-        encodeDatesAsStrings = dflt.isEncodeDatesAsStrings();
-
-        // non-standard JSON options.
-        quoteIdentifier = dflt.isQuoteIdentifier();
-        useECMA6 = dflt.isUseECMA6();
-        allowReservedWordsInIdentifiers = dflt.isAllowReservedWordsInIdentifiers();
-        encodeDatesAsObjects = dflt.isEncodeDatesAsObjects();
-
         synchronized ( JSONConfigDefaults.class ){
-            Map<Class<? extends Number>,NumberFormat> defMap = JSONConfigDefaults.getFormatMap();
-            fmtMap = defMap != null ? new HashMap<>(defMap) : null;
+            JSONConfigDefaults dflt = JSONConfigDefaults.getInstance();
+
+            setLocale(locale);
+
+            // formats
+            addNumberFormats(JSONConfigDefaults.getNumberFormatMap());
+            setDateGenFormat(JSONConfigDefaults.getDateGenFormat());
+            addDateParseFormats(JSONConfigDefaults.getDateParseFormats());
+
+            // validation options.
+            validatePropertyNames = dflt.isValidatePropertyNames();
+            detectDataStructureLoops = dflt.isDetectDataStructureLoops();
+            escapeBadIdentifierCodePoints = dflt.isEscapeBadIdentifierCodePoints();
+
+            // various alternate encoding options.
+            encodeNumericStringsAsNumbers = dflt.isEncodeNumericStringsAsNumbers();
+            escapeNonAscii = dflt.isEscapeNonAscii();
+            unEscapeWherePossible = dflt.isUnEscapeWherePossible();
+            escapeSurrogates = dflt.isEscapeSurrogates();
+            encodeDatesAsStrings = dflt.isEncodeDatesAsStrings();
+
+            // non-standard JSON options.
+            quoteIdentifier = dflt.isQuoteIdentifier();
+            useECMA6 = dflt.isUseECMA6();
+            allowReservedWordsInIdentifiers = dflt.isAllowReservedWordsInIdentifiers();
+            encodeDatesAsObjects = dflt.isEncodeDatesAsObjects();
         }
 
-        setLocale(locale);
+        objStack = detectDataStructureLoops ? new ArrayList<>() : null;
     }
 
     /**
@@ -161,23 +196,74 @@ public class JSONConfig implements Serializable, Cloneable
     {
         JSONConfig result = new JSONConfig();
 
+        result.objStack = objStack == null ? null : new ArrayList<>(4);
         result.locale = locale;
-        result.fmtMap = fmtMap == null ? null : new HashMap<>(fmtMap);
 
+        // NumberFormat and DateFormat are not thread safe so clone them.
+
+        if ( numberFormatMap != null ){
+            result.numberFormatMap = new HashMap<>(numberFormatMap);
+            for ( Entry<?,NumberFormat> entry : result.numberFormatMap.entrySet() ){
+                entry.setValue((NumberFormat)entry.getValue().clone());
+            }
+        }else{
+            result.numberFormatMap = null;
+        }
+
+        result.dateGenFormat = dateGenFormat == null ? null : (DateFormat)dateGenFormat.clone();
+
+        if ( customDateParseFormats != null ){
+            result.customDateParseFormats = new ArrayList<>(customDateParseFormats.size());
+            for ( DateFormat fmt : customDateParseFormats ){
+                result.customDateParseFormats.add((DateFormat)fmt.clone());
+            }
+        }else{
+            result.customDateParseFormats = null;
+        }
+
+        // this will just be regenerated on the next call if needed.
+        result.dateParseFormats = null;
+
+        // validation options.
         result.validatePropertyNames = validatePropertyNames;
         result.detectDataStructureLoops = detectDataStructureLoops;
         result.escapeBadIdentifierCodePoints = escapeBadIdentifierCodePoints;
 
+        // "safe" alternate encoding options.
         result.encodeNumericStringsAsNumbers = encodeNumericStringsAsNumbers;
         result.escapeNonAscii = escapeNonAscii;
         result.unEscapeWherePossible = unEscapeWherePossible;
         result.escapeSurrogates = escapeSurrogates;
+        result.encodeDatesAsStrings = encodeDatesAsStrings;
 
+        // non-standard JSON.
         result.quoteIdentifier = quoteIdentifier;
         result.useECMA6 = useECMA6;
         result.allowReservedWordsInIdentifiers = allowReservedWordsInIdentifiers;
+        result.encodeDatesAsObjects = encodeDatesAsObjects;
 
         return result;
+    }
+
+    /**
+     * Get the object stack. Used only by JSONUtil for data structure loop
+     * detection.
+     *
+     * @return the objStack
+     */
+    List<Object> getObjStack()
+    {
+        return objStack;
+    }
+
+    /**
+     * Clear the object stack.
+     */
+    void clearObjStack()
+    {
+        if ( objStack != null ){
+            objStack.clear();
+        }
     }
 
     /**
@@ -202,6 +288,38 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
+     * Get a copy of the number format map.
+     *
+     * @return A copy of the number format map.
+     */
+    Map<Class<? extends Number>,NumberFormat> getNumberFormats()
+    {
+        return numberFormatMap;
+    }
+
+    /**
+     * Get the number format for the given class.
+     *
+     * @param numericClass A class.
+     * @return A number format or null if one has not been set.
+     */
+    public NumberFormat getNumberFormat( Class<? extends Number> numericClass )
+    {
+        return numberFormatMap != null ? numberFormatMap.get(numericClass) : null;
+    }
+
+    /**
+     * Get the number format for the class of th given numeric type.
+     *
+     * @param num An object that implements {@link Number}.
+     * @return A number format or null if one has not been set.
+     */
+    public NumberFormat getNumberFormat( Number num )
+    {
+        return num != null ? getNumberFormat(num.getClass()) : null;
+    }
+
+    /**
      * Add a number format for a particular type that extends Number. You can
      * set one format per type that extends Number. All JSON conversions that
      * use this config will use the given format for output of numbers of the
@@ -214,14 +332,16 @@ public class JSONConfig implements Serializable, Cloneable
      * @param numericClass The class.
      * @param fmt The number format.
      */
-    public synchronized void addNumberFormat( Class<? extends Number> numericClass, NumberFormat fmt )
+    public void addNumberFormat( Class<? extends Number> numericClass, NumberFormat fmt )
     {
         if ( numericClass != null ){
-            if ( fmtMap == null ){
-                // don't create the map unless it's actually going to be used.
-                fmtMap = new HashMap<>();
+            if ( fmt == null ){
+                removeNumberFormat(numericClass);
+            }else{
+                Map<Class<? extends Number>,NumberFormat> numFmtMap = new HashMap<>(2);
+                numFmtMap.put(numericClass, fmt);
+                addNumberFormats(numFmtMap); 
             }
-            fmtMap.put(numericClass, fmt);
         }
     }
 
@@ -244,27 +364,16 @@ public class JSONConfig implements Serializable, Cloneable
             addNumberFormat(numericType.getClass(), fmt);
         }
     }
-
+    
     /**
-     * Get the number format for the given class.
+     * Add a map of number formats to the current map of number formats.
      *
-     * @param numericClass A class.
-     * @return A number format or null if one has not been set.
+     * @param numFmtMap The input map.
+     * @since 1.4
      */
-    public synchronized NumberFormat getNumberFormat( Class<? extends Number> numericClass )
+    public void addNumberFormats( Map<Class<? extends Number>,NumberFormat> numFmtMap )
     {
-        return fmtMap != null ? fmtMap.get(numericClass) : null;
-    }
-
-    /**
-     * Get the number format for the class of th given numeric type.
-     *
-     * @param num An object that implements {@link Number}.
-     * @return A number format or null if one has not been set.
-     */
-    public NumberFormat getNumberFormat( Number num )
-    {
-        return num != null ? getNumberFormat(num.getClass()) : null;
+        numberFormatMap = JSONConfigDefaults.mergeFormatMaps(numberFormatMap, numFmtMap);
     }
 
     /**
@@ -273,12 +382,16 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param numericClass The class.
      */
-    public synchronized void removeNumberFormat( Class<? extends Number> numericClass )
+    public void removeNumberFormat( Class<? extends Number> numericClass )
     {
-        if ( fmtMap != null ){
-            fmtMap.remove(numericClass);
-            if ( fmtMap.size() < 1 ){
-                fmtMap = null;
+        if ( numberFormatMap != null && numericClass != null ){
+            int size = numberFormatMap.size();
+            numberFormatMap.remove(numericClass);
+            if ( numberFormatMap.size() < 1 ){
+                numberFormatMap = null;
+            }else if ( numberFormatMap.size() < size ){
+                // minimize memory usage.
+                numberFormatMap = new HashMap<>(numberFormatMap);
             }
         }
     }
@@ -299,9 +412,161 @@ public class JSONConfig implements Serializable, Cloneable
     /**
      * Clear all number formats.
      */
-    public synchronized void clearNumberFormats()
+    public void clearNumberFormats()
     {
-        fmtMap = null;
+        numberFormatMap = null;
+    }
+
+    /**
+     * Get a date formatter for generating date strings. If you did not set the
+     * date formatter with {@link #setDateGenFormat(DateFormat)}, it will return
+     * an ISO 8601 extended format formatter.
+     *
+     * @return The formatter.
+     */
+    DateFormat getDateGenFormat()
+    {
+        if ( dateGenFormat == null ){
+            // don't create it until it's needed.
+            dateGenFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.sss'Z'");
+            dateGenFormat.setTimeZone(UTC_TIME_ZONE);
+        }
+        return dateGenFormat;
+    }
+
+    /**
+     * Set the date string generation format. If you did not set the date
+     * formatter, it will use an ISO 8601 extended format formatter will be used
+     * when formatting dates.
+     *
+     * @param fmt the dateFormat to set
+     * @since 1.4
+     */
+    public void setDateGenFormat( DateFormat fmt )
+    {
+        dateGenFormat = fmt == null ? null : (DateFormat)fmt.clone();
+    }
+
+    /**
+     * Set the date string generation format.
+     *
+     * @param fmt passed to the constructor
+     * {@link SimpleDateFormat#SimpleDateFormat(String,Locale)}
+     * using the locale from this config object.
+     * @since 1.4
+     */
+    public void setDateGenFormat( String fmt )
+    {
+        if ( fmt != null ){
+            setDateGenFormat(new SimpleDateFormat(fmt, locale));
+        }else{
+            dateGenFormat = null;
+        }
+    }
+
+    /**
+     * Clear date generation format.
+     * 
+     * @since 1.4
+     */
+    public void clearDateGenFormat()
+    {
+        dateGenFormat = null;
+    }
+
+    /**
+     * Get the date parsing formats to parse different accepted forms of ISO
+     * 8601. If any custom date formats were added, then those will be
+     * prepended to the list and tried before the ISO 8601 formats when parsing.
+     *
+     * @return The list of date parse formats.
+     */
+    List<DateFormat> getDateParseFormats()
+    {
+        if ( dateParseFormats == null ){
+            // don't create it until it's needed.
+            String dateTime = "yyyy-MM-dd'T'HH:mm:ss";
+            String offset = "XXX";
+            String millis = ".SSS";
+
+            // The ISO 8601 formats.
+            List<SimpleDateFormat> isoFmts = Arrays.asList(
+                    new SimpleDateFormat(dateTime+millis+offset),
+                    new SimpleDateFormat(dateTime+millis),
+                    new SimpleDateFormat(dateTime+offset),
+                    new SimpleDateFormat(dateTime));
+
+            for ( DateFormat fmt : isoFmts ){
+                fmt.setTimeZone(UTC_TIME_ZONE);
+            }
+
+            if ( customDateParseFormats == null ){
+                // It's just the ISO 8601 formats.
+                dateParseFormats = new ArrayList<>(isoFmts.size());
+                dateParseFormats.addAll(isoFmts);
+            }else{
+                // Custom formats followed by ISO 8601 formats.
+                dateParseFormats = new ArrayList<>(customDateParseFormats.size() + isoFmts.size());
+                dateParseFormats.addAll(customDateParseFormats);
+                dateParseFormats.addAll(isoFmts);
+            }
+        }
+        return dateParseFormats;
+    }
+
+    /**
+     * Add a date parsing format to the list of parsing formats.  When
+     * parsing date strings, they will be tried in the same order that
+     * they were added until one works.
+     *
+     * @param fmt A date parsing format.
+     * @since 1.4
+     */
+    public void addDateParseFormat( DateFormat fmt )
+    {
+        if ( fmt != null ){
+            addDateParseFormats(Arrays.asList(fmt));
+        }
+    }
+
+    /**
+     * Add a date parsing format to the list of parsing formats.  When
+     * parsing date strings, they will be tried in the same order that
+     * they were added until one works.
+     *
+     * @param fmt Passed to {@link SimpleDateFormat#SimpleDateFormat(String,Locale)}
+     * using the locale from this config object to create a DateFormat.
+     * @since 1.4
+     */
+    public void addDateParseFormat( String fmt )
+    {
+        addDateParseFormat(new SimpleDateFormat(fmt, locale));
+    }
+
+    /**
+     * Add a collection of date parsing formats to the list of date parsing
+     * formats.
+     *
+     * @param fmts A collection of date parsing formats.
+     * @since 1.4
+     */
+    public void addDateParseFormats( Collection<? extends DateFormat> fmts )
+    {
+        customDateParseFormats = JSONConfigDefaults.addDateParseFormats(customDateParseFormats, fmts);
+        
+        // make sure that custom formats get included in the future.
+        dateParseFormats = null;
+    }
+
+    /**
+     * Clear any date parse formats.
+     *
+     * @since 1.4
+     */
+    public void clearDateParseFormats()
+    {
+        customDateParseFormats = null;
+        dateParseFormats = null;
     }
 
     /**
@@ -490,13 +755,14 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * If true, then {@link Date} objects will be encoded as
-     * ISO 8601 date strings.  If you set this to true, then
+     * If true, then {@link Date} objects will be encoded as ISO 8601 date
+     * strings or a custom date format if you have called
+     * {@link #setDateGenFormat(DateFormat)}. If you set this to true, then
      * encodeDatesAsObjects will be set to false.
      *
      * @param encodeDatesAsStrings the encodeDatesAsStrings to set
      */
-    public synchronized void setEncodeDatesAsStrings( boolean encodeDatesAsStrings )
+    public void setEncodeDatesAsStrings( boolean encodeDatesAsStrings )
     {
         this.encodeDatesAsStrings = encodeDatesAsStrings;
         if ( encodeDatesAsStrings ){
@@ -546,7 +812,7 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * If you set this to true, then when the JSONUtil generates Unicode
+     * If you set this to true, then when JSONUtil generates Unicode
      * escapes, it will use ECMAScript 6 code point escapes if they are shorter
      * than code unit escapes. This is not standard JSON and not yet widely
      * supported by Javascript interpreters. It also allows identifiers to have
@@ -599,7 +865,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param encodeDatesAsObjects the encodeDates to set
      */
-    public synchronized void setEncodeDatesAsObjects( boolean encodeDatesAsObjects )
+    public void setEncodeDatesAsObjects( boolean encodeDatesAsObjects )
     {
         this.encodeDatesAsObjects = encodeDatesAsObjects;
         if ( encodeDatesAsObjects ){
@@ -607,6 +873,5 @@ public class JSONConfig implements Serializable, Cloneable
         }
     }
 
-    @SuppressWarnings("javadoc")
     private static final long serialVersionUID = 1L;
 }

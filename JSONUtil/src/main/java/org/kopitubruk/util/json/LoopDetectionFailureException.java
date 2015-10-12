@@ -37,14 +37,14 @@ public class LoopDetectionFailureException extends JSONException
      * Create a LoopDetectionFailureException
      *
      * @param stackIndex The index that the propertyValue was supposed to be.
-     * @param jsonConfig The config object for locale and object stack.
+     * @param cfg The config object for locale and object stack.
      */
-    LoopDetectionFailureException( int stackIndex, JSONCallData cld )
+    LoopDetectionFailureException( int stackIndex, JSONConfig cfg )
     {
-        super(cld);
+        super(cfg);
         this.stackIndex = stackIndex;
         // stack must be non-null or this exception would not be thrown.
-        objStackLength = cld.getObjStack().size();
+        objStackLength = cfg.getObjStack().size();
     }
 
     /**
@@ -57,7 +57,7 @@ public class LoopDetectionFailureException extends JSONException
     String internalGetMessage( Locale locale )
     {
         ResourceBundle bundle = JSONUtil.getBundle(locale);
-        
+
         /*
          * I considered including contents of the stack here but that
          * could potentially include sensitive information which could
@@ -72,6 +72,5 @@ public class LoopDetectionFailureException extends JSONException
         }
     }
 
-    @SuppressWarnings("javadoc")
     private static final long serialVersionUID = 1L;
 }
