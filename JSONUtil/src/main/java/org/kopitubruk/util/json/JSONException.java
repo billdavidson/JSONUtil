@@ -34,10 +34,10 @@ public abstract class JSONException extends IllegalArgumentException
      *
      * @param cfg the config object.
      */
-    JSONException( JSONCallData cld )
+    JSONException( JSONConfig cfg )
     {
         super();
-        setLocale(cld.getJSONConfig().getLocale());
+        setLocale(cfg.getLocale());
     }
 
     /**
@@ -46,10 +46,10 @@ public abstract class JSONException extends IllegalArgumentException
      * @param e the exception
      * @param cfg the config object.
      */
-    JSONException( RuntimeException e, JSONCallData cld )
+    JSONException( Exception e, JSONConfig cfg )
     {
         super(e);
-        setLocale(cld.getJSONConfig().getLocale());
+        setLocale(cfg.getLocale());
     }
 
     /**
@@ -88,6 +88,5 @@ public abstract class JSONException extends IllegalArgumentException
      */
     abstract String internalGetMessage( Locale locale );
 
-    @SuppressWarnings("javadoc")
     private static final long serialVersionUID = 1L;
 }

@@ -24,6 +24,15 @@ import java.io.Writer;
  * {@link JSONUtil#toJSON(Object, JSONConfig)} encounters one of these objects
  * as one of its property values, it will call this method in those objects to
  * convert them to JSON.
+ * <p>
+ * This interface includes some default methods, which were introduced in Java
+ * 8. If you want to make this library work with Java 7, then change those to
+ * regular public interface signatures and comment out the rest of the code for
+ * the default methods.
+ * <p>
+ * Given the default methods and the fact that you only have to implement one
+ * method, this interface can be used to create JSONAble's with Lambda
+ * expressions if you find that convenient.
  *
  * @author Bill Davidson
  */
@@ -76,6 +85,9 @@ public interface JSONAble
             toJSON(cfg, json);
         }catch ( IOException e ){
             // won't happen with the StringWriter.
+        }catch ( Exception e ){
+            cfg.clearObjStack();
+            throw e;
         }
         cfg = null;
         return json.toString();
@@ -87,7 +99,7 @@ public interface JSONAble
     /**
      * Write to the given writer as JSON data using all
      * defaults for the configuration.
-     * 
+     *
      * @param json json A writer for the output.
      * @throws IOException  If there is an error on output.
      */

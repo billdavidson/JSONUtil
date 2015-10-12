@@ -369,8 +369,18 @@ public class JSONUtil
      */
     public static void toJSON( Object obj, JSONConfig cfg, Writer json ) throws IOException
     {
-        JSONCallData cld = new JSONCallData(cfg == null ? new JSONConfig() : cfg);
-        appendPropertyValue(obj, json, cld);
+        JSONConfig jcfg = cfg == null ? new JSONConfig() : cfg;
+        try{
+            appendPropertyValue(obj, json, jcfg);
+        }catch ( IOException e ){
+            // in case the original calling code catches the exception and reuses the JSONConfig.
+            jcfg.clearObjStack();
+            throw e;
+        }catch ( RuntimeException e ){
+            // in case the original calling code catches the exception and reuses the JSONConfig.
+            jcfg.clearObjStack();
+            throw e;
+        }
     }
 
     /**
@@ -389,17 +399,17 @@ public class JSONUtil
      *
      * @param propertyValue The value to append.
      * @param json Something to write the JSON data to.
-     * @param cld The call data.
+     * @param cfg A configuration object to use to set various options.
      * @throws IOException If there is an error on output.
      */
-    private static void appendPropertyValue( Object propertyValue, Writer json, JSONCallData cld ) throws IOException
+    private static void appendPropertyValue( Object propertyValue, Writer json, JSONConfig cfg ) throws IOException
     {
         if ( propertyValue == null ){
             json.write(NULL);
         }else if ( isRecursible(propertyValue) ){
-            appendRecursiblePropertyValue(propertyValue, json, cld);
+            appendRecursiblePropertyValue(propertyValue, json, cfg);
         }else{
-            appendSimplePropertyValue(propertyValue, json, cld);
+            appendSimplePropertyValue(propertyValue, json, cfg);
         }
     }
 
@@ -425,22 +435,21 @@ public class JSONUtil
      *
      * @param propertyValue The value to append.
      * @param json Something to write the JSON data to.
-     * @param cld The call data.
+     * @param cfg A configuration object to use to set various options.
      * @throws IOException If there is an error on output.
      */
-    private static void appendRecursiblePropertyValue( Object propertyValue, Writer json, JSONCallData cld ) throws IOException
+    private static void appendRecursiblePropertyValue( Object propertyValue, Writer json, JSONConfig cfg ) throws IOException
     {
         // check for loops.
         int stackIndex = 0;
         List<Object> objStack = null;
-        JSONConfig cfg = cld.getJSONConfig();
         boolean detectDataStructureLoops = cfg.isDetectDataStructureLoops();
         if ( detectDataStructureLoops ){
-            objStack = cld.getObjStack();
+            objStack = cfg.getObjStack();
             for ( Object o : objStack ){
                 // reference comparison.
                 if ( o == propertyValue ){
-                    throw new DataStructureLoopException(propertyValue, cld);
+                    throw new DataStructureLoopException(propertyValue, cfg);
                 }
             }
             stackIndex = objStack.size();
@@ -482,7 +491,7 @@ public class JSONUtil
                     }else{
                         didStart = true;
                     }
-                    String propertyName = getPropertyName(key, cld, propertyNames);
+                    String propertyName = getPropertyName(key, cfg, propertyNames);
                     boolean doQuote = quoteIdentifier || isReservedWord(propertyName) || hasSurrogates(propertyName);
                     if ( doQuote ){
                         json.write('"');
@@ -493,7 +502,7 @@ public class JSONUtil
                     }
                     json.write(':');
                     Object value = isMap ? map.get(key) : bundle.getObject((String)key);
-                    appendPropertyValue(value, json, cld);
+                    appendPropertyValue(value, json, cfg);
                 }
                 json.write('}');
             }else{
@@ -508,7 +517,7 @@ public class JSONUtil
                         }else{
                             didStart = true;
                         }
-                        appendPropertyValue(value, json, cld);
+                        appendPropertyValue(value, json, cfg);
                     }
                 }else if ( propertyValue instanceof Enumeration ){
                     Enumeration<?> enumeration = (Enumeration<?>)propertyValue;
@@ -518,7 +527,7 @@ public class JSONUtil
                         }else{
                             didStart = true;
                         }
-                        appendPropertyValue(enumeration.nextElement(), json, cld);
+                        appendPropertyValue(enumeration.nextElement(), json, cfg);
                     }
                 }else{
                     // propertyValue.getClass().isArray() == true
@@ -528,7 +537,7 @@ public class JSONUtil
                         if ( i > 0 ){
                             json.write(',');
                         }
-                        appendPropertyValue(Array.get(array, i), json, cld);
+                        appendPropertyValue(Array.get(array, i), json, cfg);
                     }
                 }
                 json.write(']');
@@ -542,7 +551,7 @@ public class JSONUtil
                 objStack.remove(stackIndex);
             }else{
                 // this should never happen.
-                throw new LoopDetectionFailureException(stackIndex, cld);
+                throw new LoopDetectionFailureException(stackIndex, cfg);
             }
         }
     }
@@ -557,24 +566,16 @@ public class JSONUtil
      *
      * @param propertyValue The value to append.
      * @param json Something to write the JSON data to.
-     * @param cld the call data.
+     * @param cfg A configuration object to use to set various options.
      * @throws IOException If there is an error on output.
      */
-    private static void appendSimplePropertyValue( Object propertyValue, Writer json, JSONCallData cld ) throws IOException
+    private static void appendSimplePropertyValue( Object propertyValue, Writer json, JSONConfig cfg ) throws IOException
     {
-        JSONConfig cfg = cld.getJSONConfig();
         if ( propertyValue instanceof Number ){
             Number num = (Number)propertyValue;
             NumberFormat fmt = cfg.getNumberFormat(num);
-            String numericString;
-            if ( fmt == null ){
-                numericString = num.toString();
-            }else{
-                synchronized ( fmt ){
-                    // NumberFormat is not thread safe.
-                    numericString = fmt.format(num, new StringBuffer(), new FieldPosition(0)).toString();
-                }
-            }
+            String numericString = fmt == null ? num.toString()
+                                               : fmt.format(num, new StringBuffer(), new FieldPosition(0)).toString();
             if ( isValidJSONNumber(numericString) ){
                 json.write(numericString);
             }else{
@@ -588,10 +589,12 @@ public class JSONUtil
         }else if ( propertyValue instanceof Date && cfg.isEncodeDatesAsObjects() ){
             // non-standard JSON but should work with eval().
             Date date = (Date)propertyValue;
-            json.write(String.format("new Date(\"%s\")", cld.getDateFormatter().format(date)));
+            json.write("new Date(");
+            writeString(cfg.getDateGenFormat().format(date), json, cfg);
+            json.write(')');
         }else if ( propertyValue instanceof Date && cfg.isEncodeDatesAsStrings() ){
             Date date = (Date)propertyValue;
-            json.write(String.format("\"%s\"", cld.getDateFormatter().format(date)));
+            writeString(cfg.getDateGenFormat().format(date), json, cfg);
         }else{
             // Use the toString() method for the value and write it out as a string.
             writeString(propertyValue.toString(), json, cfg);
@@ -690,13 +693,12 @@ public class JSONUtil
      * @param propertyNames The set of property names.  Used to detect duplicate property names.
      * @return the escaped validated property name.
      */
-    private static String getPropertyName( Object key, JSONCallData cld, Set<String> propertyNames )
+    private static String getPropertyName( Object key, JSONConfig cfg, Set<String> propertyNames )
     {
         String propertyName = key == null ? null : key.toString();
-        JSONConfig cfg = cld.getJSONConfig();
 
         if ( propertyName == null || propertyName.length() == 0 ){
-            throw new BadPropertyNameException(propertyName, cld);
+            throw new BadPropertyNameException(propertyName, cfg);
         }
 
         /*
@@ -720,7 +722,7 @@ public class JSONUtil
             if ( propertyNames.contains(propertyName) ){
                 // very unlikely.  two key objects that are not equal would
                 // have to produce identical toString() results.
-                throw new DuplicatePropertyNameException(propertyName, cld);
+                throw new DuplicatePropertyNameException(propertyName, cfg);
             }
             checkValidJavascriptPropertyName(propertyName, cfg);
             propertyNames.add(propertyName);
@@ -756,8 +758,8 @@ public class JSONUtil
                 boolean doEscape = true;
                 if ( codePoint == '\\' ){
                     // check for a Unicode escape.
-                    Matcher matcher = unicodeEscapePat.matcher(propertyName.substring(i));
-                    if ( matcher.find() && matcher.start() == 0 ){
+                    Matcher matcher = unicodeEscapePat.matcher(propertyName);
+                    if ( matcher.find(i) && matcher.start() == i ){
                         // It's a Unicode escape.  Pass it through.
                         String esc = matcher.group(1);
                         buf.append(esc);
@@ -1016,7 +1018,7 @@ public class JSONUtil
 
     /**
      * Return true if the codePoint is a valid code point for part of an
-     * identifier but not the start of an identifier.
+     * identifier but not necessarily the start of an identifier.
      *
      * @param codePoint The code point.
      * @param cfg config object used for the ECMA 6 flag.
@@ -1047,8 +1049,7 @@ public class JSONUtil
         if ( propertyName == null ||
                 (isReservedWord(propertyName) && !jcfg.isAllowReservedWordsInIdentifiers()) ||
                 ! validationPat.matcher(propertyName).matches() ){
-            JSONCallData cld = new JSONCallData(jcfg);
-            throw new BadPropertyNameException(propertyName, cld);
+            throw new BadPropertyNameException(propertyName, jcfg);
         }
     }
 

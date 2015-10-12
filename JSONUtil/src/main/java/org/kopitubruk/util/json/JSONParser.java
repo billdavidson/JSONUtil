@@ -29,10 +29,10 @@ import java.util.regex.Pattern;
 
 /**
  * This is a JSON parser. It accepts a fairly loose version of JSON. Essentially
- * it tries to allow anything Javascript eval() allows so it lets you use single
- * quotes instead of double quotes if you want and all versions of Javascript
- * numbers are allowed. Unquoted identifiers are also permitted. Escapes in
- * strings are converted to their proper characters and all Javascript escapes
+ * it tries to allow anything Javascript eval() allows (within reason) so it lets
+ * you use single quotes instead of double quotes if you want and all versions of
+ * Javascript numbers are allowed. Unquoted identifiers are also permitted. Escapes
+ * in strings are converted to their proper characters and all Javascript escapes
  * are permitted.
  * <p>
  * Javascript objects are converted to {@link LinkedHashMap}s with the
@@ -48,9 +48,12 @@ import java.util.regex.Pattern;
  * <p>
  * If the {@link JSONConfig#isEncodeDatesAsObjects()} or
  * {@link JSONConfig#isEncodeDatesAsStrings()} returns true, then strings that
- * look like dates will be converted to {@link Date} objects. Date strings
- * should be ISO 8601 extended format that include data down to seconds.
- * Fractions of seconds and time zone offsets are optional.
+ * look like dates will be converted to {@link Date} objects. By default, parsing
+ * formats support ISO 8601 extended format that include data down to seconds.
+ * Fractions of seconds and time zone offsets are optional.  Other formats can
+ * be added with calls to {@link JSONConfig#addDateParseFormat(DateFormat)} or
+ * its variants and passing the config object to the parser. Custom formats that
+ * you add will be tried before the default ISO 8601 formats.
  * <p>
  * Calls to the new Date(String) constructor from Javascript are converted to
  * {@link Date}s.
@@ -85,7 +88,7 @@ public class JSONParser
      * Recognize Javascript floating point.
      */
     private static final Pattern JAVASCRIPT_FLOATING_POINT_PAT =
-            Pattern.compile("((?:[-+]?(?:(?:\\d+\\.\\d+|\\.\\d+)(?:[eE][-+]?\\d+)?|Infinity))|NaN)\\b");
+            Pattern.compile("((?:[-+]?(?:(?:\\d+\\.\\d+|\\.\\d+)(?:[eE][-+]?\\d+)?|Infinity))|NaN)([,\\s}]|$)");
 
     /**
      * Recognize Javascript integers.
@@ -150,7 +153,7 @@ public class JSONParser
      *
      * @param json the string of JSON data.
      * @return The object containing the parsed data.
-     * @throws ParseException
+     * @throws ParseException If there's a problem parsing dates.
      */
     public static Object parseJSON( String json ) throws ParseException
     {
@@ -163,28 +166,25 @@ public class JSONParser
      * @param json the string of JSON data.
      * @param cfg The config object.
      * @return The object containing the parsed data.
-     * @throws ParseException
      */
-    public static Object parseJSON( String json, JSONConfig cfg ) throws ParseException
+    public static Object parseJSON( String json, JSONConfig cfg )
     {
         JSONConfig jcfg = cfg == null ? new JSONConfig() : cfg;
-        JSONCallData cld = new JSONCallData(jcfg);
 
         try {
-            Queue<Token> tokens = tokenize(json, cld);
+            Queue<Token> tokens = tokenize(json, jcfg);
 
             if ( tokens.size() < 1 ){
                 return null;
             }
 
-            return parseTokens(tokens, tokens.remove(), cld);
+            return parseTokens(tokens, tokens.remove(), jcfg);
+        }catch ( JSONException e ){
+            throw e;
+        }catch ( ParseException e ){
+            throw new JSONParserException(e, jcfg);
         }catch ( RuntimeException e ){
-            if ( e instanceof JSONException ){
-                throw e;
-            }else{
-                System.err.println(e.getMessage());
-                throw new JSONParserException(e, cld);
-            }
+            throw new JSONParserException(e, jcfg);
         }
     }
 
@@ -193,11 +193,11 @@ public class JSONParser
      *
      * @param tokens the list of tokens.
      * @param nextToken the next token.
-     * @param cld the call data.
+     * @param cfg The config object.
      * @return The object from the given tokens.
-     * @throws ParseException
+     * @throws ParseException If there's a problem parsing a date.
      */
-    private static Object parseTokens( Queue<Token> tokens, Token nextToken, JSONCallData cld ) throws ParseException
+    private static Object parseTokens( Queue<Token> tokens, Token nextToken, JSONConfig cfg ) throws ParseException
     {
         switch ( nextToken.tokenType ){
             case START_OBJECT:
@@ -213,16 +213,15 @@ public class JSONParser
                         if ( nextToken.tokenType == TokenType.COLON ){
                             // got a colon.  get the value.
                             nextToken = tokens.remove();
-                            map.put(key, getValue(nextToken, tokens, cld));
+                            map.put(key, getValue(nextToken, tokens, cfg));
                         }else{
-                            throw new JSONParserException(TokenType.COLON, nextToken.tokenType, cld);
+                            throw new JSONParserException(TokenType.COLON, nextToken.tokenType, cfg);
                         }
                     }else if ( nextToken.tokenType == TokenType.END_OBJECT ){
                         // empty object; break out of loop.
                         break;
                     }else{
-                        System.err.println(nextToken.value);
-                        throw new JSONParserException(TokenType.END_OBJECT, nextToken.tokenType, cld);
+                        throw new JSONParserException(TokenType.END_OBJECT, nextToken.tokenType, cfg);
                     }
                     nextToken = tokens.remove();
                     if ( nextToken.tokenType == TokenType.END_OBJECT ){
@@ -239,7 +238,7 @@ public class JSONParser
                 ArrayList<Object> list = new ArrayList<Object>();
                 nextToken = tokens.remove();
                 while ( tokens.size() > 0 && nextToken.tokenType != TokenType.END_ARRAY ){
-                    list.add(getValue(nextToken, tokens, cld));
+                    list.add(getValue(nextToken, tokens, cfg));
                     nextToken = tokens.remove();
                     if ( nextToken.tokenType == TokenType.END_ARRAY ){
                         // end of array.
@@ -253,7 +252,7 @@ public class JSONParser
                 list.trimToSize();
                 return list;
             default:
-                return getValue(nextToken, tokens, cld);
+                return getValue(nextToken, tokens, cfg);
         }
     }
 
@@ -262,11 +261,11 @@ public class JSONParser
      *
      * @param token the token to get the value of.
      * @param tokens the list of tokens if the token is the start of an object or array.
-     * @param  cld the call data.
+     * @param cfg The config object.
      * @return A JSON value.
-     * @throws ParseException
+     * @throws ParseException if there's a problem with date parsing.
      */
-    private static Object getValue( Token token, Queue<Token> tokens, JSONCallData cld ) throws ParseException
+    private static Object getValue( Token token, Queue<Token> tokens, JSONConfig cfg ) throws ParseException
     {
         switch ( token.tokenType ){
             case STRING:
@@ -288,29 +287,28 @@ public class JSONParser
                     return Boolean.valueOf(token.value);
                 }
             case DATE:
-                return parseDate(token.value, cld);
+                return parseDate(token.value, cfg);
             case START_OBJECT:
             case START_ARRAY:
-                return parseTokens(tokens, token, cld);
+                return parseTokens(tokens, token, cfg);
             default:
-                throw new JSONParserException(TokenType.STRING, token.tokenType, cld);
+                throw new JSONParserException(TokenType.STRING, token.tokenType, cfg);
         }
     }
 
     /**
-     * Convert a JSON string to a list of tokens.
+     * Convert a JSON string to a queue of tokens.
      *
      * @param json The JSON string to be tokenized.
-     * @param  cld the call data.
+     * @param cfg The config object.
      * @return the list of tokens.
      */
-    private static Queue<Token> tokenize( String json, JSONCallData cld )
+    private static Queue<Token> tokenize( String json, JSONConfig cfg )
     {
         Queue<Token> result = new ArrayDeque<Token>();
 
         int i = 0;
         int len = json.length();
-        JSONConfig cfg = cld.getJSONConfig();
         boolean doDateStrings = cfg.isEncodeDatesAsObjects() || cfg.isEncodeDatesAsStrings();
         while ( i < len ){
             int codePoint = json.codePointAt(i);
@@ -326,10 +324,10 @@ public class JSONParser
                 case '"':
                 case '\'':
                     // string or quoted identifier
-                    char q = json.charAt(i);
+                    char q = (char)codePoint;
 
                     if ( i+1 < len ){
-                        int j = findQuote(json, q, i+1, cld);
+                        int j = findQuote(json, q, i+1, cfg);
                         int k = j-1;
                         if ( json.charAt(k) == '\\' ){
                             // quote might be escaped.
@@ -345,7 +343,7 @@ public class JSONParser
                                 if ( slashCount % 2 != 0 ){
                                     // odd number of slashes, quote is escaped.
                                     notFinished = true;
-                                    j = findQuote(json, q, j+1, cld);
+                                    j = findQuote(json, q, j+1, cfg);
                                     k = j-1;
                                 }
                                 // else, quote not escaped. string is finished.
@@ -355,7 +353,7 @@ public class JSONParser
                         Date dt = null;
                         if ( doDateStrings ){
                             try{
-                                dt = parseDate(str, cld);
+                                dt = parseDate(str, cfg);
                             }catch ( ParseException e ){
                             }
                         }
@@ -366,7 +364,7 @@ public class JSONParser
                         }
                         i += str.length()+1;
                     }else{
-                        throw new JSONParserException(q, cld);
+                        throw new JSONParserException(q, cfg);
                     }
                     break;
                 default:
@@ -406,7 +404,7 @@ public class JSONParser
                                             result.add(new Token(TokenType.UNQUOTED_ID, JSONUtil.unEscape(id)));
                                             i += id.length() - 1;
                                         }else{
-                                            throw new JSONParserException(json, i, cld);
+                                            throw new JSONParserException(json, i, cfg);
                                         }
                                     }
                                 }
@@ -427,44 +425,46 @@ public class JSONParser
      * @param json The JSON to search.
      * @param q The quote character to look for.
      * @param index The start index for the next quote search.
-     * @param  cld the call data.
+     * @param cfg The config object.
      * @return The index of the next quote.
      */
-    private static int findQuote( String json, char q, int index, JSONCallData cld )
+    private static int findQuote( String json, char q, int index, JSONConfig cfg )
     {
         int j = json.indexOf(q, index);
         if ( j < 0 ){
-            throw new JSONParserException(q, cld);
+            throw new JSONParserException(q, cfg);
         }
         return j;
     }
 
     /**
-     * Parse a date string. This does a manual parse of ISO 8601 date strings.
-     * Oddly, Java does not have the built in ability to parse ISO 8601. If the
-     * date cannot be parsed as ISO 8601, then a default DateFormat parsing is
+     * Parse a date string. This does a manual parse of any custom parsing
+     * formats from the config object followed by ISO 8601 date strings. Oddly,
+     * Java does not have the built in ability to parse ISO 8601. If the date
+     * cannot be parsed as ISO 8601, then a default DateFormat parsing is
      * attempted.
      *
      * @param dateStr The date string.
+     * @param cfg the config object.
      * @return The date.
      * @throws ParseException If DateFormat.parse() fails.
      * @since 1.3
      */
-    private static Date parseDate( String inputStr, JSONCallData cld ) throws ParseException
+    private static Date parseDate( String inputStr, JSONConfig cfg ) throws ParseException
     {
         // Java 6 and earlier don't support ISO 8601 time zones.
         String dateStr = fixTimeZone(inputStr);
 
-        // try the ISO 8601 formatters.
-        for ( DateFormat fmt : cld.getDateFormatters() ){
+        // try custom formatters, if any, followed by ISO 8601 formatters.
+        for ( DateFormat fmt : cfg.getDateParseFormats() ){
             try{
                 return fmt.parse(dateStr);
             }catch ( ParseException e ){
             }
         }
 
-        // Hail Mary.
-        Locale loc = cld.getJSONConfig().getLocale();
+        // Hail Mary.  This may not give you what you want, even if it works.
+        Locale loc = cfg.getLocale();
         ParseException ex = null;
         int[] styles = { DateFormat.FULL, DateFormat.LONG, DateFormat.MEDIUM, DateFormat.SHORT };
         for ( int style : styles ){
