@@ -187,6 +187,18 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
+     * Only used by {@link #clone()}. Initializes nothing since clone() will
+     * initialize everything itself. Avoids the overhead from the normal
+     * constructor including synchronizing on the entire
+     * {@link JSONConfigDefaults} class.
+     *
+     * @param placeHolder dummy argument to get a different signature.
+     */
+    private JSONConfig( boolean placeHolder )
+    {
+    }
+
+    /**
      * Return a clone of this object.
      *
      * @return a clone of this object.
@@ -194,9 +206,9 @@ public class JSONConfig implements Serializable, Cloneable
     @Override
     public JSONConfig clone()
     {
-        JSONConfig result = new JSONConfig();
+        JSONConfig result = new JSONConfig(true);
 
-        result.objStack = objStack == null ? null : new ArrayList<>(4);
+        result.objStack = objStack == null ? null : new ArrayList<>();
         result.locale = locale;
 
         // NumberFormat and DateFormat are not thread safe so clone them.
@@ -340,6 +352,7 @@ public class JSONConfig implements Serializable, Cloneable
             }else{
                 Map<Class<? extends Number>,NumberFormat> numFmtMap = new HashMap<>(2);
                 numFmtMap.put(numericClass, fmt);
+                // handles null checking and cloning.
                 addNumberFormats(numFmtMap); 
             }
         }
@@ -450,18 +463,22 @@ public class JSONConfig implements Serializable, Cloneable
     /**
      * Set the date string generation format.
      *
-     * @param fmt passed to the constructor
+     * @param fmtStr passed to the constructor
      * {@link SimpleDateFormat#SimpleDateFormat(String,Locale)}
      * using the locale from this config object.
+     * @return The format that was created.
      * @since 1.4
      */
-    public void setDateGenFormat( String fmt )
+    public DateFormat setDateGenFormat( String fmtStr )
     {
-        if ( fmt != null ){
-            setDateGenFormat(new SimpleDateFormat(fmt, locale));
+        DateFormat fmt = null;
+        if ( fmtStr != null ){
+            fmt = new SimpleDateFormat(fmtStr, locale);
+            setDateGenFormat(fmt);
         }else{
             dateGenFormat = null;
         }
+        return fmt;
     }
 
     /**
@@ -534,13 +551,16 @@ public class JSONConfig implements Serializable, Cloneable
      * parsing date strings, they will be tried in the same order that
      * they were added until one works.
      *
-     * @param fmt Passed to {@link SimpleDateFormat#SimpleDateFormat(String,Locale)}
+     * @param fmtStr Passed to {@link SimpleDateFormat#SimpleDateFormat(String,Locale)}
      * using the locale from this config object to create a DateFormat.
+     * @return The format that gets created.
      * @since 1.4
      */
-    public void addDateParseFormat( String fmt )
+    public DateFormat addDateParseFormat( String fmtStr )
     {
-        addDateParseFormat(new SimpleDateFormat(fmt, locale));
+        DateFormat fmt = new SimpleDateFormat(fmtStr, locale);
+        addDateParseFormat(fmt);
+        return fmt;
     }
 
     /**
