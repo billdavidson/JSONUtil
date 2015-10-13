@@ -33,7 +33,7 @@ public class JSONParserException extends JSONException
     private TokenType expectedTokenType = null;
     private TokenType tokenType = null;
     private int index = 0;
-    private RuntimeException e = null;
+    private Exception e = null;
 
     /**
      * Constructor for bad data in JSON string.
@@ -84,6 +84,7 @@ public class JSONParserException extends JSONException
     JSONParserException( Exception e, JSONConfig cfg )
     {
         super(e, cfg);
+        this.e = e;
     }
 
     /* (non-Javadoc)
@@ -108,7 +109,7 @@ public class JSONParserException extends JSONException
         }else if ( e != null ){
             return e.getLocalizedMessage();
         }else{
-            String str = badData;
+            String str = badData == null ? "" : badData;
             int pos = 10;
             if ( str.length() > 30 ){
                 int begin = index - 10;
@@ -118,11 +119,13 @@ public class JSONParserException extends JSONException
                     pos += begin;
                     begin = 0;
                 }
+                pos = Math.max(pos, 0);
+                end = Math.min(end, str.length());
                 str = str.substring(begin, end);
             }else{
                 pos = index;
             }
-            StringBuilder buf = new StringBuilder(pos-1);
+            StringBuilder buf = new StringBuilder(Math.max(pos-1, 0));
             for ( int i = 0; i < pos; i++ ){
                 buf.append(' ');
             }

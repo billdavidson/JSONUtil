@@ -15,6 +15,7 @@
  */
 package org.kopitubruk.util.json;
 
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -49,9 +50,10 @@ public interface JSONConfigDefaultsMBean
     /**
      * Set the date format used for date string generation.
      *
-     * @param fmt passed to the constructor for {@link SimpleDateFormat#SimpleDateFormat(String)}
+     * @param fmtStr passed to the constructor for {@link SimpleDateFormat#SimpleDateFormat(String)}
+     * @return The format that is created.
      */
-    public void setDateGenFormat( String fmt );
+    public DateFormat setDateGenFormat( String fmtStr );
 
     /**
      * Clear date generation format.
@@ -62,8 +64,9 @@ public interface JSONConfigDefaultsMBean
      * Add a date parsing format to the list of date parsing formats.
      *
      * @param fmt Passed to {@link SimpleDateFormat#SimpleDateFormat(String,Locale)}.
+     * @return The format that gets created.
      */
-    public void addDateParseFormat( String fmt );
+    public DateFormat addDateParseFormat( String fmt );
 
     /**
      * Clear any date parse formats.

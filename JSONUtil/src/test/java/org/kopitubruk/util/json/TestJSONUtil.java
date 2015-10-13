@@ -30,7 +30,6 @@ import java.math.BigInteger;
 import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -483,13 +482,9 @@ public class TestJSONUtil
         dt = (Date)JSONParser.parseJSON("\"2015-09-16T14:08:34+01:30\"", cfg);
         assertEquals("2015-09-16T12:38:34.034Z", fmt.format(dt));
 
-        dt = (Date)JSONParser.parseJSON("new Date(\"Tuesday, April 12, 1952\")", cfg);
-        assertEquals("1952-04-12T08:00:00.000Z", fmt.format(dt));
-
         // custom formats.
-        DateFormat nfmt = new SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss Z", Locale.US);
+        DateFormat nfmt = cfg.setDateGenFormat("EEE, d MMM yyyy HH:mm:ss Z");
         nfmt.setTimeZone(TimeZone.getTimeZone("US/Eastern"));
-        cfg.setDateGenFormat(nfmt);
         cfg.addDateParseFormat("yyyy.MM.dd G 'at' HH:mm:ss z");
         dt = (Date)JSONParser.parseJSON("\"2001.07.04 AD at 12:08:56 EDT\"", cfg);
         assertEquals("Wed, 4 Jul 2001 12:08:56 -0400", nfmt.format(dt));
