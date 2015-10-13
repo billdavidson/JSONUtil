@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Queue;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -41,7 +40,7 @@ import java.util.regex.Pattern;
  * Javascript arrays are converted to {@link ArrayList}s.
  * <p>
  * Literal null is just a null value and boolean values are converted to
- * {@link Boolean}'s.
+ * {@link Boolean}s.
  * <p>
  * Floating point numbers are converted to {@link Double} and integers are
  * converted to {@link Long}.
@@ -71,7 +70,7 @@ public class JSONParser
     /**
      * Recognize white space
      */
-    private static final Pattern SPACE_PAT = Pattern.compile("(\\s+)(?:\\S.*)?");
+    private static final Pattern SPACE_PAT = Pattern.compile("(\\s+)", Pattern.MULTILINE);
 
     /**
      * Recognize octal
@@ -350,17 +349,18 @@ public class JSONParser
                             } while ( notFinished );
                         }
                         String str = json.substring(i+1, j);
+                        String unesc = JSONUtil.unEscape(str);
                         Date dt = null;
                         if ( doDateStrings ){
                             try{
-                                dt = parseDate(str, cfg);
+                                dt = parseDate(unesc, cfg);
                             }catch ( ParseException e ){
                             }
                         }
                         if ( dt != null ){
-                            result.add(new Token(TokenType.DATE, str));
+                            result.add(new Token(TokenType.DATE, unesc));
                         }else{
-                            result.add(new Token(TokenType.STRING, JSONUtil.unEscape(str)));
+                            result.add(new Token(TokenType.STRING, unesc));
                         }
                         i += str.length()+1;
                     }else{
@@ -373,7 +373,8 @@ public class JSONParser
                         String newDate = matcher.group(1);
                         i += newDate.length() - 1;
                         String qs = matcher.group(2);
-                        result.add(new Token(TokenType.DATE, qs.substring(1, qs.length()-1)));
+                        String unesc = JSONUtil.unEscape(qs.substring(1, qs.length()-1));
+                        result.add(new Token(TokenType.DATE, unesc));
                     }else{
                         matcher = JAVASCRIPT_FLOATING_POINT_PAT.matcher(json);
                         if ( matcher.find(i) && matcher.start() == i ){
@@ -440,9 +441,8 @@ public class JSONParser
     /**
      * Parse a date string. This does a manual parse of any custom parsing
      * formats from the config object followed by ISO 8601 date strings. Oddly,
-     * Java does not have the built in ability to parse ISO 8601. If the date
-     * cannot be parsed as ISO 8601, then a default DateFormat parsing is
-     * attempted.
+     * Java does not have the built in ability to parse ISO 8601. If the string
+     * cannot be parsed then a ParseException will be thrown.
      *
      * @param dateStr The date string.
      * @param cfg the config object.
@@ -454,29 +454,18 @@ public class JSONParser
     {
         // Java 6 and earlier don't support ISO 8601 time zones.
         String dateStr = fixTimeZone(inputStr);
+        ParseException ex = null;
 
         // try custom formatters, if any, followed by ISO 8601 formatters.
         for ( DateFormat fmt : cfg.getDateParseFormats() ){
             try{
                 return fmt.parse(dateStr);
             }catch ( ParseException e ){
-            }
-        }
-
-        // Hail Mary.  This may not give you what you want, even if it works.
-        Locale loc = cfg.getLocale();
-        ParseException ex = null;
-        int[] styles = { DateFormat.FULL, DateFormat.LONG, DateFormat.MEDIUM, DateFormat.SHORT };
-        for ( int style : styles ){
-            DateFormat fmt = DateFormat.getDateInstance(style, loc);
-            try{
-                return fmt.parse(inputStr);
-            }catch ( ParseException e ){
                 ex = e;
             }
         }
 
-        // none of the styles worked.
+        // none of the formats worked.
         throw ex;
     }
 

@@ -446,6 +446,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             }else{
                 Map<Class<? extends Number>,NumberFormat> numFmtMap = new HashMap<Class<? extends Number>,NumberFormat>(2);
                 numFmtMap.put(numericClass, fmt);
+                // handles null checking and cloning.
                 addNumberFormats(numFmtMap);
             }
         }
@@ -605,19 +606,23 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Set the date format used for date string generation. Accessible via MBean
      * server.
      *
-     * @param fmt passed to the constructor for
+     * @param fmtStr passed to the constructor for
      * {@link SimpleDateFormat#SimpleDateFormat(String,Locale)} using
      * the result of {@link #getLocale()}.
+     * @return the format that is created.
      * @since 1.4
      */
     @Override
-    public void setDateGenFormat( String fmt )
+    public DateFormat setDateGenFormat( String fmtStr )
     {
-        if ( fmt != null ){
-            setDateGenFormat(new SimpleDateFormat(fmt, getLocale()));
+        DateFormat fmt = null;
+        if ( fmtStr != null ){
+            fmt = new SimpleDateFormat(fmtStr, getLocale());
+            setDateGenFormat(fmt);
         }else{
             setDateGenFormat((DateFormat)null);
         }
+        return fmt;
     }
 
     /**
@@ -663,15 +668,18 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Add a date parsing format to the list of date parsing formats. Accessible
      * via MBean server.
      *
-     * @param fmt Passed to
+     * @param fmtStr Passed to
      * {@link SimpleDateFormat#SimpleDateFormat(String,Locale)} using
      * the result of {@link #getLocale()}.
+     * @return The format that gets created.
      * @since 1.4
      */
     @Override
-    public void addDateParseFormat( String fmt )
+    public DateFormat addDateParseFormat( String fmtStr )
     {
-        addDateParseFormat(new SimpleDateFormat(fmt, getLocale()));
+        DateFormat fmt = new SimpleDateFormat(fmtStr, getLocale());
+        addDateParseFormat(fmt);
+        return fmt;
     }
 
     /**
@@ -697,18 +705,24 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         List<DateFormat> result = dest;
 
         if ( src != null ){
-            if ( result == null ){
-                result = new ArrayList<DateFormat>(src.size());
-            }else{
-                List<DateFormat> tmp = new ArrayList<DateFormat>(result.size() + src.size());
-                tmp.addAll(result);
-                result = tmp;
-            }
-
-            // DateFormat's are not thread safe.
+            ArrayList<DateFormat> cloneSrc = new ArrayList<DateFormat>(src.size());
             for ( DateFormat fmt : src ){
                 if ( fmt != null ){
-                    result.add((DateFormat)fmt.clone());
+                    // clone because DateFormat's are not thread safe.
+                    cloneSrc.add((DateFormat)fmt.clone());
+                }
+            }
+
+            if ( cloneSrc.size() > 0 ){
+                if ( result == null ){
+                    // adjust size if there were nulls.
+                    cloneSrc.trimToSize();
+                    result = cloneSrc;
+                }else{
+                    List<DateFormat> tmp = new ArrayList<DateFormat>(result.size() + cloneSrc.size());
+                    tmp.addAll(result);
+                    tmp.addAll(cloneSrc);
+                    result = tmp;
                 }
             }
         }
