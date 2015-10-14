@@ -119,7 +119,6 @@ public class JSONParserException extends JSONException
                     pos += begin;
                     begin = 0;
                 }
-                pos = Math.max(pos, 0);
                 end = Math.min(end, str.length());
                 str = str.substring(begin, end);
             }else{
