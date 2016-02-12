@@ -45,10 +45,10 @@ public interface JSONAble
      * Convert this object to a string of JSON data.
      * <p>
      * This version does not use a {@link JSONConfig} and so can break loop
-     * detection.  In many common cases, that's not a problem and this
-     * is just more convenient.
+     * detection. In many common cases, that's not a problem and this is just
+     * more convenient.
      * <p>
-     * The default implementation calls {@link #toJSON(JSONConfig)} to
+     * The default implementation calls {@link #toJSON(JSONConfig, Writer)} to
      * actually do the work.
      *
      * @return A string of JSON data.
@@ -69,8 +69,8 @@ public interface JSONAble
      * pass the supplied {@link JSONConfig} to
      * {@link JSONUtil#toJSON(Object, JSONConfig)} or
      * {@link JSONUtil#toJSON(Object, JSONConfig, Writer)} in order to preserve
-     * data structure loop detection.  If this is not done, then loops may not
-     * be detected properly.
+     * data structure loop detection. If this is not done, then loops may not be
+     * detected properly.
      * <p>
      * The default implementation calls {@link #toJSON(JSONConfig, Writer)} to
      * actually do the work.
@@ -99,11 +99,14 @@ public interface JSONAble
     // public String toJSON( JSONConfig jsonConfig );
 
     /**
-     * Write to the given writer as JSON data using all
-     * defaults for the configuration.
+     * Write to the given writer as JSON data using all defaults for the
+     * configuration.
+     * <p>
+     * The default implementation calls {@link #toJSON(JSONConfig, Writer)} to
+     * actually do the work.
      *
      * @param json json A writer for the output.
-     * @throws IOException  If there is an error on output.
+     * @throws IOException If there is an error on output.
      */
     /* Java 8 version */
     default void toJSON( Writer json ) throws IOException
