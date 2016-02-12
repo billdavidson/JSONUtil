@@ -450,6 +450,13 @@ public class TestJSONUtil
         obj = JSONParser.parseJSON("null");
         assertEquals(null, obj);
 
+        obj = JSONParser.parseJSON("[1.1,2.2,-3.134598765,4.0]");
+        List<?> array = (List<?>)obj;
+        assertEquals(array.get(0), new Double(1.1));
+        assertEquals(array.get(1), new Double(2.2));
+        assertEquals(array.get(2), new Double(-3.134598765));
+        assertEquals(array.get(3), new Double(4.0));
+
         // parse various forms of date strings.
         JSONConfig cfg = new JSONConfig();
         cfg.setEncodeDatesAsStrings(true);
