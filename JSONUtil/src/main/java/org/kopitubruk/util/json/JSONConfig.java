@@ -106,7 +106,7 @@ public class JSONConfig implements Serializable, Cloneable
     /**
      * Optional number formats mapped from different number types.
      */
-    private Map<Class<? extends Number>,NumberFormat> numberFormatMap;
+    private Map<Class<? extends Number>,NumberFormat> numberFormatMap = null;
 
     /**
      * A date formatter when encoding Dates.
@@ -154,34 +154,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public JSONConfig( Locale locale )
     {
-        synchronized ( JSONConfigDefaults.class ){
-            JSONConfigDefaults dflt = JSONConfigDefaults.getInstance();
-
-            setLocale(locale);
-
-            // formats
-            addNumberFormats(JSONConfigDefaults.getNumberFormatMap());
-            setDateGenFormat(JSONConfigDefaults.getDateGenFormat());
-            addDateParseFormats(JSONConfigDefaults.getDateParseFormats());
-
-            // validation options.
-            validatePropertyNames = dflt.isValidatePropertyNames();
-            detectDataStructureLoops = dflt.isDetectDataStructureLoops();
-            escapeBadIdentifierCodePoints = dflt.isEscapeBadIdentifierCodePoints();
-
-            // various alternate encoding options.
-            encodeNumericStringsAsNumbers = dflt.isEncodeNumericStringsAsNumbers();
-            escapeNonAscii = dflt.isEscapeNonAscii();
-            unEscapeWherePossible = dflt.isUnEscapeWherePossible();
-            escapeSurrogates = dflt.isEscapeSurrogates();
-            encodeDatesAsStrings = dflt.isEncodeDatesAsStrings();
-
-            // non-standard JSON options.
-            quoteIdentifier = dflt.isQuoteIdentifier();
-            useECMA6 = dflt.isUseECMA6();
-            allowReservedWordsInIdentifiers = dflt.isAllowReservedWordsInIdentifiers();
-            encodeDatesAsObjects = dflt.isEncodeDatesAsObjects();
-        }
+        JSONConfigDefaults.initJSONConfig(this, locale);
 
         objStack = detectDataStructureLoops ? new ArrayList<Object>() : null;
     }
@@ -199,7 +172,8 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * Return a clone of this object.
+     * Return a clone of this object.  Note that this is unsynchronized,
+     * so code accordingly.
      *
      * @return a clone of this object.
      */
@@ -353,7 +327,7 @@ public class JSONConfig implements Serializable, Cloneable
                 Map<Class<? extends Number>,NumberFormat> numFmtMap = new HashMap<Class<? extends Number>,NumberFormat>(2);
                 numFmtMap.put(numericClass, fmt);
                 // handles null checking and cloning.
-                addNumberFormats(numFmtMap); 
+                addNumberFormats(numFmtMap);
             }
         }
     }
@@ -377,7 +351,7 @@ public class JSONConfig implements Serializable, Cloneable
             addNumberFormat(numericType.getClass(), fmt);
         }
     }
-    
+
     /**
      * Add a map of number formats to the current map of number formats.
      *
@@ -483,7 +457,7 @@ public class JSONConfig implements Serializable, Cloneable
 
     /**
      * Clear date generation format.
-     * 
+     *
      * @since 1.4
      */
     public void clearDateGenFormat()
@@ -573,7 +547,7 @@ public class JSONConfig implements Serializable, Cloneable
     public void addDateParseFormats( Collection<? extends DateFormat> fmts )
     {
         customDateParseFormats = JSONConfigDefaults.addDateParseFormats(customDateParseFormats, fmts);
-        
+
         // make sure that custom formats get included in the future.
         dateParseFormats = null;
     }
@@ -700,16 +674,21 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * If you want non-ascii characters encoded as Unicode escapes, you can do
-     * that by setting this to true. Default is false. One reason that you might
-     * want to do this is when debugging code that is working with code points
-     * for which you do not have a usable font.
+     * If you want non-ascii characters encoded as Unicode escapes in strings
+     * and identifiers, you can do that by setting this to true. Default is
+     * false. One reason that you might want to do this is when debugging code
+     * that is working with code points for which you do not have a usable font.
+     * If true, then escapeSurrogates will be forced to false (it would be
+     * redundant).
      *
      * @param escapeNonAscii set to true if you want non-ascii to be Unicode escaped.
      */
     public void setEscapeNonAscii( boolean escapeNonAscii )
     {
         this.escapeNonAscii = escapeNonAscii;
+        if ( escapeNonAscii ){
+            escapeSurrogates = false;
+        }
     }
 
     /**
@@ -755,13 +734,17 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * If true then all surrogates will be escaped.
+     * If true then all surrogates will be escaped in strings and identifiers
+     * and escapeNonAscii will be forced to false.
      *
      * @param escapeSurrogates the escapeSurrogates to set
      */
     public void setEscapeSurrogates( boolean escapeSurrogates )
     {
         this.escapeSurrogates = escapeSurrogates;
+        if ( escapeSurrogates ){
+            this.escapeNonAscii = false;
+        }
     }
 
     /**

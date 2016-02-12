@@ -491,6 +491,7 @@ public class JSONUtil
                     }else{
                         didStart = true;
                     }
+                    // apply any escapes and do validation as per the config flags.
                     String propertyName = getPropertyName(key, cfg, propertyNames);
                     boolean doQuote = quoteIdentifier || isReservedWord(propertyName) || hasSurrogates(propertyName);
                     if ( doQuote ){
@@ -502,6 +503,7 @@ public class JSONUtil
                     }
                     json.write(':');
                     Object value = isMap ? map.get(key) : bundle.getObject((String)key);
+                    // recurse on the value.
                     appendPropertyValue(value, json, cfg);
                 }
                 json.write('}');
@@ -517,6 +519,7 @@ public class JSONUtil
                         }else{
                             didStart = true;
                         }
+                        // recurse on the value.
                         appendPropertyValue(value, json, cfg);
                     }
                 }else if ( propertyValue instanceof Enumeration ){
@@ -527,6 +530,7 @@ public class JSONUtil
                         }else{
                             didStart = true;
                         }
+                        // recurse on the value.
                         appendPropertyValue(enumeration.nextElement(), json, cfg);
                     }
                 }else{
@@ -537,6 +541,7 @@ public class JSONUtil
                         if ( i > 0 ){
                             json.write(',');
                         }
+                        // recurse on the value.
                         appendPropertyValue(Array.get(array, i), json, cfg);
                     }
                 }
@@ -587,7 +592,7 @@ public class JSONUtil
             // boolean values go literal -- no quotes.
             json.write(propertyValue.toString());
         }else if ( propertyValue instanceof Date && cfg.isEncodeDatesAsObjects() ){
-            // non-standard JSON but should work with eval().
+            // non-standard JSON but should work with Javascript eval().
             Date date = (Date)propertyValue;
             json.write("new Date(");
             writeString(cfg.getDateGenFormat().format(date), json, cfg);
@@ -708,14 +713,9 @@ public class JSONUtil
          */
 
         // handle escaping options.
-        if ( cfg.isEscapeNonAscii() ){
-            propertyName = escapeNonAscii(propertyName, cfg);
-        }else if ( cfg.isEscapeSurrogates() ){
-            propertyName = escapeSurrogates(propertyName, cfg);
-        }
-        if ( cfg.isEscapeBadIdentifierCodePoints() ){
-            propertyName = escapeBadIdentifierCodePoints(propertyName, cfg);
-        }
+        propertyName = escapeNonAscii(propertyName, cfg);
+        propertyName = escapeSurrogates(propertyName, cfg);
+        propertyName = escapeBadIdentifierCodePoints(propertyName, cfg);
 
         // handle validation.
         if ( cfg.isValidatePropertyNames() ){
@@ -732,7 +732,7 @@ public class JSONUtil
     }
 
     /**
-     * Escape bad identifier code points.
+     * Escape bad identifier code points if the config object requires it.
      *
      * @param propertyname the name to escape.
      * @param cfg The config object.
@@ -740,51 +740,91 @@ public class JSONUtil
      */
     private static String escapeBadIdentifierCodePoints( String propertyName, JSONConfig cfg )
     {
-        StringBuilder buf = new StringBuilder();
+        if ( cfg.isEscapeBadIdentifierCodePoints() && hasBadIdentifierCodePoints(propertyName, cfg) ){
+            StringBuilder buf = new StringBuilder();
+            int i = 0;
+            int len = propertyName.length();
+            boolean useECMA6 = cfg.isUseECMA6();
+            Pattern unicodeEscapePat = useECMA6 ? CODE_UNIT_OR_POINT_PAT : FREE_CODE_UNIT_PAT;
+
+            while ( i < len ){
+                int codePoint = propertyName.codePointAt(i);
+                int charCount = Character.charCount(codePoint);
+                if ( isValidIdentifierStart(codePoint, cfg) ){
+                    buf.appendCodePoint(codePoint);
+                }else if ( i > 0 && isValidIdentifierPart(codePoint, cfg) ){
+                    buf.appendCodePoint(codePoint);
+                }else{
+                    // Bad code point for an identifier.
+                    boolean doEscape = true;
+                    if ( codePoint == '\\' ){
+                        // check for a Unicode escape.
+                        Matcher matcher = unicodeEscapePat.matcher(propertyName);
+                        if ( matcher.find(i) && matcher.start() == i ){
+                            // It's a Unicode escape.  Pass it through.
+                            String esc = matcher.group(1);
+                            buf.append(esc);
+                            i += esc.length() - 1;
+                            doEscape = false;
+                        }
+                    }
+                    if ( doEscape ){
+                        if ( useECMA6 && (codePoint < 0x10 || codePoint > 0xFFFF) ){
+                            // Use ECMAScript 6 code point escape.
+                            // only very low or very high code points see an advantage.
+                            buf.append(String.format(CODE_POINT_FMT, codePoint));
+                        }else{
+                            // Use normal escape.
+                            buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i)));
+                            if ( charCount > 1 ){
+                                buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i+1)));
+                            }
+                        }
+                    }
+                }
+                i += charCount;
+            }
+
+            return buf.toString();
+        }else{
+            return propertyName;
+        }
+    }
+
+    /**
+     * Return true of if the given input contains bad identifier code points.
+     *
+     * @param propertyName the input string.
+     * @return true if the input string contains bad identifier code points. Otherwise false.
+     */
+    private static boolean hasBadIdentifierCodePoints( String propertyName, JSONConfig cfg )
+    {
         int i = 0;
         int len = propertyName.length();
-        boolean useECMA6 = cfg.isUseECMA6();
-        Pattern unicodeEscapePat = useECMA6 ? CODE_UNIT_OR_POINT_PAT : FREE_CODE_UNIT_PAT;
+        Pattern unicodeEscapePat = cfg.isUseECMA6() ? CODE_UNIT_OR_POINT_PAT : FREE_CODE_UNIT_PAT;
 
         while ( i < len ){
             int codePoint = propertyName.codePointAt(i);
             int charCount = Character.charCount(codePoint);
-            if ( isValidIdentifierStart(codePoint, cfg) ){
-                buf.appendCodePoint(codePoint);
-            }else if ( i > 0 && isValidIdentifierPart(codePoint, cfg) ){
-                buf.appendCodePoint(codePoint);
-            }else{
+            if ( !( isValidIdentifierStart(codePoint, cfg) || (i > 0 && isValidIdentifierPart(codePoint, cfg)) ) ){
                 // Bad code point for an identifier.
-                boolean doEscape = true;
                 if ( codePoint == '\\' ){
                     // check for a Unicode escape.
                     Matcher matcher = unicodeEscapePat.matcher(propertyName);
                     if ( matcher.find(i) && matcher.start() == i ){
-                        // It's a Unicode escape.  Pass it through.
+                        // It's a Unicode escape.  Skip it.
                         String esc = matcher.group(1);
-                        buf.append(esc);
                         i += esc.length() - 1;
-                        doEscape = false;
-                    }
-                }
-                if ( doEscape ){
-                    if ( useECMA6 && (codePoint < 0x10 || codePoint > 0xFFFF) ){
-                        // Use ECMAScript 6 code point escape.
-                        // only very low or very high code points see an advantage.
-                        buf.append(String.format(CODE_POINT_FMT, codePoint));
                     }else{
-                        // Use normal escape.
-                        buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i)));
-                        if ( charCount > 1 ){
-                            buf.append(String.format(CODE_UNIT_FMT, (int)propertyName.charAt(i+1)));
-                        }
+                        return true;
                     }
+                }else{
+                    return true;
                 }
             }
             i += charCount;
         }
-
-        return buf.toString();
+        return false;
     }
 
     /**
@@ -834,7 +874,7 @@ public class JSONUtil
      */
     private static String escapeSurrogates( String str, JSONConfig cfg )
     {
-        if ( hasSurrogates(str) ){
+        if ( cfg.isEscapeSurrogates() && hasSurrogates(str) ){
             StringBuilder buf = new StringBuilder();
             int i = 0;
             int len = str.length();
@@ -861,7 +901,7 @@ public class JSONUtil
     }
 
     /**
-     * Escape non-ascii.
+     * Escape non-ascii if the config object requires it.
      *
      * @param str The input string.
      * @param cfg The config object for flags.
@@ -869,28 +909,48 @@ public class JSONUtil
      */
     private static String escapeNonAscii( String str, JSONConfig cfg )
     {
-        StringBuilder buf = new StringBuilder();
-        int i = 0;
-        int len = str.length();
-        boolean useECMA6 = cfg.isUseECMA6();
-        while ( i < len ){
-            int codePoint = str.codePointAt(i);
-            int charCount = Character.charCount(codePoint);
-            if ( codePoint > 127 ){
-                if ( useECMA6 && codePoint > 0xFFFF ){
-                    buf.append(String.format(CODE_POINT_FMT, codePoint));
-                }else{
-                    buf.append(String.format(CODE_UNIT_FMT, (int)str.charAt(i)));
-                    if ( charCount > 1 ){
-                        buf.append(String.format(CODE_UNIT_FMT, (int)str.charAt(i+1)));
+        if ( cfg.isEscapeNonAscii() && hasNonAscii(str) ){
+            StringBuilder buf = new StringBuilder();
+            int i = 0;
+            int len = str.length();
+            boolean useECMA6 = cfg.isUseECMA6();
+            while ( i < len ){
+                int codePoint = str.codePointAt(i);
+                int charCount = Character.charCount(codePoint);
+                if ( codePoint > 127 ){
+                    if ( useECMA6 && codePoint > 0xFFFF ){
+                        buf.append(String.format(CODE_POINT_FMT, codePoint));
+                    }else{
+                        buf.append(String.format(CODE_UNIT_FMT, (int)str.charAt(i)));
+                        if ( charCount > 1 ){
+                            buf.append(String.format(CODE_UNIT_FMT, (int)str.charAt(i+1)));
+                        }
                     }
+                }else{
+                    buf.appendCodePoint(codePoint);
                 }
-            }else{
-                buf.appendCodePoint(codePoint);
+                i += charCount;
             }
-            i += charCount;
+            return buf.toString();
+        }else{
+            return str;
         }
-        return buf.toString();
+    }
+
+    /**
+     * Return true of if the given input contains non-ASCII characters.
+     *
+     * @param str the input string.
+     * @return true if the input string contains non-ASCII characters. Otherwise false.
+     */
+    private static boolean hasNonAscii( String str )
+    {
+        for ( int i = 0, len = str.length(); i < len; i++ ){
+            if ( str.charAt(i) > 127 ){
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
