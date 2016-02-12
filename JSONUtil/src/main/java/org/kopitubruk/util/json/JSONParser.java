@@ -87,7 +87,7 @@ public class JSONParser
      * Recognize Javascript floating point.
      */
     private static final Pattern JAVASCRIPT_FLOATING_POINT_PAT =
-            Pattern.compile("((?:[-+]?(?:(?:\\d+\\.\\d+|\\.\\d+)(?:[eE][-+]?\\d+)?|Infinity))|NaN)([,\\s}]|$)");
+            Pattern.compile("((?:[-+]?(?:(?:\\d+\\.\\d+|\\.\\d+)(?:[eE][-+]?\\d+)?|Infinity))|NaN)([,\\s}\\]]|$)");
 
     /**
      * Recognize Javascript integers.

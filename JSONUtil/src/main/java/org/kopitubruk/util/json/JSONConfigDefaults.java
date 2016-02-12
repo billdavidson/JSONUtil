@@ -38,6 +38,9 @@ import javax.naming.Context;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import static org.kopitubruk.util.json.JNDIUtil.getString;
+import static org.kopitubruk.util.json.JNDIUtil.getBoolean;
+
 /**
  * <p>
  * This class provides a singleton object which is used to change static
@@ -111,6 +114,11 @@ import org.apache.commons.logging.LogFactory;
  * "dateGenFormat" described above.  They will be added in numeric order of
  * the name.
  * <p>
+ * Number formats and date formats are cloned when they are added because they
+ * are not thread safe.  They are cloned again when applied to a new
+ * {@link JSONConfig} for the same reason.  Once you add a format, you can't
+ * modify it except by replacing it entirely.
+ * <p>
  * It is possible to see and modify the default values of all of the boolean
  * flags at runtime if you have a JMX client with MBean support connected to
  * your server.  It will be in org.kopitubruk.util.json.JSONConfigDefaults.  You
@@ -176,8 +184,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         // the singleton.
         jsonConfigDefaults = new JSONConfigDefaults();
 
+        // copy reference to shorten code.
+        JSONConfigDefaults d = jsonConfigDefaults;
+
         // annoying that there's no static equivalent to "this".
-        Class<?> thisClass = jsonConfigDefaults.getClass();
+        Class<?> thisClass = d.getClass();
 
         String pkgName = thisClass.getPackage().getName();
         String registerMBeanName = "registerMBean";
@@ -202,9 +213,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 Context ctx = JNDIUtil.getEnvContext(pkgName.replaceAll("\\.", "/"));
 
                 // locale.
-                String languageTag = JNDIUtil.getString(ctx, "locale", null);
+                String languageTag = getString(ctx, "locale", null);
                 if ( languageTag != null ){
-                    jsonConfigDefaults.setLocale(languageTag);
+                    d.setLocale(languageTag);
                     if ( logging ){
                         // possibly changed the locale.  redo the bundle.
                         bundle = JSONUtil.getBundle(getLocale());
@@ -212,38 +223,38 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 }
 
                 // date generation format.
-                String dgf = JNDIUtil.getString(ctx, "dateGenFormat", null);
+                String dgf = getString(ctx, "dateGenFormat", null);
                 if ( dgf != null ){
-                    jsonConfigDefaults.setDateGenFormat(dgf);
+                    d.setDateGenFormat(dgf);
                 }
 
                 // date parse formats.
                 for ( int i = 0; i < 16; i++ ){
-                    String dpf = JNDIUtil.getString(ctx, "dateParseFormat" + i, null);
+                    String dpf = getString(ctx, "dateParseFormat" + i, null);
                     if ( dpf != null ){
-                        jsonConfigDefaults.addDateParseFormat(dpf);
+                        d.addDateParseFormat(dpf);
                     }
                 }
 
-                registerMBean = JNDIUtil.getBoolean(ctx, registerMBeanName, registerMBean);
+                registerMBean = getBoolean(ctx, registerMBeanName, registerMBean);
 
                 // validation flags.
-                validatePropertyNames = JNDIUtil.getBoolean(ctx, "validatePropertyNames", validatePropertyNames);
-                detectDataStructureLoops = JNDIUtil.getBoolean(ctx, "detectDataStructureLoops", detectDataStructureLoops);
-                escapeBadIdentifierCodePoints = JNDIUtil.getBoolean(ctx, "escapeBadIdentifierCodePoints", escapeBadIdentifierCodePoints);
+                d.setValidatePropertyNames(getBoolean(ctx, "validatePropertyNames", validatePropertyNames));
+                d.setDetectDataStructureLoops(getBoolean(ctx, "detectDataStructureLoops", detectDataStructureLoops));
+                d.setEscapeBadIdentifierCodePoints(getBoolean(ctx, "escapeBadIdentifierCodePoints", escapeBadIdentifierCodePoints));
 
                 // safe alternate encoding options.
-                encodeNumericStringsAsNumbers = JNDIUtil.getBoolean(ctx, "encodeNumericStringsAsNumbers", encodeNumericStringsAsNumbers);
-                escapeNonAscii = JNDIUtil.getBoolean(ctx, "escapeNonAscii", escapeNonAscii);
-                unEscapeWherePossible = JNDIUtil.getBoolean(ctx, "unEscapeWherePossible", unEscapeWherePossible);
-                escapeSurrogates = JNDIUtil.getBoolean(ctx, "escapeSurrogates", escapeSurrogates);
-                jsonConfigDefaults.setEncodeDatesAsStrings(JNDIUtil.getBoolean(ctx, "encodeDatesAsStrings", encodeDatesAsStrings));
+                d.setEncodeNumericStringsAsNumbers(getBoolean(ctx, "encodeNumericStringsAsNumbers", encodeNumericStringsAsNumbers));
+                d.setEscapeNonAscii(getBoolean(ctx, "escapeNonAscii", escapeNonAscii));
+                d.setUnEscapeWherePossible(getBoolean(ctx, "unEscapeWherePossible", unEscapeWherePossible));
+                d.setEscapeSurrogates(getBoolean(ctx, "escapeSurrogates", escapeSurrogates));
+                d.setEncodeDatesAsStrings(getBoolean(ctx, "encodeDatesAsStrings", encodeDatesAsStrings));
 
                 // non-standard encoding options.
-                quoteIdentifier = JNDIUtil.getBoolean(ctx, "quoteIdentifier", quoteIdentifier);
-                useECMA6 = JNDIUtil.getBoolean(ctx, "useECMA6CodePoints", useECMA6);
-                allowReservedWordsInIdentifiers = JNDIUtil.getBoolean(ctx, "allowReservedWordsInIdentifiers", allowReservedWordsInIdentifiers);
-                jsonConfigDefaults.setEncodeDatesAsObjects(JNDIUtil.getBoolean(ctx, "encodeDatesAsObjects", encodeDatesAsObjects));
+                d.setQuoteIdentifier(getBoolean(ctx, "quoteIdentifier", quoteIdentifier));
+                d.setUseECMA6(getBoolean(ctx, "useECMA6CodePoints", useECMA6));
+                d.setAllowReservedWordsInIdentifiers(getBoolean(ctx, "allowReservedWordsInIdentifiers", allowReservedWordsInIdentifiers));
+                d.setEncodeDatesAsObjects(getBoolean(ctx, "encodeDatesAsObjects", encodeDatesAsObjects));
             }catch ( Exception e ){
                 // Nothing set in JNDI.  Use code defaults.  Not a problem.
                 debug(bundle.getString("badJNDIforConfig"), e);
@@ -255,8 +266,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             try{
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
 
-                mBeanName = JNDIUtil.getObjectName(jsonConfigDefaults);
-                mBeanServer.registerMBean(jsonConfigDefaults, mBeanName);
+                mBeanName = JNDIUtil.getObjectName(d);
+                mBeanServer.registerMBean(d, mBeanName);
                 debug(String.format(bundle.getString("registeredMbean"), mBeanName));
             }catch ( Exception e ){
                 // No MBean server.  Not a problem.
@@ -355,6 +366,41 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 mBeanName = null;
             }
         }
+    }
+
+    /**
+     * Apply defaults to the given {@link JSONConfig} object.
+     *
+     * @param cfg The config object to initialize with defaults.
+     * @param loc The locale.
+     * @since 1.5
+     */
+    static synchronized void initJSONConfig( JSONConfig cfg, Locale loc )
+    {
+        cfg.setLocale(loc);
+
+        // formats
+        cfg.addNumberFormats(getNumberFormatMap());
+        cfg.setDateGenFormat(getDateGenFormat());
+        cfg.addDateParseFormats(getDateParseFormats());
+
+        // validation options.
+        cfg.setValidatePropertyNames(validatePropertyNames);
+        cfg.setDetectDataStructureLoops(detectDataStructureLoops);
+        cfg.setEscapeBadIdentifierCodePoints(escapeBadIdentifierCodePoints);
+
+        // various alternate encoding options.
+        cfg.setEncodeNumericStringsAsNumbers(encodeNumericStringsAsNumbers);
+        cfg.setEscapeNonAscii(escapeNonAscii);
+        cfg.setUnEscapeWherePossible(unEscapeWherePossible);
+        cfg.setEscapeSurrogates(escapeSurrogates);
+        cfg.setEncodeDatesAsStrings(encodeDatesAsStrings);
+
+        // non-standard JSON options.
+        cfg.setQuoteIdentifier(quoteIdentifier);
+        cfg.setUseECMA6(useECMA6);
+        cfg.setAllowReservedWordsInIdentifiers(allowReservedWordsInIdentifiers);
+        cfg.setEncodeDatesAsObjects(encodeDatesAsObjects);
     }
 
     /**
@@ -567,7 +613,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Clear any default number formats.  Accessible via MBean server.
-     * 
+     *
      * @since 1.4
      */
     public void clearNumberFormats()
@@ -686,7 +732,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     {
         dateParseFormats = addDateParseFormats(dateParseFormats, fmts);
     }
-    
+
     /**
      * Add the source collection of formats to the destination list of formats.
      *
@@ -849,9 +895,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Set the default flag for forcing escaping of non-ASCII characters.
-     * This will affect all new JSONConfig objects created after this call
-     * within the same class loader.  Accessible via MBean server.
+     * Set the default flag for forcing escaping of non-ASCII characters in
+     * strings and identifiers. If true, then escapeSurrogates will be forced to
+     * false. This will affect all new JSONConfig objects created after this
+     * call within the same class loader. Accessible via MBean server.
      *
      * @param dflt If true, then all non-ASCII will be Unicode escaped.
      */
@@ -860,6 +907,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     {
         synchronized ( this.getClass() ){
             escapeNonAscii = dflt;
+            if ( escapeNonAscii ){
+                escapeSurrogates = false;
+            }
         }
     }
 
@@ -901,7 +951,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * If true, then surrogates will be escaped.
+     * If true, then surrogates will be escaped in strings and identifiers
+     * and escapeNonAscii will be forced to false.
      *
      * @param dflt the defaultEscapeSurrogates to set
      */
@@ -910,6 +961,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     {
         synchronized ( this.getClass() ){
             escapeSurrogates = dflt;
+            if ( escapeSurrogates ){
+                escapeNonAscii = false;
+            }
         }
     }
 
