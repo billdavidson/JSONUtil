@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.FieldPosition;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
@@ -563,17 +564,20 @@ public class JSONUtil
     }
 
     /**
-     * Java5 can't get a key set from a resource bundle.
+     * This converts an enumeration to a set.
+     * <p>
+     * Java5 can't get a key set from a resource bundle.  
+     *
      * @param enr the enumeration.
      * @return the set.
      */
     private static Set<String> enumerationToSet( Enumeration<String> enr )
     {
-        Set<String> result = new LinkedHashSet<String>();
+        List<String> result = new ArrayList<String>();
         while ( enr.hasMoreElements() ){
             result.add(enr.nextElement());
         }
-        return result;
+        return new LinkedHashSet<String>(result);
     }
 
     /**
