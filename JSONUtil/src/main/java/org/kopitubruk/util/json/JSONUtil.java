@@ -874,6 +874,8 @@ public class JSONUtil
     }
 
     /**
+     * Return true if the given character is a UTF-16 surrogate.
+     * <p>
      * Replacement since this method wasn't in the JRE until JDK 7.
      *
      * @param ch the char to test.
