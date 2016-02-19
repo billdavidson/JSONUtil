@@ -24,7 +24,7 @@
 
   <groupId>org.kopitubruk.util</groupId>
   <artifactId>JSONUtil</artifactId>
-  <version>1.4</version>
+  <version>1.5</version>
   <packaging>jar</packaging>
 
   <name>JSONUtil</name>
@@ -48,7 +48,7 @@
     <connection>scm:git:git@github.com:billdavidson/JSONUtil.git</connection>
     <developerConnection>scm:git:git@github.com:billdavidson/JSONUtil.git</developerConnection>
     <url>git@github.com:billdavidson/JSONUtil.git</url>
-    <tag>JSONUtil-1.4</tag>
+    <tag>JSONUtil-1.5</tag>
   </scm>
 
   <properties>
