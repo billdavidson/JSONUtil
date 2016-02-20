@@ -24,7 +24,7 @@
 
   <groupId>org.kopitubruk.util</groupId>
   <artifactId>JSONUtil</artifactId>
-  <version>1.5</version>
+  <version>1.5-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>JSONUtil</name>
