@@ -444,6 +444,9 @@ public class TestJSONUtil
         obj = JSONParser.parseJSON("Infinity");
         assertTrue(Double.isInfinite((Double)obj));
 
+        obj = JSONParser.parseJSON("NaN");
+        assertTrue(Double.isNaN((Double)obj));
+
         obj = JSONParser.parseJSON("false");
         assertEquals(Boolean.FALSE, obj);
 
