@@ -22,6 +22,8 @@ use.
 
 [Binaries](https://github.com/billdavidson/JSONUtil/releases)
 
+[Getting Started Guide](https://github.com/billdavidson/JSONUtil/wiki)
+
 [Javadoc online](http://kopitubruk.org/JSONUtil/javadoc)
 
 [JSONUtil at the Maven Central Repository](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.kopitubruk.util%22%20AND%20a%3A%22JSONUtil%22)
