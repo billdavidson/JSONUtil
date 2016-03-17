@@ -22,7 +22,7 @@ use.
 
 [Binaries](https://github.com/billdavidson/JSONUtil/releases)
 
-[Getting Started Guide](https://github.com/billdavidson/JSONUtil/wiki)
+[Getting Started Guide](https://github.com/billdavidson/JSONUtil/wiki/Getting-Started-Guide)
 
 [Javadoc online](http://kopitubruk.org/JSONUtil/javadoc) (start with the JSONUtil class)
 
