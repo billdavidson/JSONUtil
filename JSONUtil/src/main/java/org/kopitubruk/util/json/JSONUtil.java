@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Bill Davidson
+ * Copyright 2015-2016 Bill Davidson
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -237,7 +237,7 @@ public class JSONUtil
      *   \p{L} (any letter).
      * </p>
      * <p>
-     *   The permitted characters are specified by ECMAScript 5.1, Section 7.6
+     *   The permitted characters are specified by ECMAScript 5.1, Section 7.6.
      * </p>
      * <p>
      *   Permitted starting characters.
@@ -280,10 +280,28 @@ public class JSONUtil
      */
     private static final Pattern VALID_ECMA6_PROPERTY_NAME_PAT =
             Pattern.compile("^(?:[_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})(?:[_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*$");
+    
+    /**
+     * This pattern is for full JSON identifier names. This is much more
+     * permissive than the ECMAScript 5 standard. Property names that use
+     * characters not permitted by the ECMAScript standard will not work with
+     * Javascript eval() but will work with Javascript JSON.parse().
+     */
+    private static final Pattern VALID_JSON5_PROPERTY_NAME_PAT = Pattern.compile("^([^\u0000-\u001F\\p{Cn}\"/\\\\]|\\\\[bfnrt\\\\/\"]|\\\\u\\p{XDigit}{4})+$");
+    
+    /**
+     * This pattern is for full JSON identifier names. This is much more
+     * permissive than the ECMAScript 6 standard. Property names that use
+     * characters not permitted by the ECMAScript standard will not work with
+     * Javascript eval() but will work with Javascript JSON.parse().
+     */
+    private static final Pattern VALID_JSON6_PROPERTY_NAME_PAT = Pattern.compile("^([^\u0000-\u001F\\p{Cn}\"/\\\\]|\\\\[bfnrt\\\\/\"]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})+$");
 
     /**
      * This is the set of reserved words from ECMAScript 6. It's a bad practice
      * to use these as property names and not permitted by the JSON standard.
+     * They will work as property names with Javascript eval() but not with a
+     * strict JSON parser.
      */
     private static final Set<String> RESERVED_WORDS =
             new HashSet<>(Arrays.asList(
@@ -1055,11 +1073,14 @@ public class JSONUtil
      */
     static boolean isValidIdentifierStart( int codePoint, JSONConfig cfg )
     {
-        return codePoint == '_' || codePoint == '$' ||
-                (cfg.isUseECMA6() ? Character.isUnicodeIdentifierStart(codePoint)
-                                  : Character.isLetter(codePoint));
+        if ( cfg.isFullJSONIdentifierCodePoints() ){
+            return codePoint >= ' ' && Character.isDefined(codePoint);
+        }else{
+            return codePoint == '_' || codePoint == '$' ||
+                    (cfg.isUseECMA6() ? Character.isUnicodeIdentifierStart(codePoint)
+                                      : Character.isLetter(codePoint));
+        }
     }
-
 
     /**
      * Return true if the codePoint is a valid code point for part of an
@@ -1072,11 +1093,15 @@ public class JSONUtil
      */
     static boolean isValidIdentifierPart( int codePoint, JSONConfig cfg )
     {
-        return cfg.isUseECMA6() ? Character.isUnicodeIdentifierPart(codePoint)
-                                       : (Character.isDigit(codePoint) ||
-                ((((1 << Character.NON_SPACING_MARK) | (1 << Character.COMBINING_SPACING_MARK) |
-                (1 << Character.CONNECTOR_PUNCTUATION) ) >> Character.getType(codePoint)) & 1) != 0 ||
-                codePoint == 0x200C || codePoint == 0x200D);
+        if ( cfg.isFullJSONIdentifierCodePoints() ){
+            return codePoint >= ' ' && Character.isDefined(codePoint);
+        }else{
+            return cfg.isUseECMA6() ? Character.isUnicodeIdentifierPart(codePoint)
+                                    : (Character.isDigit(codePoint) ||
+                        ((((1 << Character.NON_SPACING_MARK) | (1 << Character.COMBINING_SPACING_MARK) |
+                        (1 << Character.CONNECTOR_PUNCTUATION) ) >> Character.getType(codePoint)) & 1) != 0 ||
+                        codePoint == 0x200C || codePoint == 0x200D);
+        }
     }
 
     /**
@@ -1089,7 +1114,13 @@ public class JSONUtil
     public static void checkValidJavascriptPropertyName( String propertyName, JSONConfig cfg ) throws BadPropertyNameException
     {
         JSONConfig jcfg = cfg != null ? cfg : new JSONConfig();
-        Pattern validationPat = jcfg.isUseECMA6() ? VALID_ECMA6_PROPERTY_NAME_PAT : VALID_ECMA5_PROPERTY_NAME_PAT;
+        Pattern validationPat;
+        
+        if ( jcfg.isFullJSONIdentifierCodePoints() ){
+            validationPat = jcfg.isUseECMA6() ? VALID_JSON6_PROPERTY_NAME_PAT : VALID_JSON5_PROPERTY_NAME_PAT;
+        }else{
+            validationPat = jcfg.isUseECMA6() ? VALID_ECMA6_PROPERTY_NAME_PAT : VALID_ECMA5_PROPERTY_NAME_PAT;
+        }
 
         if ( propertyName == null ||
                 (isReservedWord(propertyName) && !jcfg.isAllowReservedWordsInIdentifiers()) ||
