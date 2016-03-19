@@ -44,6 +44,7 @@ import java.util.Map.Entry;
  *   <li>validatePropertyNames = true</li>
  *   <li>detectDataStructureLoops = true</li>
  *   <li>escapeBadIdentifierCodePoints = false</li>
+ *   <li>fullJSONIdentifierCodePoints = false</li>
  * </ul>
  * <h3>Safe alternate encoding options.</h3>
  * <ul>
@@ -127,6 +128,7 @@ public class JSONConfig implements Serializable, Cloneable
     private boolean validatePropertyNames;
     private boolean detectDataStructureLoops;
     private boolean escapeBadIdentifierCodePoints;
+    private boolean fullJSONIdentifierCodePoints;
 
     private boolean encodeNumericStringsAsNumbers;
     private boolean escapeNonAscii;
@@ -214,6 +216,7 @@ public class JSONConfig implements Serializable, Cloneable
         result.validatePropertyNames = validatePropertyNames;
         result.detectDataStructureLoops = detectDataStructureLoops;
         result.escapeBadIdentifierCodePoints = escapeBadIdentifierCodePoints;
+        result.fullJSONIdentifierCodePoints = fullJSONIdentifierCodePoints;
 
         // "safe" alternate encoding options.
         result.encodeNumericStringsAsNumbers = encodeNumericStringsAsNumbers;
@@ -638,6 +641,30 @@ public class JSONConfig implements Serializable, Cloneable
     public void setEscapeBadIdentifierCodePoints( boolean escapeBadIdentifierCodePoints )
     {
         this.escapeBadIdentifierCodePoints = escapeBadIdentifierCodePoints;
+    }
+
+    /**
+     * Get the full JSON identifier code points policy.
+     *
+     * @return the fullJSONIdentifierCodePoints
+     */
+    public boolean isFullJSONIdentifierCodePoints()
+    {
+        return fullJSONIdentifierCodePoints;
+    }
+
+    /**
+     * If true, then the full set of identifier code points permitted by the
+     * JSON standard will be allowed instead of the more restrictive set
+     * permitted by the ECMAScript standard. Use of characters not permitted by
+     * the ECMAScript standard will cause an error if parsed by Javascript
+     * eval().
+     *
+     * @param dflt If true, then allow all code points permitted by the JSON standard in identifiers.
+     */
+    public void setFullJSONIdentifierCodePoints( boolean dflt )
+    {
+        fullJSONIdentifierCodePoints = dflt;
     }
 
     /**

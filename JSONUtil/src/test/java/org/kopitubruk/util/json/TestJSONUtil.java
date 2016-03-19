@@ -25,6 +25,8 @@ import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.DateFormat;
@@ -40,12 +42,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.Vector;
 
 import javax.naming.NamingException;
+import javax.script.Invocable;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
@@ -55,11 +59,18 @@ import org.apache.commons.logging.LogFactory;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import sun.org.mozilla.javascript.internal.Context;
+import sun.org.mozilla.javascript.internal.NativeObject;
+import sun.org.mozilla.javascript.internal.ScriptableObject;
+
+//import jdk.nashorn.api.scripting.ScriptObjectMirror;
+
 /**
  * Tests for JSONUtil. Most of the produced JSON is put through Java's script
- * engine so that it will be tested that it parses without error. However,
- * eval() is more lenient than a strict JSON parser, so it's not a perfect test
- * of JSON standards compliance.
+ * engine so that it will be tested that it parses without error. In most cases,
+ * the JSON is tested both against Javascript eval() and JSON.parse(). In
+ * general, eval() is looser than JSON.parse() except for property names where
+ * JSON.parse() is looser.
  *
  * @author Bill Davidson
  */
@@ -83,14 +94,28 @@ public class TestJSONUtil
 
             // not needed -- just used to test that the context was usable.
             //ctx.bind("registerMBean", Boolean.FALSE);
-
-            // Some of these tests depend upon error messages
-            // which need to be in English, so it's forced
-            // during the tests.
-            JSONConfigDefaults.setLocale(Locale.US);
         }catch ( NamingException ex ){
+            // not fatal but will cause annoying log messages.
             s_log.error("Couldn't create context", ex);
         }
+
+        String validateJs = "validate.js";
+        try{
+            // Get the Javascript engine and load the validation javascript file into it.
+            ScriptEngine engine = new ScriptEngineManager().getEngineByExtension("js");
+            engine.eval(new FileReader(TestJSONUtil.class.getResource(validateJs).getFile()));
+            invocable = (Invocable)engine;
+        }catch ( ScriptException|FileNotFoundException e ){
+            // Can't validate any JSON.
+            s_log.fatal("Couldn't load " + validateJs, e);
+            System.exit(-1);
+        }
+
+        /*
+         * Some of these tests depend upon error messages which need to be in
+         * English, so it's forced during the tests.
+         */
+        JSONConfigDefaults.setLocale(Locale.US);
     }
 
     /**
@@ -98,22 +123,29 @@ public class TestJSONUtil
      * ECMAScript 5.1. Java 7 uses Rhino 1.7, which supports something roughly
      * close to ECMAScript 3.
      */
-    private final ScriptEngine engine = new ScriptEngineManager().getEngineByExtension("js");
+    private static Invocable invocable;
 
     /**
-     * Make sure that the JSON parses.
+     * Make sure that the JSON parses. Using a script and Invocable because that
+     * makes the data get sent to the script raw, as it would in an AJAX call.
+     * I used to do a direct eval but that caused some issues for some things
+     * with regard to escapes.
      *
      * @param json A JSON string.
+     * @param func the Javascript function to call.
+     * @return the object returned by the function or null if there's an exception thrown.
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
-    private void validateJSON( String json ) throws ScriptException
+    private Object runValidateJSON( String json, String func ) throws ScriptException, NoSuchMethodException
     {
-        // assign it to a variable to make sure it parses.
+        // make sure it parses.
+        Object result = null;
         try{
-            engine.eval("var x="+json+";");
+            result = invocable.invokeFunction(func, json);
         }catch ( ScriptException e ){
             boolean lastCode = false;
-            StringBuilder buf = new StringBuilder();
+            StringBuilder buf = new StringBuilder(func).append("()\n");
             for ( int i = 0, j = 0, len = json.length(); i < len && j < 500; j++ ){
                 int codePoint = json.codePointAt(i);
                 int charCount = Character.charCount(codePoint);
@@ -134,7 +166,51 @@ public class TestJSONUtil
             }
             s_log.error(buf.toString(), e);
             throw e;
+            //System.exit(-1);
+        }catch ( NoSuchMethodException e ){
+            s_log.error("Couldn't invoke "+func+"()", e);
+            throw e;
         }
+        return result;
+    }
+
+    /**
+     * Validate the given JSON string with Javascript eval(String).
+     *
+     * @param json A JSON string.
+     * @return the object returned by the function or null if there's an exception thrown.
+     * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
+     */
+    private Object evalJSON( String json ) throws ScriptException, NoSuchMethodException
+    {
+        return runValidateJSON(json, "evalJSON");
+    }
+
+    /**
+     * Validate the given JSON string with Javascript JSON.parse(String).
+     *
+     * @param json A JSON string.
+     * @return the object returned by the function or null if there's an exception thrown.
+     * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
+     */
+    private Object parseJSON( String json ) throws ScriptException, NoSuchMethodException
+    {
+        return runValidateJSON(json, "parseJSON");
+    }
+
+    /**
+     * Validate the given JSON string with both Javascript eval(String) and JSON.parse(String).
+     *
+     * @param json A JSON string.
+     * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
+     */
+    private void validateJSON( String json ) throws ScriptException, NoSuchMethodException
+    {
+        evalJSON(json);
+        parseJSON(json);
     }
 
     /**
@@ -156,12 +232,12 @@ public class TestJSONUtil
      * even though I turned identifier quoting off for the tests.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testValidPropertyNames() throws ScriptException
+    public void testValidPropertyNames() throws ScriptException, NoSuchMethodException
     {
         JSONConfig cfg = new JSONConfig();
-        cfg.setQuoteIdentifier(false);
 
         ArrayList<Integer> validStart = new ArrayList<>();
         ArrayList<Integer> validPart = new ArrayList<>();
@@ -207,6 +283,87 @@ public class TestJSONUtil
             if ( partIndex == partSize ){
                 partIndex = 0;
             }
+        }
+    }
+
+    /**
+     * Test all characters allowed for property names by JSON.parse() but not by
+     * Javascript eval(). The JSON standard is much looser with characters
+     * allowed in property names than ECMAScript. It allows pretty much any
+     * defined code point greater than or equal to 32. There are no start
+     * character rules either as there are with ECMAScript identifiers.
+     *
+     * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
+     */
+    @Test
+    public void testJSONPropertyNames() throws ScriptException, NoSuchMethodException
+    {
+        JSONConfig jcfg = new JSONConfig();
+        jcfg.setFullJSONIdentifierCodePoints(false);
+        JSONConfig cfg = new JSONConfig();
+        cfg.setFullJSONIdentifierCodePoints(true);
+
+        Map<String,Object> jsonObj = new HashMap<>(2);
+        int[] normalIdent = new int[1];
+        int[] escName = new int[2];
+        escName[0] = '\\';
+        int jsonOnlyCount = 0;
+
+        for ( int i = ' '; i <= Character.MAX_CODE_POINT; i++ ){
+            if ( JSONUtil.isValidIdentifierStart(i, jcfg) ){
+                // ignore - these are tested by testValidPropertyNames()
+            }else if ( Character.isDefined(i) && ! (i <= 0xFFFF && Character.isSurrogate((char)i)) ){
+                String propertyName;
+                switch ( i ){
+                    // escape characters as needed.
+                    case '"':
+                    case '/':
+                    case '\\':
+                        escName[1] = i;
+                        propertyName = new String(escName,0,2);
+                        break;
+                    default:
+                        normalIdent[0] = i;
+                        propertyName = new String(normalIdent,0,1);
+                        break;
+                }
+                jsonObj.clear();
+                jsonObj.put(propertyName, 0);
+                String json = JSONUtil.toJSON(jsonObj, cfg);
+                // these would fail eval().
+                parseJSON(json);
+                ++jsonOnlyCount;
+            }
+        }
+
+        s_log.debug(jsonOnlyCount+" code points are valid identifier start characters for JSON.parse() but not for eval()");
+    }
+
+    /**
+     * Test all characters not allowed for property names by JSON.parse().
+     */
+    @Test
+    public void testBadJSONPropertyNames()
+    {
+        JSONConfig cfg = new JSONConfig();
+        cfg.setFullJSONIdentifierCodePoints(true);
+
+        Map<String,Object> jsonObj = new HashMap<>(2);
+        int[] codePoints = new int[256];
+        int j = 0;
+
+        for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
+            if (  i < ' ' || ! Character.isDefined(i) ){
+                codePoints[j++] = i;
+                if ( j == codePoints.length ){
+                    testBadIdentifier(codePoints, 0, j, jsonObj, cfg);
+                    j = 0;
+                }
+            }
+        }
+        if ( j > 0 ){
+            testBadIdentifier(codePoints, 0, j, jsonObj, cfg);
         }
     }
 
@@ -266,6 +423,8 @@ public class TestJSONUtil
      */
     private void testBadIdentifier( int[] codePoints, int start, int end, Map<String,Object> jsonObj, JSONConfig cfg )
     {
+        // clear in order to avoid memory abuse.
+        // didn't create the object here because it would have to be recreated millions of times.
         jsonObj.clear();
         try{
             jsonObj.put(new String(codePoints,0,end), 0);
@@ -283,9 +442,10 @@ public class TestJSONUtil
      * Test valid Unicode strings.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testValidStrings() throws ScriptException
+    public void testValidStrings() throws ScriptException, NoSuchMethodException
     {
         int[] codePoints = new int[32768];
         Map<String,Object> jsonObj = new HashMap<>(2);
@@ -313,9 +473,10 @@ public class TestJSONUtil
      * Test that Unicode escape sequences in identifiers work.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testUnicodeEscapeInIdentifier() throws ScriptException
+    public void testUnicodeEscapeInIdentifier() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         String[] ids = { "a\\u1234", "\\u1234x" };
@@ -356,12 +517,13 @@ public class TestJSONUtil
      * Test that Unicode escape sequences in identifiers work.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testEscapePassThrough() throws ScriptException
+    public void testEscapePassThrough() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
-        String[] strs = { "a\\u1234", "b\\x4F", "c\\377", "d\\u{1F4A9}", "e\\nf"};
+        String[] strs = {"a\\u1234", "b\\x4F", "c\\377", "d\\u{1F4A9}", "e\\nf"};
         for ( String str : strs ){
             jsonObj.clear();
             jsonObj.put("x", str);
@@ -369,7 +531,12 @@ public class TestJSONUtil
             String json = JSONUtil.toJSON(jsonObj);
             if ( str.charAt(0) != 'd' ){
                 // Nashorn doesn't understand EMCAScript 6 code point escapes.
-                validateJSON(json);
+                if ( str.charAt(0) == 'b' || str.charAt(0) == 'c' ){
+                    // JSON.parse() doesn't accept octal or hex escapes.
+                    evalJSON(json);
+                }else{
+                    validateJSON(json);
+                }
             }
             assertThat(json, is("{\"x\":\""+str+"\"}"));
         }
@@ -379,12 +546,13 @@ public class TestJSONUtil
      * Test that unescape works.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testUnEscape() throws ScriptException
+    public void testUnEscape() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
-        String[] strs = { "a\\u0041", "b\\x41", "d\\u{41}", "e\\v"};
+        String[] strs = {"a\\u0041", "b\\x41", "d\\u{41}", "e\\v"};
         JSONConfig cfg = new JSONConfig();
         cfg.setUnEscapeWherePossible(true);
         for ( String str : strs ){
@@ -507,9 +675,10 @@ public class TestJSONUtil
      * Test using reserved words in identifiers.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testReservedWordsInIdentifiers() throws ScriptException
+    public void testReservedWordsInIdentifiers() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         JSONConfig cfg = new JSONConfig();
@@ -539,9 +708,10 @@ public class TestJSONUtil
      * Test EscapeBadIdentifierCodePoints
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testEscapeBadIdentifierCodePoints() throws ScriptException
+    public void testEscapeBadIdentifierCodePoints() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         JSONConfig cfg = new JSONConfig();
@@ -572,11 +742,14 @@ public class TestJSONUtil
      * Test dates.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testDate() throws ScriptException
+    public void testDate() throws ScriptException, NoSuchMethodException
     {
         JSONConfig cfg = new JSONConfig();
+        
+        // non-standard JSON - only works with eval() and my parser.
         cfg.setEncodeDatesAsObjects(true);
         Map<String,Object> jsonObj = new LinkedHashMap<>();
         Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
@@ -584,16 +757,31 @@ public class TestJSONUtil
         cal.set(Calendar.MILLISECOND, 34);
         jsonObj.put("t", cal.getTime());
         String json = JSONUtil.toJSON(jsonObj, cfg);
-        String extra = ";\nvar t = x.t;\n" +
-                "if ( t.getUTCFullYear() != 2015 ){ throw ('bad year '+t.getUTCFullYear()); }\n"  +
-                "if ( t.getUTCMonth() != 8 ){ throw ('bad month '+t.getUTCMonth()); }\n" +
-                "if ( t.getUTCDate() != 16 ){ throw ('bad day '+t.getUTCDate()); }\n" +
-                "if ( t.getUTCHours() != 14 ){ throw ('bad hours '+t.getUTCHours()); }\n" +
-                "if ( t.getUTCMinutes() != 8 ){ throw ('bad minutes '+t.getUTCMinutes()); }\n" +
-                "if ( t.getUTCSeconds() != 34 ){ throw ('bad seconds '+t.getUTCSeconds()); }\n" +
-                "if ( t.getUTCMilliseconds() != 34 ){ throw ('bad millseconds '+t.getUTCMilliseconds()); }";
-        validateJSON(json + extra);
         assertThat(json, is("{\"t\":new Date(\"2015-09-16T14:08:34.034Z\")}"));
+
+        // examine the Javascript object created by this JSON and eval().
+        Object result = evalJSON(json);
+        if ( result instanceof NativeObject ){
+            NativeObject no = (NativeObject)result;
+            Object obj = no.get("t");
+            if ( obj != null && obj.getClass().getSimpleName().equals("NativeDate")  ){
+                Object dto = Context.jsToJava(obj, Date.class);
+                Date dt = (Date)dto;
+                Calendar jc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+                jc.setTime(dt);
+                assertEquals(jc.get(Calendar.YEAR), 2015);
+                assertEquals(jc.get(Calendar.MONTH), 8);
+                assertEquals(jc.get(Calendar.DAY_OF_MONTH), 16);
+                assertEquals(jc.get(Calendar.HOUR_OF_DAY), 14);
+                assertEquals(jc.get(Calendar.MINUTE), 8);
+                assertEquals(jc.get(Calendar.SECOND), 34);
+                assertEquals(jc.get(Calendar.MILLISECOND), 34);
+            }else{
+                fail("Expected NativeDate from result");
+            }
+        }else{
+            fail("Expected NativeObject from evalJSON");
+        }
 
         cfg.setEncodeDatesAsStrings(true);
         json = JSONUtil.toJSON(jsonObj, cfg);
@@ -605,9 +793,10 @@ public class TestJSONUtil
      * Test booleans.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testBoolean() throws ScriptException
+    public void testBoolean() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new LinkedHashMap<>();
         jsonObj.put("t", true);
@@ -621,9 +810,10 @@ public class TestJSONUtil
      * Test a byte value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testByte() throws ScriptException
+    public void testByte() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         byte b = 27;
@@ -637,9 +827,10 @@ public class TestJSONUtil
      * Test a char value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testChar() throws ScriptException
+    public void testChar() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         char ch = '@';
@@ -653,9 +844,10 @@ public class TestJSONUtil
      * Test a short value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testShort() throws ScriptException
+    public void testShort() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         short s = 275;
@@ -669,9 +861,10 @@ public class TestJSONUtil
      * Test a int value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testInt() throws ScriptException
+    public void testInt() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         int i = 100000;
@@ -685,9 +878,10 @@ public class TestJSONUtil
      * Test a byte value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testLong() throws ScriptException
+    public void testLong() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         long l = 68719476735L;
@@ -701,9 +895,10 @@ public class TestJSONUtil
      * Test a float value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testFloat() throws ScriptException
+    public void testFloat() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         float f = 3.14f;
@@ -717,9 +912,10 @@ public class TestJSONUtil
      * Test a double value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testDouble() throws ScriptException
+    public void testDouble() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         double d = 6.28;
@@ -733,9 +929,10 @@ public class TestJSONUtil
      * Test a BigInteger value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testBigInteger() throws ScriptException
+    public void testBigInteger() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         BigInteger bi = new BigInteger("1234567890");
@@ -749,9 +946,10 @@ public class TestJSONUtil
      * Test a BigDecimal value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testBigDecimal() throws ScriptException
+    public void testBigDecimal() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         BigDecimal bd = new BigDecimal("12345.67890");
@@ -765,9 +963,10 @@ public class TestJSONUtil
      * Test a custom number format.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testNumberFormat() throws ScriptException
+    public void testNumberFormat() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         float f = 1.23456f;
@@ -785,9 +984,10 @@ public class TestJSONUtil
      * Test a string value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testString() throws ScriptException
+    public void testString() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         String s = "bar";
@@ -801,9 +1001,10 @@ public class TestJSONUtil
      * Test a string with a quote value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testQuoteString() throws ScriptException
+    public void testQuoteString() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         String s = "ba\"r";
@@ -817,9 +1018,10 @@ public class TestJSONUtil
      * Test a string with a quote value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testNonBmp() throws ScriptException
+    public void testNonBmp() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         StringBuilder buf = new StringBuilder(2);
@@ -834,9 +1036,10 @@ public class TestJSONUtil
      * Test a Iterable value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testIterable() throws ScriptException
+    public void testIterable() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
         jsonObj.put("x", Arrays.asList(1,2,3));
@@ -849,9 +1052,10 @@ public class TestJSONUtil
      * Test an Enumeration.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testEnumeration() throws ScriptException
+    public void testEnumeration() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
 
@@ -889,9 +1093,10 @@ public class TestJSONUtil
      * Test a resource bundle.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testResourceBundle() throws ScriptException
+    public void testResourceBundle() throws ScriptException, NoSuchMethodException
     {
         String bundleName = getClass().getCanonicalName();
         ResourceBundle bundle = ResourceBundle.getBundle(bundleName);
@@ -912,9 +1117,10 @@ public class TestJSONUtil
      * Test a complex value.
      *
      * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
      */
     @Test
-    public void testComplex() throws ScriptException
+    public void testComplex() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new LinkedHashMap<>();
         jsonObj.put("a",1);
