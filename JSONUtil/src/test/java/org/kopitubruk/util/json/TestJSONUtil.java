@@ -60,16 +60,15 @@ import org.junit.Test;
 /**
  * Tests for JSONUtil. Most of the produced JSON is put through Java's script
  * engine so that it will be tested that it parses without error. In most cases,
- * the JSON is tested both against Javascript eval() and JSON.parse(). In
- * general, eval() is looser than JSON.parse() except for property names where
- * JSON.parse() is looser.
+ * the JSON is tested against Javascript eval().  The Rhino 1.6r2 Javasxcript
+ * engine included with Java 6 does not support JSON.parse(), so that cannot
+ * be done with Java 6.
  *
  * @author Bill Davidson
  */
 public class TestJSONUtil
 {
     private static Log s_log = LogFactory.getLog(TestJSONUtil.class);
-    private static final String FAIL_FMT = "Expected a BadPropertyNameException to be thrown for U+%04X";
 
     /**
      * Create a dummy JNDI initial context in order to avoid having
@@ -114,7 +113,7 @@ public class TestJSONUtil
      * Javascript engine to be used to validate JSON. Nashorn (Java 8) supports
      * ECMAScript 5.1. Java 7 uses Rhino 1.7, which supports something roughly
      * close to ECMAScript 3.  Java 6 uses Rhino 1.6r2 which is also close to
-     * ECMAScript 3.
+     * ECMAScript 3 but does not support JSON.parse().
      */
     private static Invocable invocable;
 
@@ -181,22 +180,6 @@ public class TestJSONUtil
     }
 
     /**
-     * Validate the given JSON string with Javascript JSON.parse(String).
-     *
-     * @param json A JSON string.
-     * @return the object returned by the function or null if there's an exception thrown.
-     * @throws ScriptException if the JSON doesn't evaluate properly.
-     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
-     */
-    /*
-     Rhino 1.6 does not support JSON.parse().
-    private Object parseJSON( String json ) throws ScriptException, NoSuchMethodException
-    {
-        return runValidateJSON(json, "parseJSON");
-    }
-    */
-
-    /**
      * Validate the given JSON string with both Javascript eval(String) and JSON.parse(String).
      *
      * @param json A JSON string.
@@ -206,7 +189,6 @@ public class TestJSONUtil
     private void validateJSON( String json ) throws ScriptException, NoSuchMethodException
     {
         evalJSON(json);
-        //parseJSON(json);
     }
 
     /**
@@ -233,7 +215,6 @@ public class TestJSONUtil
     @Test
     public void testValidPropertyNames() throws ScriptException, NoSuchMethodException
     {
-
         JSONConfig cfg = new JSONConfig();
 
         ArrayList<Integer> validStart = new ArrayList<Integer>();
@@ -280,87 +261,6 @@ public class TestJSONUtil
             if ( partIndex == partSize ){
                 partIndex = 0;
             }
-        }
-    }
-
-    /**
-     * Test all characters allowed for property names by JSON.parse() but not by
-     * Javascript eval(). The JSON standard is much looser with characters
-     * allowed in property names than ECMAScript. It allows pretty much any
-     * defined code point greater than or equal to 32. There are no start
-     * character rules either as there are with ECMAScript identifiers.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
-     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
-     */
-    //@Test
-    public void testJSONPropertyNames() throws ScriptException, NoSuchMethodException
-    {
-        JSONConfig jcfg = new JSONConfig();
-        jcfg.setFullJSONIdentifierCodePoints(false);
-        JSONConfig cfg = new JSONConfig();
-        cfg.setFullJSONIdentifierCodePoints(true);
-
-        Map<String,Object> jsonObj = new HashMap<String,Object>(2);
-        int[] normalIdent = new int[1];
-        int[] escName = new int[2];
-        escName[0] = '\\';
-        int jsonOnlyCount = 0;
-
-        for ( int i = ' '; i <= Character.MAX_CODE_POINT; i++ ){
-            if ( JSONUtil.isValidIdentifierStart(i, jcfg) ){
-                // ignore - these are tested by testValidPropertyNames()
-            }else if ( Character.isDefined(i) && ! (i <= 0xFFFF && JSONUtil.isSurrogate((char)i)) ){
-                String propertyName;
-                switch ( i ){
-                    // escape characters as needed.
-                    case '"':
-                    case '/':
-                    case '\\':
-                        escName[1] = i;
-                        propertyName = new String(escName,0,2);
-                        break;
-                    default:
-                        normalIdent[0] = i;
-                        propertyName = new String(normalIdent,0,1);
-                        break;
-                }
-                jsonObj.clear();
-                jsonObj.put(propertyName, 0);
-                String json = JSONUtil.toJSON(jsonObj, cfg);
-                // these would fail eval().
-                //parseJSON(json);
-                ++jsonOnlyCount;
-            }
-        }
-
-        s_log.debug(jsonOnlyCount+" code points are valid identifier start characters for JSON.parse() but not for eval()");
-    }
-
-    /**
-     * Test all characters not allowed for property names by JSON.parse().
-     */
-    @Test
-    public void testBadJSONPropertyNames()
-    {
-        JSONConfig cfg = new JSONConfig();
-        cfg.setFullJSONIdentifierCodePoints(true);
-
-        Map<String,Object> jsonObj = new HashMap<String,Object>(2);
-        int[] codePoints = new int[256];
-        int j = 0;
-
-        for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
-            if (  i < ' ' || ! Character.isDefined(i) ){
-                codePoints[j++] = i;
-                if ( j == codePoints.length ){
-                    testBadIdentifier(codePoints, 0, j, jsonObj, cfg);
-                    j = 0;
-                }
-            }
-        }
-        if ( j > 0 ){
-            testBadIdentifier(codePoints, 0, j, jsonObj, cfg);
         }
     }
 
@@ -427,7 +327,7 @@ public class TestJSONUtil
         try{
             jsonObj.put(new String(codePoints,0,end), 0);
             JSONUtil.toJSON(jsonObj, cfg);
-            fail(String.format(FAIL_FMT, codePoints[start]));
+            fail(String.format("Expected a BadPropertyNameException to be thrown for U+%04X", codePoints[start]));
         }catch ( BadPropertyNameException e ){
             String message = e.getMessage();
             for ( int i = start; i < end; i++ ){

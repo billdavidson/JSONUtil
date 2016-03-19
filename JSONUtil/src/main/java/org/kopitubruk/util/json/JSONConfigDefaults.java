@@ -244,6 +244,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 d.setValidatePropertyNames(getBoolean(ctx, "validatePropertyNames", validatePropertyNames));
                 d.setDetectDataStructureLoops(getBoolean(ctx, "detectDataStructureLoops", detectDataStructureLoops));
                 d.setEscapeBadIdentifierCodePoints(getBoolean(ctx, "escapeBadIdentifierCodePoints", escapeBadIdentifierCodePoints));
+                d.setFullJSONIdentifierCodePoints(getBoolean(ctx, "fullJSONIdentifierCodePoints", fullJSONIdentifierCodePoints));
 
                 // safe alternate encoding options.
                 d.setEncodeNumericStringsAsNumbers(getBoolean(ctx, "encodeNumericStringsAsNumbers", encodeNumericStringsAsNumbers));
@@ -393,7 +394,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         cfg.setDetectDataStructureLoops(detectDataStructureLoops);
         cfg.setEscapeBadIdentifierCodePoints(escapeBadIdentifierCodePoints);
         cfg.setFullJSONIdentifierCodePoints(fullJSONIdentifierCodePoints);
-
 
         // various alternate encoding options.
         cfg.setEncodeNumericStringsAsNumbers(encodeNumericStringsAsNumbers);
@@ -877,7 +877,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return the fullJSONIdentifierCodePoints
      */
-    public static boolean isFullJSONIdentifierCodePoints()
+    public boolean isFullJSONIdentifierCodePoints()
     {
         return fullJSONIdentifierCodePoints;
     }
@@ -891,7 +891,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true, then allow all code points permitted by the JSON standard in identifiers.
      */
-    public static void setFullJSONIdentifierCodePoints( boolean dflt )
+    public void setFullJSONIdentifierCodePoints( boolean dflt )
     {
         fullJSONIdentifierCodePoints = dflt;
     }
@@ -1020,8 +1020,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * If true, then {@link Date} objects will be encoded as
-     * ISO 8601 date strings.
+     * If true, then {@link Date} objects will be encoded as ISO 8601 date
+     * strings or a custom date format if you have called
+     * {@link #setDateGenFormat(DateFormat)}. If you set this to true, then
+     * encodeDatesAsObjects will be set to false.
      *
      * @param dflt the encodeDatesAsStrings to set
      */
@@ -1075,11 +1077,14 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Set the default flag for using ECMAScript 6 code points to encode
-     * Unicode escapes. Accessible via MBean server.
+     * If you set this to true, then when JSONUtil generates Unicode
+     * escapes, it will use ECMAScript 6 code point escapes if they are shorter
+     * than code unit escapes. This is not standard JSON and not yet widely
+     * supported by Javascript interpreters. It also allows identifiers to have
+     * letter numbers in addition to other letters.  Default is false.
      *
-     * @param dflt if true then ECMAScript 6 code points
-     * will be used to encode Unicode escapes as needed.
+     * @param dflt If true, use EMCAScript 6 code point escapes and allow
+     * ECMAScript 6 identifier character set.
      */
     @Override
     public void setUseECMA6( boolean dflt )
@@ -1126,7 +1131,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * If true, then {@link Date} objects will be encoded as
-     * Javascript dates, using new Date().
+     * Javascript dates, using new Date(dateString).  If you
+     * set this to true, then encodeDatesAsStrings will be
+     * set to false.
      *
      * @param dflt the encodeDatesAsObjects to set
      */
