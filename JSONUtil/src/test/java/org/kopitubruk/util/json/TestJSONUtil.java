@@ -46,9 +46,6 @@ import java.util.TimeZone;
 import java.util.Vector;
 
 import javax.naming.NamingException;
-//import javax.script.ScriptEngine;
-//import javax.script.ScriptEngineManager;
-//import javax.script.ScriptException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -57,9 +54,7 @@ import org.junit.Test;
 
 /**
  * Tests for JSONUtil. Most of the produced JSON is put through Java's script
- * engine so that it will be tested that it parses without error. However,
- * eval() is more lenient than a strict JSON parser, so it's not a perfect test
- * of JSON standards compliance.
+ * engine so that it will be tested that it parses without error.
  *
  * @author Bill Davidson
  */
@@ -83,62 +78,17 @@ public class TestJSONUtil
 
             // not needed -- just used to test that the context was usable.
             //ctx.bind("registerMBean", Boolean.FALSE);
-
-            // Some of these tests depend upon error messages
-            // which need to be in English, so it's forced
-            // during the tests.
-            JSONConfigDefaults.setLocale(Locale.US);
         }catch ( NamingException ex ){
+            // not fatal but will cause annoying log messages.
             s_log.error("Couldn't create context", ex);
         }
-    }
 
-    /**
-     * Javascript engine to be used to validate JSON. Nashorn (Java 8) supports
-     * ECMAScript 5.1. Java 7 uses Rhino 1.7, which supports something roughly
-     * close to ECMAScript 3.  Java 6 uses Rhino 1.6r2 which is also close to
-     * ECMAScript 3.
-     */
-    //private final ScriptEngine engine = new ScriptEngineManager().getEngineByExtension("js");
-
-    /**
-     * Make sure that the JSON parses.
-     *
-     * @param json A JSON string.
-     * @throws ScriptException if the JSON doesn't evaluate properly.
-     */
-    /*
-    private void validateJSON( String json ) throws ScriptException
-    {
-        // assign it to a variable to make sure it parses.
-        try{
-            engine.eval("var x="+json+";");
-        }catch ( ScriptException e ){
-            boolean lastCode = false;
-            StringBuilder buf = new StringBuilder();
-            for ( int i = 0, j = 0, len = json.length(); i < len && j < 500; j++ ){
-                int codePoint = json.codePointAt(i);
-                int charCount = Character.charCount(codePoint);
-                if ( codePoint < 256 && codePoint >= ' ' ){
-                    if ( lastCode ){
-                        buf.append('\n');
-                    }
-                    buf.appendCodePoint(codePoint);
-                    lastCode = false;
-                }else{
-                    buf.append(String.format("\n%d U+%04X %s %d",
-                                             i, codePoint,
-                                             Character.getName(codePoint),
-                                             Character.getType(codePoint)));
-                    lastCode = true;
-                }
-                i += charCount;
-            }
-            s_log.error(buf.toString(), e);
-            throw e;
-        }
+        /*
+         * Some of these tests depend upon error messages which need to be in
+         * English, so it's forced during the tests.
+         */
+        JSONConfigDefaults.setLocale(Locale.US);
     }
-    */
 
     /**
      * Test all characters allowed for property names. Every start character
@@ -157,15 +107,11 @@ public class TestJSONUtil
      * be in quotes in order for the validation to work properly so the
      * validation tests that those identifiers that need that do get quoted
      * even though I turned identifier quoting off for the tests.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testValidPropertyNames()
     {
-
         JSONConfig cfg = new JSONConfig();
-        cfg.setQuoteIdentifier(false);
 
         ArrayList<Integer> validStart = new ArrayList<Integer>();
         ArrayList<Integer> validPart = new ArrayList<Integer>();
@@ -272,6 +218,8 @@ public class TestJSONUtil
      */
     private void testBadIdentifier( int[] codePoints, int start, int end, Map<String,Object> jsonObj, JSONConfig cfg )
     {
+        // clear in order to avoid memory abuse.
+        // didn't create the object here because it would have to be recreated millions of times.
         jsonObj.clear();
         try{
             jsonObj.put(new String(codePoints,0,end), 0);
@@ -287,8 +235,6 @@ public class TestJSONUtil
 
     /**
      * Test valid Unicode strings.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testValidStrings()
@@ -318,8 +264,6 @@ public class TestJSONUtil
 
     /**
      * Test that Unicode escape sequences in identifiers work.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testUnicodeEscapeInIdentifier()
@@ -338,8 +282,6 @@ public class TestJSONUtil
 
     /**
      * Test that ECMAScript 6 code point escapes.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testECMA6UnicodeEscapeInString()
@@ -361,14 +303,12 @@ public class TestJSONUtil
 
     /**
      * Test that Unicode escape sequences in identifiers work.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testEscapePassThrough()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
-        String[] strs = { "a\\u1234", "b\\x4F", "c\\377", "d\\u{1F4A9}", "e\\nf"};
+        String[] strs = {"a\\u1234", "b\\x4F", "c\\377", "d\\u{1F4A9}", "e\\nf"};
         for ( String str : strs ){
             jsonObj.clear();
             jsonObj.put("x", str);
@@ -384,14 +324,12 @@ public class TestJSONUtil
 
     /**
      * Test that unescape works.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testUnEscape()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
-        String[] strs = { "a\\u0041", "b\\x41", "d\\u{41}", "e\\v"};
+        String[] strs = {"a\\u0041", "b\\x41", "d\\u{41}", "e\\v"};
         JSONConfig cfg = new JSONConfig();
         cfg.setUnEscapeWherePossible(true);
         for ( String str : strs ){
@@ -512,8 +450,6 @@ public class TestJSONUtil
 
     /**
      * Test using reserved words in identifiers.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testReservedWordsInIdentifiers()
@@ -544,8 +480,6 @@ public class TestJSONUtil
 
     /**
      * Test EscapeBadIdentifierCodePoints
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testEscapeBadIdentifierCodePoints()
@@ -577,13 +511,13 @@ public class TestJSONUtil
 
     /**
      * Test dates.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
-    public void testDate() // throws ScriptException
+    public void testDate()
     {
         JSONConfig cfg = new JSONConfig();
+
+        // non-standard JSON - only works with eval() and my parser.
         cfg.setEncodeDatesAsObjects(true);
         Map<String,Object> jsonObj = new LinkedHashMap<String,Object>();
         Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
@@ -591,18 +525,6 @@ public class TestJSONUtil
         cal.set(Calendar.MILLISECOND, 34);
         jsonObj.put("t", cal.getTime());
         String json = JSONUtil.toJSON(jsonObj, cfg);
-        /* Java 6 uses Rhino 1.6r2, which doesn't understand ISO 8601.
-        String extra = ";\nvar t = x.t;\n" +
-                "java.lang.System.out.println(t.toString());\n" +
-                "if ( t.getUTCFullYear() != 2015 ){ throw ('bad year '+t.getUTCFullYear()); }\n"  +
-                "if ( t.getUTCMonth() != 8 ){ throw ('bad month '+t.getUTCMonth()); }\n" +
-                "if ( t.getUTCDate() != 16 ){ throw ('bad day '+t.getUTCDate()); }\n" +
-                "if ( t.getUTCHours() != 14 ){ throw ('bad hours '+t.getUTCHours()); }\n" +
-                "if ( t.getUTCMinutes() != 8 ){ throw ('bad minutes '+t.getUTCMinutes()); }\n" +
-                "if ( t.getUTCSeconds() != 34 ){ throw ('bad seconds '+t.getUTCSeconds()); }\n" +
-                "if ( t.getUTCMilliseconds() != 34 ){ throw ('bad millseconds '+t.getUTCMilliseconds()); }";
-        */
-        //validateJSON(json);
         assertThat(json, is("{\"t\":new Date(\"2015-09-16T14:08:34.034Z\")}"));
 
         cfg.setEncodeDatesAsStrings(true);
@@ -613,8 +535,6 @@ public class TestJSONUtil
 
     /**
      * Test booleans.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testBoolean() // throws ScriptException
@@ -629,8 +549,6 @@ public class TestJSONUtil
 
     /**
      * Test a byte value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testByte()
@@ -645,8 +563,6 @@ public class TestJSONUtil
 
     /**
      * Test a char value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testChar()
@@ -661,8 +577,6 @@ public class TestJSONUtil
 
     /**
      * Test a short value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testShort()
@@ -677,8 +591,6 @@ public class TestJSONUtil
 
     /**
      * Test a int value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testInt()
@@ -693,8 +605,6 @@ public class TestJSONUtil
 
     /**
      * Test a byte value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testLong()
@@ -709,8 +619,6 @@ public class TestJSONUtil
 
     /**
      * Test a float value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testFloat()
@@ -725,8 +633,6 @@ public class TestJSONUtil
 
     /**
      * Test a double value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testDouble()
@@ -741,8 +647,6 @@ public class TestJSONUtil
 
     /**
      * Test a BigInteger value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testBigInteger()
@@ -757,8 +661,6 @@ public class TestJSONUtil
 
     /**
      * Test a BigDecimal value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testBigDecimal()
@@ -773,8 +675,6 @@ public class TestJSONUtil
 
     /**
      * Test a custom number format.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testNumberFormat()
@@ -793,8 +693,6 @@ public class TestJSONUtil
 
     /**
      * Test a string value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testString()
@@ -809,8 +707,6 @@ public class TestJSONUtil
 
     /**
      * Test a string with a quote value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testQuoteString()
@@ -825,8 +721,6 @@ public class TestJSONUtil
 
     /**
      * Test a string with a quote value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testNonBmp()
@@ -842,8 +736,6 @@ public class TestJSONUtil
 
     /**
      * Test a Iterable value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testIterable()
@@ -857,8 +749,6 @@ public class TestJSONUtil
 
     /**
      * Test an Enumeration.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testEnumeration()
@@ -874,8 +764,6 @@ public class TestJSONUtil
 
     /**
      * Test a Map value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testLoop()
@@ -897,8 +785,6 @@ public class TestJSONUtil
 
     /**
      * Test a resource bundle.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testResourceBundle()
@@ -922,8 +808,6 @@ public class TestJSONUtil
 
     /**
      * Test a complex value.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
      */
     @Test
     public void testComplex()

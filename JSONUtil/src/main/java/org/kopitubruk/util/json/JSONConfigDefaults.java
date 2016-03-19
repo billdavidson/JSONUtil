@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Bill Davidson
+ * Copyright 2015-2016 Bill Davidson
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,6 +76,7 @@ import static org.kopitubruk.util.json.JNDIUtil.getBoolean;
  *   <li>validatePropertyNames = true</li>
  *   <li>detectDataStructureLoops = true</li>
  *   <li>escapeBadIdentifierCodePoints = false</li>
+ *   <li>fullJSONIdentifierCodePoints = false</li>
  * </ul>
  * <h3>Safe alternate encoding options.</h3>
  * <ul>
@@ -104,8 +105,8 @@ import static org.kopitubruk.util.json.JNDIUtil.getBoolean;
  * {@link Locale}.  If you don't do this, then the
  * default locale will be whatever is provided by the JVM.
  * <p>
- * You can set the default date generation format using the name "dateGenFormat"
- * and a String value that will be passed to
+ * You can set the default date generation format in JNDI using the name
+ * "dateGenFormat" and a String value that will be passed to
  * {@link SimpleDateFormat#SimpleDateFormat(String, Locale)} using the locale
  * from {@link #getLocale()}.
  * <p>
@@ -150,6 +151,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static volatile boolean validatePropertyNames;
     private static volatile boolean detectDataStructureLoops;
     private static volatile boolean escapeBadIdentifierCodePoints;
+    private static volatile boolean fullJSONIdentifierCodePoints;
 
     private static volatile boolean encodeNumericStringsAsNumbers;
     private static volatile boolean escapeNonAscii;
@@ -305,6 +307,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             validatePropertyNames = true;
             detectDataStructureLoops = true;
             escapeBadIdentifierCodePoints = false;
+            fullJSONIdentifierCodePoints = false;
 
             encodeNumericStringsAsNumbers = false;
             escapeNonAscii = false;
@@ -388,6 +391,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         cfg.setValidatePropertyNames(validatePropertyNames);
         cfg.setDetectDataStructureLoops(detectDataStructureLoops);
         cfg.setEscapeBadIdentifierCodePoints(escapeBadIdentifierCodePoints);
+        cfg.setFullJSONIdentifierCodePoints(fullJSONIdentifierCodePoints);
+
 
         // various alternate encoding options.
         cfg.setEncodeNumericStringsAsNumbers(encodeNumericStringsAsNumbers);
@@ -404,7 +409,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Set a default locale for new JSONConfig objects to use.
+     * Get the default locale for new JSONConfig objects.
      *
      * @return the default locale.
      */
@@ -853,6 +858,30 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         synchronized ( this.getClass() ){
             escapeBadIdentifierCodePoints = dflt;
         }
+    }
+
+    /**
+     * Get the full JSON identifier code points policy.
+     *
+     * @return the fullJSONIdentifierCodePoints
+     */
+    public static boolean isFullJSONIdentifierCodePoints()
+    {
+        return fullJSONIdentifierCodePoints;
+    }
+
+    /**
+     * If true, then the full set of identifier code points permitted by the
+     * JSON standard will be allowed instead of the more restrictive set
+     * permitted by the ECMAScript standard. Use of characters not permitted by
+     * the ECMAScript standard will cause an error if parsed by Javascript
+     * eval().
+     *
+     * @param dflt If true, then allow all code points permitted by the JSON standard in identifiers.
+     */
+    public static void setFullJSONIdentifierCodePoints( boolean dflt )
+    {
+        fullJSONIdentifierCodePoints = dflt;
     }
 
     /**
