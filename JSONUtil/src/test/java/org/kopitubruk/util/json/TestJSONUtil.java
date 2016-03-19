@@ -63,14 +63,15 @@ import jdk.nashorn.api.scripting.ScriptObjectMirror;
  * engine so that it will be tested that it parses without error. In most cases,
  * the JSON is tested both against Javascript eval() and JSON.parse(). In
  * general, eval() is looser than JSON.parse() except for property names where
- * JSON.parse() is looser.
+ * JSON.parse() is looser because eval() requires ECMAScript compliant property
+ * names while JSON.parse() only requires compliance with the JSON standard
+ * which allows almost all defined Unicode code points.
  *
  * @author Bill Davidson
  */
 public class TestJSONUtil
 {
     private static Log s_log = LogFactory.getLog(TestJSONUtil.class);
-    private static final String FAIL_FMT = "Expected a BadPropertyNameException to be thrown for U+%04X";
 
     /**
      * Create a dummy JNDI initial context in order to avoid having
@@ -422,7 +423,7 @@ public class TestJSONUtil
         try{
             jsonObj.put(new String(codePoints,0,end), 0);
             JSONUtil.toJSON(jsonObj, cfg);
-            fail(String.format(FAIL_FMT, codePoints[start]));
+            fail(String.format("Expected a BadPropertyNameException to be thrown for U+%04X", codePoints[start]));
         }catch ( BadPropertyNameException e ){
             String message = e.getMessage();
             for ( int i = start; i < end; i++ ){
@@ -741,7 +742,7 @@ public class TestJSONUtil
     public void testDate() throws ScriptException, NoSuchMethodException
     {
         JSONConfig cfg = new JSONConfig();
-        
+
         // non-standard JSON - only works with eval() and my parser.
         cfg.setEncodeDatesAsObjects(true);
         Map<String,Object> jsonObj = new LinkedHashMap<>();
@@ -757,16 +758,16 @@ public class TestJSONUtil
         if ( result instanceof ScriptObjectMirror ){
             ScriptObjectMirror mirror = (ScriptObjectMirror)result;
             Object obj = mirror.get("t");
-            if ( obj != null && obj instanceof ScriptObjectMirror ){
+            if ( obj instanceof ScriptObjectMirror ){
                 ScriptObjectMirror t = (ScriptObjectMirror)obj;
                 if ( t.getClassName().equals("Date") ){
-                    assertEquals((Double)t.callMember("getUTCFullYear"), new Double(2015));
-                    assertEquals((Double)t.callMember("getUTCMonth"), new Double(8));
-                    assertEquals((Double)t.callMember("getUTCDate"), new Double(16));
-                    assertEquals((Double)t.callMember("getUTCHours"), new Double(14));
-                    assertEquals((Double)t.callMember("getUTCMinutes"), new Double(8));
-                    assertEquals((Double)t.callMember("getUTCSeconds"), new Double(34));
-                    assertEquals((Double)t.callMember("getUTCMilliseconds"), new Double(34));
+                    assertEquals(new Double(2015), t.callMember("getUTCFullYear"));
+                    assertEquals(new Double(8), t.callMember("getUTCMonth"));
+                    assertEquals(new Double(16), t.callMember("getUTCDate"));
+                    assertEquals(new Double(14), t.callMember("getUTCHours"));
+                    assertEquals(new Double(8), t.callMember("getUTCMinutes"));
+                    assertEquals(new Double(34), t.callMember("getUTCSeconds"));
+                    assertEquals(new Double(34), t.callMember("getUTCMilliseconds"));
                 }else{
                     fail("Expected Date from t");
                 }
