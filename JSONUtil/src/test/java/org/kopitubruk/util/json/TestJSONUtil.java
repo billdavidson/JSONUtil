@@ -53,15 +53,14 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
- * Tests for JSONUtil. Most of the produced JSON is put through Java's script
- * engine so that it will be tested that it parses without error.
+ * Tests for JSONUtil.  Java 5 does not support a scripting engine so
+ * the output cannot be validated against a Javascript engine.
  *
  * @author Bill Davidson
  */
 public class TestJSONUtil
 {
     private static Log s_log = LogFactory.getLog(TestJSONUtil.class);
-    private static final String FAIL_FMT = "Expected a BadPropertyNameException to be thrown for U+%04X";
 
     /**
      * Create a dummy JNDI initial context in order to avoid having
@@ -224,7 +223,7 @@ public class TestJSONUtil
         try{
             jsonObj.put(new String(codePoints,0,end), 0);
             JSONUtil.toJSON(jsonObj, cfg);
-            fail(String.format(FAIL_FMT, codePoints[start]));
+            fail(String.format("Expected a BadPropertyNameException to be thrown for U+%04X", codePoints[start]));
         }catch ( BadPropertyNameException e ){
             String message = e.getMessage();
             for ( int i = start; i < end; i++ ){
