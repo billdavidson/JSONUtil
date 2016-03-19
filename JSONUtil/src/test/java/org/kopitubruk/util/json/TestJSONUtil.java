@@ -42,7 +42,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.TimeZone;
@@ -61,23 +60,21 @@ import org.junit.Test;
 
 import sun.org.mozilla.javascript.internal.Context;
 import sun.org.mozilla.javascript.internal.NativeObject;
-import sun.org.mozilla.javascript.internal.ScriptableObject;
-
-//import jdk.nashorn.api.scripting.ScriptObjectMirror;
 
 /**
  * Tests for JSONUtil. Most of the produced JSON is put through Java's script
  * engine so that it will be tested that it parses without error. In most cases,
  * the JSON is tested both against Javascript eval() and JSON.parse(). In
  * general, eval() is looser than JSON.parse() except for property names where
- * JSON.parse() is looser.
+ * JSON.parse() is looser because eval() requires ECMAScript compliant property
+ * names while JSON.parse() only requires compliance with the JSON standard
+ * which allows almost all defined Unicode code points.
  *
  * @author Bill Davidson
  */
 public class TestJSONUtil
 {
     private static Log s_log = LogFactory.getLog(TestJSONUtil.class);
-    private static final String FAIL_FMT = "Expected a BadPropertyNameException to be thrown for U+%04X";
 
     /**
      * Create a dummy JNDI initial context in order to avoid having
@@ -429,7 +426,7 @@ public class TestJSONUtil
         try{
             jsonObj.put(new String(codePoints,0,end), 0);
             JSONUtil.toJSON(jsonObj, cfg);
-            fail(String.format(FAIL_FMT, codePoints[start]));
+            fail(String.format("Expected a BadPropertyNameException to be thrown for U+%04X", codePoints[start]));
         }catch ( BadPropertyNameException e ){
             String message = e.getMessage();
             for ( int i = start; i < end; i++ ){
@@ -748,7 +745,7 @@ public class TestJSONUtil
     public void testDate() throws ScriptException, NoSuchMethodException
     {
         JSONConfig cfg = new JSONConfig();
-        
+
         // non-standard JSON - only works with eval() and my parser.
         cfg.setEncodeDatesAsObjects(true);
         Map<String,Object> jsonObj = new LinkedHashMap<>();
@@ -769,13 +766,13 @@ public class TestJSONUtil
                 Date dt = (Date)dto;
                 Calendar jc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
                 jc.setTime(dt);
-                assertEquals(jc.get(Calendar.YEAR), 2015);
-                assertEquals(jc.get(Calendar.MONTH), 8);
-                assertEquals(jc.get(Calendar.DAY_OF_MONTH), 16);
-                assertEquals(jc.get(Calendar.HOUR_OF_DAY), 14);
-                assertEquals(jc.get(Calendar.MINUTE), 8);
-                assertEquals(jc.get(Calendar.SECOND), 34);
-                assertEquals(jc.get(Calendar.MILLISECOND), 34);
+                assertEquals(2015, jc.get(Calendar.YEAR));
+                assertEquals(   8, jc.get(Calendar.MONTH));
+                assertEquals(  16, jc.get(Calendar.DAY_OF_MONTH));
+                assertEquals(  14, jc.get(Calendar.HOUR_OF_DAY));
+                assertEquals(   8, jc.get(Calendar.MINUTE));
+                assertEquals(  34, jc.get(Calendar.SECOND));
+                assertEquals(  34, jc.get(Calendar.MILLISECOND));
             }else{
                 fail("Expected NativeDate from result");
             }
