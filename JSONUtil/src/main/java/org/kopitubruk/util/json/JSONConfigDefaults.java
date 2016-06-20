@@ -44,33 +44,36 @@ import static org.kopitubruk.util.json.JNDIUtil.getBoolean;
 /**
  * <p>
  * This class provides a singleton object which is used to change static
- * defaults used by JSONConfig and it is used as an MBean to allow JMX
- * clients with MBean support to view and modify the defaults.
+ * defaults used by {@link JSONConfig} and it is used as an MBean to
+ * allow JMX clients with MBean support to view and modify the defaults.
  * <p>
- * Keep in mind that affects all new JSONConfig objects created in the
- * same class loader, including those created by toJSON methods which
- * don't take a JSONConfig, which could have undesirable side effects depending upon
- * your app. Use with care, if at all.  All data in this class is static.  The
- * only reason that there is an instance or instance methods is to support
- * MBean access to the defaults.  A few defaults are only available
- * programmatically.  Those are accessed statically.
+ * Keep in mind that changes made with this class affect all new
+ * {@link JSONConfig} objects created in the same class loader,
+ * including those created by toJSON() methods which don't take a
+ * {@link JSONConfig}, which could have undesirable side effects depending
+ * upon your app. Use with care, if at all.  All data in this class
+ * is static.  The only reason that there is an instance or instance
+ * methods is to support MBean access to the defaults.  A few defaults
+ * are only available programmatically.  Those are accessed statically.
  * <p>
- * It is possible to configure the default values of these flags via JNDI
- * such as is typically available in a web application by adding values to
- * your application's environment under java:/comp/env/org/kopitubruk/util/json.
- * That way you can do things like having all of the validation turned on
- * in development and testing servers and turn it off in production servers
- * for faster performance, without changing any code.
+ * It is possible to configure the default values of these flags
+ * via JNDI such as is typically available in a web application
+ * by adding values to your application's environment under
+ * java:/comp/env/org/kopitubruk/util/json.  That way you can do things
+ * like having all of the validation turned on in development and testing
+ * servers and turn it off in production servers for faster performance,
+ * without changing any code.
  * <p>
- * Example for Tomcat, assuming your app is named "MyApp", in
- * <code>$CATALINA_BASE/conf/Catalina/<i>host</i>/MyApp.xml</code> in order to
+ * Example for Tomcat, assuming your app is named "MyApp", and your host
+ * is named "host", put this into your
+ * <code>$CATALINA_BASE/conf/Catalina/<i>host</i>/MyApp.xml</code> file in order to
  * disable property name validation:
  * <pre>{@code <Context path="/MyApp">
  *   <Environment name="org/kopitubruk/util/json/validatePropertyNames" type="java.lang.Boolean" value="false" override="false" />
  * </Context>}</pre>
  * <p>
  * These are the names and their normal defaults if you don't change them.
- * See the setters for these for descriptions of what they do.
+ * See their setters for these for descriptions of what they do.
  * <h3>Validation related options.</h3>
  * <ul>
  *   <li>validatePropertyNames = true</li>
@@ -120,13 +123,14 @@ import static org.kopitubruk.util.json.JNDIUtil.getBoolean;
  * {@link JSONConfig} for the same reason.  Once you add a format, you can't
  * modify it except by replacing it entirely.
  * <p>
- * It is possible to see and modify the default values of all of the boolean
- * flags at runtime if you have a JMX client with MBean support connected to
- * your server.  It will be in org.kopitubruk.util.json.JSONConfigDefaults.  You
- * can disable MBean registration by setting a boolean variable named registerMBean
- * to false in the environment as shown above for the flags.  See also the
- * {@link #clearMBean()} method for information on how to remove the MBean from
- * your server when your app is unloaded or reloaded.
+ * It is possible to see and modify the default values of all
+ * of the boolean flags at runtime if you have a JMX client
+ * with MBean support connected to your server.  It will be in
+ * org.kopitubruk.util.json.JSONConfigDefaults.  You can disable MBean
+ * registration by setting a boolean variable named registerMBean to
+ * false in the environment as shown above for the flags.  See also the
+ * {@link #clearMBean()} method for information on how to remove the
+ * MBean from your server when your app is unloaded or reloaded.
  * <p>
  * There is some limited logging for access of JNDI and the MBean server.
  * Most of it is debug, so you won't see it unless you have debug logging
@@ -138,7 +142,9 @@ import static org.kopitubruk.util.json.JNDIUtil.getBoolean;
  * org.kopitubruk.util.json.registerMBean or org.kopitubruk.util.json.logging
  * respectively as false.  System properties may be set on the java command
  * line using the "-D" flag or possibly programmatically if your program has
- * permission to do it and does so before this class is loaded.
+ * permission to do it and does so before this class is loaded.  If logging
+ * is not set via a system property at all, then JDNI can also be used to
+ * disable logging by setting the boolean named "org/kopitubruk/util/json/logging".
  *
  * @see JSONConfig
  * @author Bill Davidson
@@ -194,12 +200,19 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
         String pkgName = thisClass.getPackage().getName();
         String registerMBeanName = "registerMBean";
+        String loggingName = "logging";
         String trueStr = Boolean.TRUE.toString();
 
         // allow disabling JNDI, MBean and logging from the command line.
         boolean useJNDI = Boolean.parseBoolean(System.getProperty(pkgName+".useJNDI", trueStr));
         boolean registerMBean = Boolean.parseBoolean(System.getProperty(pkgName+'.'+registerMBeanName, trueStr));
-        logging = Boolean.parseBoolean(System.getProperty(pkgName+".logging", trueStr));
+
+        String loggingProperty = System.getProperty(pkgName+'.'+loggingName);
+        if ( loggingProperty != null ){
+            logging = Boolean.parseBoolean(loggingProperty);
+        }else{
+            logging = true;
+        }
 
         ResourceBundle bundle = null;
         if ( useJNDI || registerMBean ){
@@ -207,6 +220,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             if ( logging ){
                 s_log = LogFactory.getLog(thisClass);
             }
+        }else{
+            // bundle not used and logging is only used for JNDI and MBeans.
+            logging = false;
         }
 
         if ( useJNDI ){
@@ -214,11 +230,23 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             try{
                 Context ctx = JNDIUtil.getEnvContext(pkgName.replaceAll("\\.", "/"));
 
+                if ( loggingProperty != null ){
+                    // logging was not set by a system property. allow JNDI override.
+                    logging = getBoolean(ctx, loggingName, logging);
+                    if ( logging ){
+                        if ( s_log == null ){
+                            s_log = LogFactory.getLog(thisClass);
+                        }
+                    }else{
+                        s_log = null;
+                    }
+                }
+
                 // locale.
                 String languageTag = getString(ctx, "locale", null);
                 if ( languageTag != null ){
                     d.setLocale(languageTag);
-                    if ( logging ){
+                    if ( bundle != null ){
                         // possibly changed the locale.  redo the bundle.
                         bundle = JSONUtil.getBundle(getLocale());
                     }
@@ -410,7 +438,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the default locale for new JSONConfig objects.
+     * Get the default locale for new {@link JSONConfig} objects.  If a
+     * default locale has not been set, then the locale returned
+     * by {@link Locale#getDefault()} will be returned.
      *
      * @return the default locale.
      */
@@ -420,7 +450,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Set a default locale for new JSONConfig objects to use.
+     * Set a default locale for new {@link JSONConfig} objects to use.
      *
      * @param loc the default locale.
      */
@@ -430,7 +460,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Set the default locale for new JSONConfig objects to use.
+     * Set the default locale for new {@link JSONConfig} objects to use.
+     * <p>
+     * Accessible via MBean server.
      *
      * @param languageTag A language tag suitable for use by {@link Locale#forLanguageTag(String)}.
      */
@@ -478,7 +510,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Add a default number format for a particular type that extends Number.
-     * This will be applied to all new JSONConfig objects that are created after
+     * This will be applied to all new {@link JSONConfig} objects that are created after
      * this in the same class loader.  The format is cloned for thread safety.
      *
      * @param numericClass The class.
@@ -500,7 +532,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Add a default number format for a particular type that extends Number.
-     * This will be applied to all new JSONConfig objects that are created after
+     * This will be applied to all new {@link JSONConfig} objects that are created after
      * this in the same class loader.  The format is cloned for thread safety.
      *
      * @param numericType The object.
@@ -614,7 +646,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Clear any default number formats.  Accessible via MBean server.
+     * Clear any default number formats.
+     * <p>
+     * Accessible via MBean server.
      *
      * @since 1.4
      */
@@ -638,7 +672,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Set the date string generation format.
+     * Set the date string generation format used when encodeDatesAsStrings
+     * or encodeDatesAsObjects is true.
      *
      * @param fmt the dateFormat to set
      * @since 1.4
@@ -649,8 +684,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Set the date format used for date string generation. Accessible via MBean
-     * server.
+     * Set the date format used for date string generation when
+     * encodeDatesAsStrings or encodeDatesAsObjects is true.
+     * <p>
+     * Accessible via MBean server.
      *
      * @param fmtStr passed to the constructor for
      * {@link SimpleDateFormat#SimpleDateFormat(String,Locale)} using
@@ -672,7 +709,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Clear date generation format.  Accessible via MBean server.
+     * Clear date generation format.
+     * <p>
+     * Accessible via MBean server.
      *
      * @since 1.4
      */
@@ -685,7 +724,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the list of date parsing formats.
+     * Get the list of date parsing formats used by the parser when
+     * encodeDatesAsStrings or encodeDatesAsObjects is true.
      *
      * @return the list of date parsing formats.
      * @since 1.4
@@ -696,9 +736,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Add a date parsing format to the list of parsing formats.  When
-     * parsing date strings, they will be used in the same order that
-     * they were added.
+     * Add a date parsing format to the list of parsing formats used
+     * by the parser when encodeDatesAsStrings or encodeDatesAsObjects
+     * is true.  When parsing date strings, they will be used in the
+     * same order that they were added.
      *
      * @param fmt A date parsing format.
      * @since 1.4
@@ -711,8 +752,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Add a date parsing format to the list of date parsing formats. Accessible
-     * via MBean server.
+     * Add a date parsing format to the list of date parsing formats
+     * used by the parser when encodeDatesAsStrings or
+     * encodeDatesAsObjects is true.
+     * <p>
+     * Accessible via MBean server.
      *
      * @param fmtStr Passed to
      * {@link SimpleDateFormat#SimpleDateFormat(String,Locale)} using
@@ -729,7 +773,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Add a collection of date parsing format to the list of date parsing formats.
+     * Add a collection of date parsing format to the list of date
+     * parsing formats used by the parser when encodeDatesAsStrings
+     * or encodeDatesAsObjects is true.
      *
      * @param fmts A collection of date parsing formats.
      * @since 1.4
@@ -777,7 +823,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Clear any date parse formats.
+     * Clear any date parse formats from the list of formats
+     * used by the parser when encodeDatesAsStrings or
+     * encodeDatesAsObjects is true.
+     * <p>
+     * Accessible via MBean server.
      */
     @Override
     public void clearDateParseFormats()
@@ -789,6 +839,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Get the default validate property names policy.
+     * <p>
      * Accessible via MBean server.
      *
      * @return The default validate property names policy.
@@ -801,8 +852,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Set the default flag for validation of property names.
-     * This will affect all new JSONConfig objects created after this call
-     * within the same class loader.  Accessible via MBean server.
+     * This will affect all new {@link JSONConfig} objects created after this call
+     * within the same class loader.
+     * <p>
+     * Accessible via MBean server.
      *
      * @param dflt If true, then property names will be validated by default.
      */
@@ -827,11 +880,15 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Set the default flag for forcing quotes on identifiers.
-     * This will affect all new JSONConfig objects created after this call
-     * within the same class loader. Accessible via MBean server.
+     * Set the default flag for detecting data structure loops.  If true,
+     * then if a loop in a data structure is found then a
+     * {@link DataStructureLoopException} will be thrown.
+     * This will affect all new {@link JSONConfig} objects created after this call
+     * within the same class loader.
+     * <p>
+     * Accessible via MBean server.
      *
-     * @param dflt If true, then all identifiers will be quoted.
+     * @param dflt If true, then the code will detect loops in data structures.
      */
     @Override
     public void setDetectDataStructureLoops( boolean dflt )
@@ -843,6 +900,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Get the default escape bad identifier code points policy.
+     * <p>
      * Accessible via MBean server.
      *
      * @return The default escape bad identifier code points policy.
@@ -855,9 +913,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * If true, then any bad code points in identifiers will be escaped.
-     * Default is false.  Accessible via MBean server.
+     * Default is false.
+     * <p>
+     * Accessible via MBean server.
      *
-     * @param dflt the escapeBadIdentifierCodePoints to set
+     * @param dflt if true, then any bad code points in identifiers will be escaped.
      */
     @Override
     public void setEscapeBadIdentifierCodePoints( boolean dflt )
@@ -869,9 +929,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Get the full JSON identifier code points policy.
+     * <p>
+     * Accessible via MBean server.
      *
      * @return the fullJSONIdentifierCodePoints
      */
+    @Override
     public boolean isFullJSONIdentifierCodePoints()
     {
         return fullJSONIdentifierCodePoints;
@@ -883,9 +946,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * permitted by the ECMAScript standard. Use of characters not permitted by
      * the ECMAScript standard will cause an error if parsed by Javascript
      * eval().
+     * <p>
+     * Accessible via MBean server.
      *
      * @param dflt If true, then allow all code points permitted by the JSON standard in identifiers.
      */
+    @Override
     public void setFullJSONIdentifierCodePoints( boolean dflt )
     {
         fullJSONIdentifierCodePoints = dflt;
@@ -893,6 +959,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Get the default encode numeric strings as numbers policy.
+     * <p>
      * Accessible via MBean server.
      *
      * @return The default encode numeric strings as numbers policy.
@@ -905,10 +972,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Set the default flag for encoding of numeric strings as numbers.
+     * <p>
      * Accessible via MBean server.
      *
-     * @param dflt If true, then strings that look like numbers will be encoded
-     * as numbers.
+     * @param dflt If true, then strings that look like valid JSON numbers
+     * will be encoded as numbers.
      */
     @Override
     public void setEncodeNumericStringsAsNumbers( boolean dflt )
@@ -919,7 +987,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the default quote non-ASCII policy.
+     * Get the default escape non-ASCII policy.
+     * <p>
      * Accessible via MBean server.
      *
      * @return The default quote non-ASCII policy.
@@ -933,8 +1002,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     /**
      * Set the default flag for forcing escaping of non-ASCII characters in
      * strings and identifiers. If true, then escapeSurrogates will be forced to
-     * false. This will affect all new JSONConfig objects created after this
-     * call within the same class loader. Accessible via MBean server.
+     * false. This will affect all new {@link JSONConfig} objects created after this
+     * call within the same class loader.
+     * <p>
+     * Accessible via MBean server.
      *
      * @param dflt If true, then all non-ASCII will be Unicode escaped.
      */
@@ -950,7 +1021,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * The default unEscape policy.
+     * Get the default unEscape policy.
+     * <p>
      * Accessible via MBean server.
      *
      * @return the unEscape policy.
@@ -963,6 +1035,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Set default flag for undoing inline escapes in strings.
+     * <p>
      * Accessible via MBean server.
      *
      * @param dflt If true then where possible, undo inline escapes in strings.
@@ -976,9 +1049,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * The default escape surrogates policy.
+     * Get the default escape surrogates policy.
+     * <p>
+     * Accessible via MBean server.
      *
-     * @return the s_defaultEscapeSurrogates
+     * @return the escape surrogates policy.
      */
     @Override
     public boolean isEscapeSurrogates()
@@ -987,10 +1062,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * If true, then surrogates will be escaped in strings and identifiers
-     * and escapeNonAscii will be forced to false.
+     * Set the default escapeSurrogates policy.
+     * <p>
+     * Accessible via MBean server.
      *
-     * @param dflt the defaultEscapeSurrogates to set
+     * @param dflt If true, then surrogates will be escaped in strings and identifiers
+     * and escapeNonAscii will be forced to false.
      */
     @Override
     public void setEscapeSurrogates( boolean dflt )
@@ -1005,6 +1082,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Get the encode dates as strings policy.
+     * <p>
+     * Accessible via MBean server.
      *
      * @return the encodeDatesAsStrings policy.
      */
@@ -1015,12 +1094,14 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * If true, then {@link Date} objects will be encoded as ISO 8601 date
-     * strings or a custom date format if you have called
-     * {@link #setDateGenFormat(DateFormat)}. If you set this to true, then
+     * Set the encodeDatesAsStrings policy.  If you set this to true, then
      * encodeDatesAsObjects will be set to false.
+     * <p>
+     * Accessible via MBean server.
      *
-     * @param dflt the encodeDatesAsStrings to set
+     * @param dflt If true, then {@link Date} objects will be encoded as ISO 8601 date
+     * strings or a custom date format if you have called
+     * {@link #setDateGenFormat(DateFormat)}.
      */
     @Override
     public synchronized void setEncodeDatesAsStrings( boolean dflt )
@@ -1035,6 +1116,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Get the default quote identifier policy.
+     * <p>
+     * Accessible via MBean server.
      *
      * @return The default quote identifier policy.
      */
@@ -1046,8 +1129,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Set the default flag for forcing quotes on identifiers.
-     * This will affect all new JSONConfig objects created after this call
-     * within the same class loader. Accessible via MBean server.
+     * This will affect all new {@link JSONConfig} objects created after this call
+     * within the same class loader.
+     * <p>
+     * Accessible via MBean server.
      *
      * @param dflt If true, then all identifiers will be quoted.
      */
@@ -1061,6 +1146,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Get the default escape ECMAScript 6 code points policy.
+     * <p>
      * Accessible via MBean server.
      *
      * @return The default escape ECMAScript 6 code points policy.
@@ -1077,6 +1163,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * than code unit escapes. This is not standard JSON and not yet widely
      * supported by Javascript interpreters. It also allows identifiers to have
      * letter numbers in addition to other letters.  Default is false.
+     * <p>
+     * Accessible via MBean server.
      *
      * @param dflt If true, use EMCAScript 6 code point escapes and allow
      * ECMAScript 6 identifier character set.
@@ -1091,8 +1179,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Get the default for allowing reserved words in identifiers.
+     * <p>
+     * Accessible via MBean server.
      *
-     * @return the defaultAllowReservedWordsInIdentifiers
+     * @return the reserverd words in identifiers policy.
      */
     @Override
     public boolean isAllowReservedWordsInIdentifiers()
@@ -1102,8 +1192,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Set default flag for allowing reserved words in identifiers.
+     * <p>
+     * Accessible via MBean server.
      *
-     * @param dflt the defaultAllowReservedWordsInIdentifiers to set
+     * @param dflt If true, then reserved words will be allowed in identifiers.
      */
     @Override
     public void setAllowReservedWordsInIdentifiers( boolean dflt )
@@ -1115,6 +1207,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Get the encode dates as objects policy.
+     * <p>
+     * Accessible via MBean server.
      *
      * @return the encodeDatesAsObjects policy.
      */
@@ -1129,8 +1223,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Javascript dates, using new Date(dateString).  If you
      * set this to true, then encodeDatesAsStrings will be
      * set to false.
+     * <p>
+     * Accessible via MBean server.
      *
-     * @param dflt the encodeDatesAsObjects to set
+     * @param dflt If true, then {@link Date} objects will be encoded as
+     * Javascript dates.
      */
     @Override
     public synchronized void setEncodeDatesAsObjects( boolean dflt )
