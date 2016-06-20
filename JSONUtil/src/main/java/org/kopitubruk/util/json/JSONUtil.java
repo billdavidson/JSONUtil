@@ -60,7 +60,12 @@ import java.util.regex.Pattern;
  *   This implementation validates property names by default using the
  *   specification from ECMAScript and ECMA JSON standards.  The validation
  *   can be disabled for faster performance.  See {@link JSONConfig}.  Leaving it
- *   on during development and testing is probably advisable.
+ *   on during development and testing is probably advisable.  Note that the
+ *   ECMAScript standard for identifiers is more strict than the JSON standard
+ *   for identifiers.  If you need full JSON identifiers, then you should
+ *   enable fullJSONIdentifierCodePoints in your {@link JSONConfig}.  Keep
+ *   in mind that JSON generated that way may not evaluate properly in
+ *   Javascript eval().
  * </p>
  * <p>
  *   There is some effort to detect loops in the data structure that would cause
@@ -77,7 +82,7 @@ import java.util.regex.Pattern;
  *     In most cases, this will be what you will send to the toJSON method. The
  *     {@link Map} becomes a Javascript object with the property names being the
  *     result of the key's toString() method and the values being property values.
- *     The key's toString() must produce valid Javascript identifiers and the
+ *     The key's toString() must produce valid Javascript/JSON identifiers and the
  *     values can be almost anything.  Note that this is different than
  *     the org.json library which requires the keys to actually be Strings.
  *   </dd>
@@ -507,7 +512,9 @@ public class JSONUtil
                     }
                     // apply any escapes and do validation as per the config flags.
                     String propertyName = getPropertyName(key, cfg, propertyNames);
-                    boolean doQuote = quoteIdentifier || isReservedWord(propertyName) || hasSurrogates(propertyName);
+                    boolean doQuote = quoteIdentifier ||
+                                        isReservedWord(propertyName) ||
+                                        hasSurrogates(propertyName);
                     if ( doQuote ){
                         json.write('"');
                     }
@@ -1108,7 +1115,7 @@ public class JSONUtil
      * Checks if the input string represents a valid Javascript property name.
      *
      * @param propertyName A Javascript property name to check.
-     * @param cfg A JSONConfig to use for locale.
+     * @param cfg A JSONConfig to use for locale and identifier options.  If null, defaults will be used.
      * @throws BadPropertyNameException If the propertyName is not a valid Javascript property name.
      */
     public static void checkValidJavascriptPropertyName( String propertyName, JSONConfig cfg ) throws BadPropertyNameException

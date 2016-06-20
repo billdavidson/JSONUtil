@@ -32,7 +32,8 @@ import java.util.regex.Pattern;
  * you use single quotes instead of double quotes if you want and all versions of
  * Javascript numbers are allowed. Unquoted identifiers are also permitted. Escapes
  * in strings are converted to their proper characters and all Javascript escapes
- * are permitted.
+ * are permitted.  Identifiers which contain code points which are permitted by
+ * the JSON standard but not by the ECMAScript standard must be quoted.
  * <p>
  * Javascript objects are converted to {@link LinkedHashMap}s with the
  * identifiers being the keys.

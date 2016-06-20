@@ -58,7 +58,7 @@ import java.util.Map.Entry;
  *   Allow generation of certain types of non-standard JSON.
  * </h3>
  * <p>
- *   This could cause problems for some things that take JSON.  Defaults
+ *   These could cause problems for some things that take JSON.  Defaults
  *   are for standard JSON.  Be careful about changing these.  They should
  *   work fine if the JSON is interpreted by a standard Javascript
  *   eval(), except ECMAScript 6 code points if your interpreter doesn't
@@ -175,7 +175,8 @@ public class JSONConfig implements Serializable, Cloneable
 
     /**
      * Return a clone of this object.  Note that this is unsynchronized,
-     * so code accordingly.
+     * so code accordingly.  This is a deep clone so any date or number formats
+     * defined for this instance will also be cloned.
      *
      * @return a clone of this object.
      */
@@ -256,7 +257,7 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * Get the locale.
+     * Get the locale for this instance.
      *
      * @return the locale
      */
@@ -298,7 +299,7 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * Get the number format for the class of th given numeric type.
+     * Get the number format for the class of the given numeric type.
      *
      * @param num An object that implements {@link Number}.
      * @return A number format or null if one has not been set.
@@ -408,9 +409,11 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * Get a date formatter for generating date strings. If you did not set the
-     * date formatter with {@link #setDateGenFormat(DateFormat)}, it will return
-     * an ISO 8601 extended format formatter.
+     * Get the date formatter for generating date strings when encodeDatesAsStrings
+     * or encodeDatesAsObjects are true. If you did not set the date formatter
+     * with {@link #setDateGenFormat(DateFormat)}, and a default format has not
+     * been set, then it will return an ISO 8601 extended format
+     * formatter: yyyy-MM-dd'T'HH:mm:ss.sss'Z'.
      *
      * @return The formatter.
      */
@@ -425,9 +428,10 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * Set the date string generation format. If you did not set the date
-     * formatter, it will use an ISO 8601 extended format formatter will be used
-     * when formatting dates.
+     * Set the date string generation format used when encodeDatesAsStrings or
+     * encodeDatesAsObjects are true. If you do not set the date formatter, it
+     * will use an ISO 8601 extended format formatter will be used when formatting
+     * dates.  The format is yyyy-MM-dd'T'HH:mm:ss.sss'Z'
      *
      * @param fmt the dateFormat to set
      * @since 1.4
@@ -582,11 +586,16 @@ public class JSONConfig implements Serializable, Cloneable
      * an issue for you, then you may want to do most of your development and
      * testing with this set to true but switch to false when you release.
      * <p>
-     * When validation is enabled, only code points which are allowed in
-     * identifiers will be permitted as per the ECMAScript 5 or 6 standard as
-     * well as disallowing reserved words as per the JSON spec.  It will also
-     * check for duplicate property names in the same object, which is possible
-     * because keys in maps are not required to be String objects and it's
+     * When validation is enabled and fullJSONIdentifierCodePoints is false, then
+     * only code points which are allowed in identifiers will be permitted as per
+     * the ECMAScript 5 or 6 standard as well as disallowing reserved words as per
+     * the JSON spec.  If fullJSONIdentifierCodePoints is true, then all code points
+     * permitted by the ECMA JSON standard will be permitted, though many of those
+     * are not permitted by the ECMAScript standard and will break if evaluated by
+     * a Javascript eval().
+     * <p>
+     * It will also check for duplicate property names in the same object, which is
+     * possible because keys in maps are not required to be String objects and it's
      * possible (though not likely) for two objects which are not equal to have
      * the same result from a toString() method.
      *
