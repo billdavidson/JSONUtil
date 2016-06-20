@@ -30,6 +30,7 @@ import java.math.BigInteger;
 import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -54,7 +55,11 @@ import javax.script.ScriptException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.TestWatcher;
+import org.junit.runner.Description;
 
 import jdk.nashorn.api.scripting.ScriptObjectMirror;
 
@@ -72,6 +77,23 @@ import jdk.nashorn.api.scripting.ScriptObjectMirror;
 public class TestJSONUtil
 {
     private static Log s_log = LogFactory.getLog(TestJSONUtil.class);
+
+    private static long s_tm;
+    private static SimpleDateFormat sdf;
+
+    /**
+     * Print out the name of the currently running test.
+     */
+    @Rule
+    public TestRule watcher = new TestWatcher()
+    {
+        protected void starting( Description description )
+        {
+            long tm = System.currentTimeMillis();
+
+            System.out.println(sdf.format(new Date(tm-s_tm)) + ' ' + description.getMethodName());
+        }
+    };
 
     /**
      * Create a dummy JNDI initial context in order to avoid having
@@ -110,6 +132,10 @@ public class TestJSONUtil
          * English, so it's forced during the tests.
          */
         JSONConfigDefaults.setLocale(Locale.US);
+
+        sdf = new SimpleDateFormat("mm:ss.SSS");
+        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+        s_tm = System.currentTimeMillis();
     }
 
     /**
