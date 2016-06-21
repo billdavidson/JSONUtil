@@ -215,19 +215,21 @@ public class JSONUtil
     private static final Pattern CODE_UNIT_PAT = Pattern.compile("^\\\\u(\\p{XDigit}{4})$");
 
     /**
-     * Parse a Unicode code unit escape without the anchors.
-     */
-    static final Pattern FREE_CODE_UNIT_PAT = Pattern.compile("\\\\u(\\p{XDigit}{4})");
-
-    /**
      * Parse an ECMAScript 6 Unicode code point escaoe.
      */
     private static final Pattern CODE_POINT_PAT = Pattern.compile("^\\\\u\\{(\\p{XDigit}+)\\}$");
 
     /**
-     * Match either a code point or a code unit.
+     * Escapes to pass through for ECMA5 when escaping bad identifier code points.
      */
-    static final Pattern CODE_UNIT_OR_POINT_PAT = Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})");
+    static final Pattern ECMA5_ESCAPE_PASS_THROUGH_PAT =
+            Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\[bfnrt\\\\/'\"])");
+
+    /**
+     * Escapes to pass through for ECMA6 when escaping bad identifier code points.
+     */
+    static final Pattern ECMA6_ESCAPE_PASS_THROUGH_PAT =
+            Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\}|\\\\[bfnrt\\\\/'\"])");
 
     /**
      * <p>
@@ -755,7 +757,7 @@ public class JSONUtil
     /**
      * Escape bad identifier code points if the config object requires it.
      *
-     * @param propertyname the name to escape.
+     * @param propertyName the name to escape.
      * @param cfg The config object.
      * @return the escaped property name.
      */
@@ -766,30 +768,33 @@ public class JSONUtil
             int i = 0;
             int len = propertyName.length();
             boolean useECMA6 = cfg.isUseECMA6();
-            Pattern unicodeEscapePat = useECMA6 ? CODE_UNIT_OR_POINT_PAT : FREE_CODE_UNIT_PAT;
+            Pattern escapePassThroughPat = useECMA6 ? ECMA6_ESCAPE_PASS_THROUGH_PAT
+                                                    : ECMA5_ESCAPE_PASS_THROUGH_PAT;
 
             while ( i < len ){
                 int codePoint = propertyName.codePointAt(i);
                 int charCount = Character.charCount(codePoint);
-                if ( isValidIdentifierStart(codePoint, cfg) ){
-                    buf.appendCodePoint(codePoint);
-                }else if ( i > 0 && isValidIdentifierPart(codePoint, cfg) ){
-                    buf.appendCodePoint(codePoint);
-                }else{
-                    // Bad code point for an identifier.
-                    boolean doEscape = true;
-                    if ( codePoint == '\\' ){
-                        // check for a Unicode escape.
-                        Matcher matcher = unicodeEscapePat.matcher(propertyName);
-                        if ( matcher.find(i) && matcher.start() == i ){
-                            // It's a Unicode escape.  Pass it through.
-                            String esc = matcher.group(1);
-                            buf.append(esc);
-                            i += esc.length() - 1;
-                            doEscape = false;
-                        }
+                if ( codePoint == '\\' ){
+                    // check for escapes to pass through.
+                    Matcher matcher = escapePassThroughPat.matcher(propertyName);
+                    if ( matcher.find(i) && matcher.start() == i ){
+                        // It's a valid escape.  Pass it through.
+                        String esc = matcher.group(1);
+                        buf.append(esc);
+                        i += esc.length();
+                    }else{
+                        // no valid escape.  escape it.
+                        buf.append('\\')
+                           .append('\\');
+                        i += charCount;
                     }
-                    if ( doEscape ){
+                }else{
+                    if ( i == 0 && isValidIdentifierStart(codePoint, cfg) ){
+                        buf.appendCodePoint(codePoint);
+                    }else if ( i > 0 && isValidIdentifierPart(codePoint, cfg) ){
+                        buf.appendCodePoint(codePoint);
+                    }else{
+                        // Bad code point for an identifier.
                         if ( useECMA6 && (codePoint < 0x10 || codePoint > 0xFFFF) ){
                             // Use ECMAScript 6 code point escape.
                             // only very low or very high code points see an advantage.
@@ -802,8 +807,8 @@ public class JSONUtil
                             }
                         }
                     }
+                    i += charCount;
                 }
-                i += charCount;
             }
 
             return buf.toString();
@@ -822,28 +827,31 @@ public class JSONUtil
     {
         int i = 0;
         int len = propertyName.length();
-        Pattern unicodeEscapePat = cfg.isUseECMA6() ? CODE_UNIT_OR_POINT_PAT : FREE_CODE_UNIT_PAT;
+        Pattern escapePassThroughPat = cfg.isUseECMA6() ? ECMA6_ESCAPE_PASS_THROUGH_PAT
+                                                        : ECMA5_ESCAPE_PASS_THROUGH_PAT;
 
         while ( i < len ){
             int codePoint = propertyName.codePointAt(i);
             int charCount = Character.charCount(codePoint);
-            if ( !( isValidIdentifierStart(codePoint, cfg) || (i > 0 && isValidIdentifierPart(codePoint, cfg)) ) ){
-                // Bad code point for an identifier.
-                if ( codePoint == '\\' ){
-                    // check for a Unicode escape.
-                    Matcher matcher = unicodeEscapePat.matcher(propertyName);
-                    if ( matcher.find(i) && matcher.start() == i ){
-                        // It's a Unicode escape.  Skip it.
-                        String esc = matcher.group(1);
-                        i += esc.length() - 1;
-                    }else{
-                        return true;
-                    }
+            if ( codePoint == '\\' ){
+                // check for escapes to pass through.
+                Matcher matcher = escapePassThroughPat.matcher(propertyName);
+                if ( matcher.find(i) && matcher.start() == i ){
+                    // It's a valid escape.  Pass it through.
+                    String esc = matcher.group(1);
+                    i += esc.length();
                 }else{
+                    // bad escape.
                     return true;
                 }
+            }else if ( i == 0 && isValidIdentifierStart(codePoint, cfg) ){
+                i += charCount;
+            }else if ( i > 0 && isValidIdentifierPart(codePoint, cfg) ){
+                i += charCount;
+            }else{
+                // Bad code point for an identifier.
+                return true;
             }
-            i += charCount;
         }
         return false;
     }
