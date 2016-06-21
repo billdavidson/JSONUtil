@@ -78,8 +78,7 @@ public class TestJSONUtil
 {
     private static Log s_log = LogFactory.getLog(TestJSONUtil.class);
 
-    private static long s_tm;
-    private static SimpleDateFormat sdf;
+    private static SimpleDateFormat s_sdf;
 
     /**
      * Print out the name of the currently running test.
@@ -89,9 +88,7 @@ public class TestJSONUtil
     {
         protected void starting( Description description )
         {
-            long tm = System.currentTimeMillis();
-
-            System.out.println(sdf.format(new Date(tm-s_tm)) + ' ' + description.getMethodName());
+            System.out.println(s_sdf.format(new Date()) + ' ' + description.getMethodName());
         }
     };
 
@@ -133,9 +130,7 @@ public class TestJSONUtil
          */
         JSONConfigDefaults.setLocale(Locale.US);
 
-        sdf = new SimpleDateFormat("mm:ss.SSS");
-        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-        s_tm = System.currentTimeMillis();
+        s_sdf = new SimpleDateFormat("YYYY-MM-dd hh:mm:ss.SSS");
     }
 
     /**
