@@ -32,6 +32,7 @@ import java.math.BigInteger;
 import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
+//import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -56,7 +57,11 @@ import javax.script.ScriptException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.BeforeClass;
+//import org.junit.Rule;
 import org.junit.Test;
+//import org.junit.rules.TestRule;
+//import org.junit.rules.TestWatcher;
+//import org.junit.runner.Description;
 
 import sun.org.mozilla.javascript.internal.Context;
 import sun.org.mozilla.javascript.internal.NativeObject;
@@ -75,6 +80,20 @@ import sun.org.mozilla.javascript.internal.NativeObject;
 public class TestJSONUtil
 {
     private static Log s_log = LogFactory.getLog(TestJSONUtil.class);
+
+    //private static SimpleDateFormat s_sdf;
+
+    /**
+     * Print out the name of the currently running test.
+     *
+    @Rule
+    public TestRule watcher = new TestWatcher()
+    {
+        protected void starting( Description description )
+        {
+            System.out.println(s_sdf.format(new Date()) + ' ' + description.getMethodName());
+        }
+    }; */
 
     /**
      * Create a dummy JNDI initial context in order to avoid having
@@ -113,6 +132,8 @@ public class TestJSONUtil
          * English, so it's forced during the tests.
          */
         JSONConfigDefaults.setLocale(Locale.US);
+
+        //s_sdf = new SimpleDateFormat("YYYY-MM-dd hh:mm:ss.SSS");
     }
 
     /**
@@ -526,16 +547,21 @@ public class TestJSONUtil
             jsonObj.put("x", str);
 
             String json = JSONUtil.toJSON(jsonObj);
-            if ( str.charAt(0) != 'd' ){
-                // Nashorn doesn't understand EMCAScript 6 code point escapes.
-                if ( str.charAt(0) == 'b' || str.charAt(0) == 'c' ){
-                    // JSON.parse() doesn't accept octal or hex escapes.
-                    evalJSON(json);
-                }else{
-                    validateJSON(json);
-                }
+            validateJSON(json);
+            switch ( str.charAt(0) ){
+                case 'b':
+                    assertThat(json, is("{\"x\":\"bO\"}"));
+                    break;
+                case 'c':
+                    assertThat(json, is("{\"x\":\"c\377\"}"));
+                    break;
+                case 'd':
+                    assertThat(json, is("{\"x\":\"d\uD83D\uDCA9\"}"));
+                    break;
+                default:
+                    assertThat(json, is("{\"x\":\""+str+"\"}"));
+                    break;
             }
-            assertThat(json, is("{\"x\":\""+str+"\"}"));
         }
     }
 
@@ -567,11 +593,15 @@ public class TestJSONUtil
             assertThat(json, is("{\"x\":\""+result+"\"}"));
         }
 
-        // test octal unescape.
+        // test that these get fixed regardless.
+        cfg.setUnEscapeWherePossible(false);
+
+        // test octal/hex unescape.
         for ( int i = 0; i < 256; i++ ){
             jsonObj.clear();
             jsonObj.put("x", String.format("a\\%o", i));
-            String result;
+            jsonObj.put("y", String.format("a\\x%02X", i));
+            String result = null;
             switch ( i ){
                 case '"':  result = "a\\\""; break;
                 case '/':  result = "a\\/"; break;
@@ -586,7 +616,7 @@ public class TestJSONUtil
                     break;
             }
             String json = JSONUtil.toJSON(jsonObj, cfg);
-            assertThat(json, is("{\"x\":\""+result+"\"}"));
+            assertThat(json, is("{\"x\":\""+result+"\",\"y\":\""+result+"\"}"));
         }
     }
 
@@ -600,7 +630,7 @@ public class TestJSONUtil
     {
         Object obj = JSONParser.parseJSON("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37e24,\"c\":Infinity,\"d\":NaN,\"e\":[1,2,3,{\"a\":4}]}");
         String json = JSONUtil.toJSON(obj);
-        assertEquals("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37E24,\"c\":\"Infinity\",\"d\":\"NaN\",\"e\":[1,2,3,{\"a\":4}]}", json);
+        assertEquals("{\"foo\":\"b\\\"ar\",\"a\":5,\"b\":2.37E24,\"c\":\"Infinity\",\"d\":\"NaN\",\"e\":[1,2,3,{\"a\":4}]}", json);
 
         obj = JSONParser.parseJSON("'foo'");
         assertEquals("foo", obj);

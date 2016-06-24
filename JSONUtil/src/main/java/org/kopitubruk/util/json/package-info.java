@@ -54,7 +54,7 @@
  * when it saves characters over code unit escapes.  It also allows a larger set
  * of characters in identifiers as per the ECMAScript 6 standard.
  * <p>
- * This package uses Apache Commons Logging in a few places so it should work
+ * This package uses Apache Commons Logging facade in a few places so it should work
  * with whatever logging framework you're using, but most of the messages are debug
  * level so you shouldn't see them unless you enable debug for the package/classes.
  * They are all related to JNDI lookups or MBean access so if you're having trouble
