@@ -611,6 +611,7 @@ public class TestJSONUtil
                 result = i < 0x20 ? String.format("\\u%04X", i) : String.format("%c", (char)i);
             }
             String json = JSONUtil.toJSON(jsonObj, cfg);
+            validateJSON(json);
             assertThat(json, is("{\"x\":\"a"+result+"\",\"y\":\"a"+result+"\"}"));
         }
     }
@@ -754,6 +755,7 @@ public class TestJSONUtil
             jsonObj.put(String.format("b\\x%02X", i), 0);
             jsonObj.put(buf, 0);                            // raw.
             json = JSONUtil.toJSON(jsonObj, cfg);
+            validateJSON(json);
 
             String r = JSONUtil.isValidIdentifierPart(i, cfg) ? String.format("%c", (char)i) : String.format("\\u%04X", i);
 
@@ -772,6 +774,7 @@ public class TestJSONUtil
             jsonObj.put(String.format("b\\x%02X", i), 0);
             jsonObj.put(buf, 0);                            // raw.
             json = JSONUtil.toJSON(jsonObj, cfg);
+            validateJSON(json);
 
             String r = JSONUtil.getEscape((char)i);
             if ( r == null ){
