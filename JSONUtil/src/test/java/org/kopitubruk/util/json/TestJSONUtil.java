@@ -538,27 +538,21 @@ public class TestJSONUtil
     public void testEscapePassThrough() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
-        String[] strs = {"a\\u1234", "b\\x4F", "c\\377", "d\\u{1F4A9}", "e\\nf"};
+        JSONConfig cfg = new JSONConfig();
+        cfg.setUnEscapeWherePossible(false);
+        cfg.setUseECMA6(true);
+        // escapes that get passed through.
+        String[] strs = { "\\u1234", "a\\u{41}", "\\\"", "\\/", "\\b", "\\f", "\\n", "\\r", "\\t", "\\\\" };
         for ( String str : strs ){
             jsonObj.clear();
             jsonObj.put("x", str);
 
-            String json = JSONUtil.toJSON(jsonObj);
-            validateJSON(json);
-            switch ( str.charAt(0) ){
-                case 'b':
-                    assertThat(json, is("{\"x\":\"bO\"}"));
-                    break;
-                case 'c':
-                    assertThat(json, is("{\"x\":\"c\377\"}"));
-                    break;
-                case 'd':
-                    assertThat(json, is("{\"x\":\"d\uD83D\uDCA9\"}"));
-                    break;
-                default:
-                    assertThat(json, is("{\"x\":\""+str+"\"}"));
-                    break;
+            String json = JSONUtil.toJSON(jsonObj, cfg);
+            if ( str.indexOf('{') < 0 ){
+                // Nashorn doesn't understand ECMAScript 6 code point escapes.
+                validateJSON(json);
             }
+            assertThat(json, is("{\"x\":\""+str+"\"}"));
         }
     }
 
@@ -572,7 +566,7 @@ public class TestJSONUtil
     public void testUnEscape() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
-        String[] strs = {"a\\u0041", "b\\x41", "d\\u{41}", "e\\v"};
+        String[] strs = {"a\\u0041", "d\\u{41}", "e\\v", "f\\'"};
         JSONConfig cfg = new JSONConfig();
         cfg.setUnEscapeWherePossible(true);
         for ( String str : strs ){
@@ -586,7 +580,18 @@ public class TestJSONUtil
                 validateJSON(json);
             }
             // \v unescaped will be re-escaped as a Unicode code unit.
-            String result = firstChar + (firstChar != 'e' ? "A" : "\\u000B");
+            String result;
+            switch ( firstChar ){
+                case 'e':
+                    result = firstChar + "\\u000B";
+                    break;
+                case 'f':
+                    result = firstChar + "'";
+                    break;
+                default:
+                    result = firstChar + "A";
+                    break;
+            }
             assertThat(json, is("{\"x\":\""+result+"\"}"));
         }
 
@@ -598,22 +603,12 @@ public class TestJSONUtil
             jsonObj.clear();
             jsonObj.put("x", String.format("a\\%o", i));
             jsonObj.put("y", String.format("a\\x%02X", i));
-            String result = null;
-            switch ( i ){
-                case '"':  result = "a\\\""; break;
-                case '/':  result = "a\\/"; break;
-                case '\b': result = "a\\b"; break;
-                case '\f': result = "a\\f"; break;
-                case '\n': result = "a\\n"; break;
-                case '\r': result = "a\\r"; break;
-                case '\t': result = "a\\t"; break;
-                case '\\': result = "a\\\\"; break;
-                default:
-                    result = i < 0x20 ? String.format("a\\u%04X", i) : String.format("a%c", (char)i);
-                    break;
+            String result = JSONUtil.getEscape((char)i);
+            if ( result == null ){
+                result = i < 0x20 ? String.format("\\u%04X", i) : String.format("%c", (char)i);
             }
             String json = JSONUtil.toJSON(jsonObj, cfg);
-            assertThat(json, is("{\"x\":\""+result+"\",\"y\":\""+result+"\"}"));
+            assertThat(json, is("{\"x\":\"a"+result+"\",\"y\":\"a"+result+"\"}"));
         }
     }
 
@@ -737,7 +732,7 @@ public class TestJSONUtil
     @Test
     public void testEscapeBadIdentifierCodePoints() throws ScriptException, NoSuchMethodException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new LinkedHashMap<>();
         JSONConfig cfg = new JSONConfig();
         cfg.setEscapeBadIdentifierCodePoints(true);
         jsonObj.put("x\u0005", 0);
@@ -745,6 +740,35 @@ public class TestJSONUtil
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
         assertThat(json, is("{\"x\\u0005\":0}"));
+
+        // test octal/hex unescape.
+        for ( int i = 0; i < 256; i++ ){
+            jsonObj.clear();
+            jsonObj.put(String.format("a\\%o", i), 0);
+            jsonObj.put(String.format("b\\x%02X", i), 0);
+            json = JSONUtil.toJSON(jsonObj, cfg);
+            
+            String r = JSONUtil.isValidIdentifierPart(i, cfg) ? String.format("%c", (char)i) : String.format("\\u%04X", i);
+
+            assertThat(json, is("{\"a"+r+"\":0,\"b"+r+"\":0}"));
+        }
+
+        cfg.setFullJSONIdentifierCodePoints(true);
+
+        // test octal/hex unescape.
+        for ( int i = 0; i < 256; i++ ){
+            jsonObj.clear();
+            jsonObj.put(String.format("a\\%o", i), 0);
+            jsonObj.put(String.format("b\\x%02X", i), 0);
+            json = JSONUtil.toJSON(jsonObj, cfg);
+            
+            String r = JSONUtil.getEscape((char)i);
+            if ( r == null ){
+                r = JSONUtil.isValidIdentifierPart(i, cfg) ? String.format("%c", (char)i) : String.format("\\u%04X", i);
+            }
+
+            assertThat(json, is("{\"a"+r+"\":0,\"b"+r+"\":0}"));
+        }
     }
 
     /**
