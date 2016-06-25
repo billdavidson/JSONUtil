@@ -732,7 +732,8 @@ public class TestJSONUtil
     @Test
     public void testEscapeBadIdentifierCodePoints() throws ScriptException, NoSuchMethodException
     {
-        Map<String,Object> jsonObj = new LinkedHashMap<>();
+        Map<Object,Object> jsonObj = new LinkedHashMap<>();
+        StringBuilder buf = new StringBuilder("c");
         JSONConfig cfg = new JSONConfig();
         cfg.setEscapeBadIdentifierCodePoints(true);
         jsonObj.put("x\u0005", 0);
@@ -743,31 +744,38 @@ public class TestJSONUtil
 
         // test octal/hex unescape.
         for ( int i = 0; i < 256; i++ ){
+            buf.setLength(0);
+            buf.append("c").append((char)i);
             jsonObj.clear();
             jsonObj.put(String.format("a\\%o", i), 0);
             jsonObj.put(String.format("b\\x%02X", i), 0);
+            jsonObj.put(buf, 0);                            // raw.
             json = JSONUtil.toJSON(jsonObj, cfg);
-            
+
             String r = JSONUtil.isValidIdentifierPart(i, cfg) ? String.format("%c", (char)i) : String.format("\\u%04X", i);
 
-            assertThat(json, is("{\"a"+r+"\":0,\"b"+r+"\":0}"));
+            assertThat(json, is("{\"a"+r+"\":0,\"b"+r+"\":0,\"c"+r+"\":0}"));
+
         }
 
         cfg.setFullJSONIdentifierCodePoints(true);
 
         // test octal/hex unescape.
         for ( int i = 0; i < 256; i++ ){
+            buf.setLength(0);
+            buf.append("c").append((char)i);
             jsonObj.clear();
             jsonObj.put(String.format("a\\%o", i), 0);
             jsonObj.put(String.format("b\\x%02X", i), 0);
+            jsonObj.put(buf, 0);                            // raw.
             json = JSONUtil.toJSON(jsonObj, cfg);
-            
+
             String r = JSONUtil.getEscape((char)i);
             if ( r == null ){
                 r = JSONUtil.isValidIdentifierPart(i, cfg) ? String.format("%c", (char)i) : String.format("\\u%04X", i);
             }
 
-            assertThat(json, is("{\"a"+r+"\":0,\"b"+r+"\":0}"));
+            assertThat(json, is("{\"a"+r+"\":0,\"b"+r+"\":0,\"c"+r+"\":0}"));
         }
     }
 

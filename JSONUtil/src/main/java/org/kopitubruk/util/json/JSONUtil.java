@@ -359,18 +359,6 @@ public class JSONUtil
     }
 
     /**
-     * Return the JSON character escape for the given char,
-     * if any.
-     *
-     * @param c The char to be escaped.
-     * @return The escape if there is one.
-     */
-    static String getEscape( char c )
-    {
-        return JSON_ESC_MAP.get(c);
-    }
-
-    /**
      * Convert an object to JSON and return it as a {@link String}. All options
      * will use defaults.
      *
@@ -742,9 +730,9 @@ public class JSONUtil
                     }
                 }
                 if ( notDone && codePoint <= '\\' ){
-                    // escapes required by the JSON standard.
                     String esc = getEscape((char)codePoint);
                     if ( esc != null ){
+                        // escapes required by the JSON standard.
                         json.write(esc);
                         notDone = false;
                     }
@@ -884,22 +872,23 @@ public class JSONUtil
                     i += codePointMatcher.group(1).length() - charCount;
                 }
             }
+            if ( notDone && isFullJSONIdentifierCodePoints && codePoint <= '\\' ){
+                String esc = getEscape((char)codePoint);
+                if ( esc != null ){
+                    // escapes required by the JSON standard.
+                    buf.append(esc);
+                    notDone = false;
+                }
+            }
             if ( notDone ){
                 // escapes should be handled.  if not, then it's a bad escape.
-                if ( i == 0 && isValidIdentifierStart(codePoint, cfg) && codePoint != '\\' ){
+                if ( i == 0 && isValidIdentifierStart(codePoint, cfg) ){
                     buf.appendCodePoint(codePoint);
-                }else if ( i > 0 && isValidIdentifierPart(codePoint, cfg) && codePoint != '\\' ){
+                }else if ( i > 0 && isValidIdentifierPart(codePoint, cfg) ){
                     buf.appendCodePoint(codePoint);
                 }else{
                     // Bad code point for an identifier.
-                    String esc = null;
-                    if ( isFullJSONIdentifierCodePoints && codePoint <= '\\' ){
-                        esc = getEscape((char)codePoint);
-                    }
-                    if ( esc != null ){
-                        // full JSON identifiers -- use standard JSON character escapes.
-                        buf.append(esc);
-                    }else if ( useECMA6 && (codePoint < 0x10 || codePoint > 0xFFFF) ){
+                    if ( useECMA6 && (codePoint < 0x10 || codePoint > 0xFFFF) ){
                         // Use ECMAScript 6 code point escape.
                         // only very low or very high code points see an advantage.
                         buf.append(String.format(CODE_POINT_FMT, codePoint));
@@ -1161,14 +1150,36 @@ public class JSONUtil
     {
         char result;
 
-        if ( esc.charAt(1) == 'x' ){
+        char c = esc.charAt(1);
+        if ( c == 'x' ){
             result = (char)Integer.parseInt(esc.substring(2), 16); // hex escape
-        }else if ( Character.isDigit(esc.charAt(1)) ){
+        }else if ( Character.isDigit(c) ){
             result = (char)Integer.parseInt(esc.substring(1), 8);  // octal escape
         }else{
             result = JAVASCRIPT_ESC_MAP.get(esc);                  // other character escape
         }
         return result;
+    }
+
+    /**
+     * Return the JSON character escape for the given char or null if there isn't one.
+     *
+     * @param c The char to be escaped.
+     * @return The escape if there is one.
+     */
+    static String getEscape( char c )
+    {
+        return JSON_ESC_MAP.get(c);
+    }
+    
+    /**
+     * Get the chars that the JSON standard requires to be escaped.
+     * @return the chars that the JSON standard requires to be escaped.
+     */
+    static Set<Character> getJsonEscapeChars()
+    {
+        // TreeSet sorts it.
+        return new TreeSet<>(JSON_ESC_MAP.keySet());
     }
 
     /**
@@ -1216,7 +1227,7 @@ public class JSONUtil
     static boolean isValidIdentifierStart( int codePoint, JSONConfig cfg )
     {
         if ( cfg.isFullJSONIdentifierCodePoints() ){
-            return codePoint >= ' ' 
+            return codePoint >= ' '
                    && Character.isDefined(codePoint)
                    && ! (codePoint <= '\\' && JSON_ESC_MAP.containsKey((char)codePoint));
         }else{
@@ -1243,7 +1254,8 @@ public class JSONUtil
                    && ! (codePoint <= '\\' && JSON_ESC_MAP.containsKey((char)codePoint));
         }else{
             return cfg.isUseECMA6() ? Character.isUnicodeIdentifierPart(codePoint)
-                                    : (Character.isDigit(codePoint) ||
+                                    : (isValidIdentifierStart(codePoint, cfg) ||
+                                       Character.isDigit(codePoint) ||
                         ((((1 << Character.NON_SPACING_MARK) | (1 << Character.COMBINING_SPACING_MARK) |
                         (1 << Character.CONNECTOR_PUNCTUATION) ) >> Character.getType(codePoint)) & 1) != 0 ||
                         codePoint == 0x200C || codePoint == 0x200D);
