@@ -5,6 +5,6 @@
 *.xml text
 *.properties text
 LICENSE text
-NOTICE text
+NOTICE diff
 
 *.jar binary
