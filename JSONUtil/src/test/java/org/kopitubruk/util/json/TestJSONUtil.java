@@ -182,6 +182,86 @@ public class TestJSONUtil
     }
 
     /**
+     * Test all characters allowed for property names by JSON.parse() but not by
+     * Javascript eval(). The JSON standard is much looser with characters
+     * allowed in property names than ECMAScript. It allows pretty much any
+     * defined code point greater than or equal to 32. There are no start
+     * character rules either as there are with ECMAScript identifiers.
+     *
+     */
+    @Test
+    public void testJSONPropertyNames()
+    {
+        JSONConfig jcfg = new JSONConfig();
+        jcfg.setFullJSONIdentifierCodePoints(false);
+        JSONConfig cfg = new JSONConfig();
+        cfg.setFullJSONIdentifierCodePoints(true);
+
+        Map<String,Object> jsonObj = new HashMap<String,Object>(2);
+        int[] normalIdent = new int[1];
+        int[] escName = new int[2];
+        escName[0] = '\\';
+        int jsonOnlyCount = 0;
+
+        for ( int i = ' '; i <= Character.MAX_CODE_POINT; i++ ){
+            if ( JSONUtil.isValidIdentifierStart(i, jcfg) ){
+                // ignore - these are tested by testValidPropertyNames()
+            }else if ( isNormalCodePoint(i) ){
+                String propertyName;
+                switch ( i ){
+                    // escape characters as needed.
+                    case '"':
+                    case '/':
+                    case '\\':
+                        escName[1] = i;
+                        propertyName = new String(escName,0,2);
+                        break;
+                    default:
+                        normalIdent[0] = i;
+                        propertyName = new String(normalIdent,0,1);
+                        break;
+                }
+                jsonObj.clear();
+                jsonObj.put(propertyName, 0);
+                //String json = 
+                JSONUtil.toJSON(jsonObj, cfg);
+                // these would fail eval().
+                //parseJSON(json);
+                ++jsonOnlyCount;
+            }
+        }
+
+        s_log.debug(jsonOnlyCount+" code points are valid identifier start characters for JSON.parse() but not for eval()");
+    }
+
+    /**
+     * Test all characters not allowed for property names by JSON.parse().
+     */
+    @Test
+    public void testBadJSONPropertyNames()
+    {
+        JSONConfig cfg = new JSONConfig();
+        cfg.setFullJSONIdentifierCodePoints(true);
+
+        Map<String,Object> jsonObj = new HashMap<String,Object>(2);
+        int[] codePoints = new int[256];
+        int j = 0;
+
+        for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
+            if (  i < ' ' || ! Character.isDefined(i) ){
+                codePoints[j++] = i;
+                if ( j == codePoints.length ){
+                    testBadIdentifier(codePoints, 0, j, jsonObj, cfg);
+                    j = 0;
+                }
+            }
+        }
+        if ( j > 0 ){
+            testBadIdentifier(codePoints, 0, j, jsonObj, cfg);
+        }
+    }
+
+    /**
      * Test bad code points for the start of characters in names.
      */
     @Test
@@ -212,8 +292,7 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
-
-            if ( ! JSONUtil.isValidIdentifierStart(i, cfg) && ! JSONUtil.isValidIdentifierPart(i, cfg) && ! (i <= 0xFFFF && JSONUtil.isSurrogate((char)i)) ){
+            if ( isNormalCodePoint(i) && ! JSONUtil.isValidIdentifierStart(i, cfg) && ! JSONUtil.isValidIdentifierPart(i, cfg) ){
                 // high surrogates break the test unless they are followed immediately by low surrogates.
                 // just skip them.  anyone who sends bad surrogate pairs deserves what they get.
                 codePoints[j++] = i;
@@ -265,7 +344,7 @@ public class TestJSONUtil
         int j = 0;
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
-            if ( Character.isDefined(i) && ! (i <= 0xFFFF && JSONUtil.isSurrogate((char)i)) ){
+            if ( isNormalCodePoint(i) ){
                 // 247650 code points, the last time I checked.
                 codePoints[j++] = i;
                 if ( j == codePoints.length/2 ){
@@ -328,27 +407,21 @@ public class TestJSONUtil
     public void testEscapePassThrough()
     {
         Map<String,Object> jsonObj = new HashMap<String,Object>();
-        String[] strs = {"a\\u1234", "b\\x4F", "c\\377", "d\\u{1F4A9}", "e\\nf"};
+        JSONConfig cfg = new JSONConfig();
+        cfg.setUnEscapeWherePossible(false);
+        cfg.setUseECMA6(true);
+        // escapes that get passed through.
+        String[] strs = { "\\u1234", "a\\u{41}", "\\\"", "\\/", "\\b", "\\f", "\\n", "\\r", "\\t", "\\\\" };
         for ( String str : strs ){
             jsonObj.clear();
             jsonObj.put("x", str);
 
-            String json = JSONUtil.toJSON(jsonObj);
-            //validateJSON(json);
-            switch ( str.charAt(0) ){
-                case 'b':
-                    assertThat(json, is("{\"x\":\"bO\"}"));
-                    break;
-                case 'c':
-                    assertThat(json, is("{\"x\":\"c\377\"}"));
-                    break;
-                case 'd':
-                    assertThat(json, is("{\"x\":\"d\\uD83D\\uDCA9\"}"));
-                    break;
-                default:
-                    assertThat(json, is("{\"x\":\""+str+"\"}"));
-                    break;
+            String json = JSONUtil.toJSON(jsonObj, cfg);
+            if ( str.indexOf('{') < 0 ){
+                // Nashorn doesn't understand ECMAScript 6 code point escapes.
+                //validateJSON(json);
             }
+            assertThat(json, is("{\"x\":\""+str+"\"}"));
         }
     }
 
@@ -358,8 +431,8 @@ public class TestJSONUtil
     @Test
     public void testUnEscape()
     {
-        Map<String,Object> jsonObj = new LinkedHashMap<String,Object>();
-        String[] strs = {"a\\u0041", "b\\x41", "d\\u{41}", "e\\v"};
+        Map<String,Object> jsonObj = new LinkedHashMap<String, Object>();
+        String[] strs = {"a\\u0041", "d\\u{41}", "e\\v", "f\\'"};
         JSONConfig cfg = new JSONConfig();
         cfg.setUnEscapeWherePossible(true);
         for ( String str : strs ){
@@ -373,7 +446,18 @@ public class TestJSONUtil
                 // validateJSON(json);
             }
             // \v unescaped will be re-escaped as a Unicode code unit.
-            String result = firstChar + (firstChar != 'e' ? "A" : "\\u000B");
+            String result;
+            switch ( firstChar ){
+                case 'e':
+                    result = firstChar + "\\u000B";
+                    break;
+                case 'f':
+                    result = firstChar + "'";
+                    break;
+                default:
+                    result = firstChar + "A";
+                    break;
+            }
             assertThat(json, is("{\"x\":\""+result+"\"}"));
         }
 
@@ -385,22 +469,13 @@ public class TestJSONUtil
             jsonObj.clear();
             jsonObj.put("x", String.format("a\\%o", i));
             jsonObj.put("y", String.format("a\\x%02X", i));
-            String result = null;
-            switch ( i ){
-                case '"':  result = "a\\\""; break;
-                case '/':  result = "a\\/"; break;
-                case '\b': result = "a\\b"; break;
-                case '\f': result = "a\\f"; break;
-                case '\n': result = "a\\n"; break;
-                case '\r': result = "a\\r"; break;
-                case '\t': result = "a\\t"; break;
-                case '\\': result = "a\\\\"; break;
-                default:
-                    result = i < 0x20 ? String.format("a\\u%04X", i) : String.format("a%c", (char)i);
-                    break;
+            String result = JSONUtil.getEscape((char)i);
+            if ( result == null ){
+                result = i < 0x20 ? String.format("\\u%04X", i) : String.format("%c", (char)i);
             }
             String json = JSONUtil.toJSON(jsonObj, cfg);
-            assertThat(json, is("{\"x\":\""+result+"\",\"y\":\""+result+"\"}"));
+            //validateJSON(json);
+            assertThat(json, is("{\"x\":\"a"+result+"\",\"y\":\"a"+result+"\"}"));
         }
     }
 
@@ -518,7 +593,10 @@ public class TestJSONUtil
     @Test
     public void testEscapeBadIdentifierCodePoints()
     {
-        Map<String,Object> jsonObj = new HashMap<String,Object>();
+
+        Map<Object,Object> jsonObj = new LinkedHashMap<Object,Object>();
+        StringBuilder buf = new StringBuilder("c");
+        StringBuilder m = new StringBuilder();
         JSONConfig cfg = new JSONConfig();
         cfg.setEscapeBadIdentifierCodePoints(true);
         jsonObj.put("x\u0005", 0);
@@ -526,6 +604,91 @@ public class TestJSONUtil
         String json = JSONUtil.toJSON(jsonObj, cfg);
         //validateJSON(json);
         assertThat(json, is("{\"x\\u0005\":0}"));
+
+        // test octal/hex unescape.
+        for ( int i = 0; i < 256; i++ ){
+            buf.setLength(0);
+            buf.append("c").append((char)i);
+            jsonObj.clear();
+            jsonObj.put(String.format("a\\%o", i), 0);
+            jsonObj.put(String.format("b\\x%02X", i), 0);
+            jsonObj.put(buf, 0);                            // raw.
+            json = JSONUtil.toJSON(jsonObj, cfg);
+            //validateJSON(json);
+
+            String r = JSONUtil.isValidIdentifierPart(i, cfg) ? String.format("%c", (char)i) : String.format("\\u%04X", i);
+
+            assertThat(json, is("{\"a"+r+"\":0,\"b"+r+"\":0,\"c"+r+"\":0}"));
+        }
+        for ( int i = 256; i <= Character.MAX_CODE_POINT; i++ ){
+            if ( isNormalCodePoint(i) ){
+                buf.setLength(0);
+                buf.append("c").appendCodePoint(i);
+                jsonObj.clear();
+                jsonObj.put(buf, 0);                            // raw.
+                json = JSONUtil.toJSON(jsonObj, cfg);
+                //validateJSON(json);
+
+                String r;
+                if ( JSONUtil.isValidIdentifierPart(i, cfg) ){
+                    m.setLength(0);
+                    m.appendCodePoint(i);
+                    r = m.toString();
+                }else if ( i <= 0xFFFF ){
+                    r = String.format("\\u%04X", i);
+                }else{
+                    m.setLength(0);
+                    m.appendCodePoint(i);
+                    r = String.format("\\u%04X\\u%04X", (int)m.charAt(0), (int)m.charAt(1));
+                }
+                assertThat(json, is("{\"c"+r+"\":0}"));
+            }
+        }
+
+        cfg.setFullJSONIdentifierCodePoints(true);
+
+        // test octal/hex unescape.
+        for ( int i = 0; i < 256; i++ ){
+            buf.setLength(0);
+            buf.append("c").append((char)i);
+            jsonObj.clear();
+            jsonObj.put(String.format("a\\%o", i), 0);
+            jsonObj.put(String.format("b\\x%02X", i), 0);
+            jsonObj.put(buf, 0);                            // raw.
+            json = JSONUtil.toJSON(jsonObj, cfg);
+            //validateJSON(json);
+
+            String r = JSONUtil.getEscape((char)i);
+            if ( r == null ){
+                r = JSONUtil.isValidIdentifierPart(i, cfg) ? String.format("%c", (char)i) : String.format("\\u%04X", i);
+            }
+
+            assertThat(json, is("{\"a"+r+"\":0,\"b"+r+"\":0,\"c"+r+"\":0}"));
+        }
+        for ( int i = 256; i <= Character.MAX_CODE_POINT; i++ ){
+            if ( isNormalCodePoint(i) ){
+                buf.setLength(0);
+                buf.append("c").appendCodePoint(i);
+                jsonObj.clear();
+                jsonObj.put(buf, 0);                            // raw.
+                json = JSONUtil.toJSON(jsonObj, cfg);
+                //parseJSON(json);
+
+                String r;
+                if ( JSONUtil.isValidIdentifierPart(i, cfg) ){
+                    m.setLength(0);
+                    m.appendCodePoint(i);
+                    r = m.toString();
+                }else if ( i <= 0xFFFF ){
+                    r = String.format("\\u%04X", i);
+                }else{
+                    m.setLength(0);
+                    m.appendCodePoint(i);
+                    r = String.format("\\u%04X\\u%04X", (int)m.charAt(0), (int)m.charAt(1));
+                }
+                assertThat(json, is("{\"c"+r+"\":0}"));
+            }
+        }
     }
 
     /**
@@ -890,6 +1053,23 @@ public class TestJSONUtil
         String json = JSONUtil.toJSON(jsonObj, cfg);
         // validateJSON(json);
         assertThat(json, is("{\"a\":1,\"b\":\"x\",\"c\":[\"1\",\"2\",\"3\"],\"d\":[\"1\",\"2\",\"3\"],\"e\":[null,{\"a\":0,\"b\":2,\"x\":[1,2,3]},[\"1\",\"2\",\"3\"]]}"));
+    }
+
+    /**
+     * Return true if the character is defined and not a surrogate.
+     *
+     * @param codePoint The code point to check.
+     * @return true if the character is defined and not a surrogate.
+     */
+    private boolean isNormalCodePoint( int codePoint )
+    {
+        if ( Character.isDefined(codePoint) ){
+            if ( codePoint <= 0xFFFF && JSONUtil.isSurrogate((char)codePoint) ){
+                return false;
+            }
+            return true;
+        }
+        return false;
     }
 
     /**
