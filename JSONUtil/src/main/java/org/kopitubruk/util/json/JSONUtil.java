@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.TreeSet;
@@ -205,13 +206,13 @@ public class JSONUtil
      * Escapes to pass through for ECMA5 when escaping bad identifier code points.
      */
     private static final Pattern JSON5_ESCAPE_PASS_THROUGH_PAT =
-            Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\[bfnrt\\\\/'\"])");
+            Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\[bfnrt\\\\/\"])");
 
     /**
      * Escapes to pass through for ECMA6 when escaping bad identifier code points.
      */
     private static final Pattern JSON6_ESCAPE_PASS_THROUGH_PAT =
-            Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\}|\\\\[bfnrt\\\\/'\"])");
+            Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\}|\\\\[bfnrt\\\\/\"])");
 
     /**
      * Escapes to pass through for ECMA5 when escaping bad identifier code points.
@@ -328,21 +329,45 @@ public class JSONUtil
     private static final Map<String,Character> JAVASCRIPT_ESC_MAP;
 
     /**
-     * Initialize JAVASCRIPT_ESC_MAP.
+     * Map characters that go to JSON character escapes.
+     */
+    private static final Map<Character,String> JSON_ESC_MAP;
+
+    /**
+     * Initialize JSON_ESC_MAP && JAVASCRIPT_ESC_MAP.
      */
     static {
-        Map<String,Character> map = new HashMap<>();
-        map.put("\\\"", '"');
-        map.put("\\'", '\'');
-        map.put("\\/", '/');
-        map.put("\\b", '\b');
-        map.put("\\f", '\f');
-        map.put("\\n", '\n');
-        map.put("\\r", '\r');
-        map.put("\\t", '\t');
-        map.put("\\v", (char)0xB);
-        map.put("\\\\", '\\');
-        JAVASCRIPT_ESC_MAP = new HashMap<>(map);
+        Map<Character,String> jsonMap = new HashMap<>();
+        jsonMap.put('"', "\\\"");
+        jsonMap.put('/', "\\/");
+        jsonMap.put('\b', "\\b");
+        jsonMap.put('\f', "\\f");
+        jsonMap.put('\n', "\\n");
+        jsonMap.put('\r', "\\r");
+        jsonMap.put('\t', "\\t");
+        jsonMap.put('\\', "\\\\");
+        JSON_ESC_MAP = new HashMap<>(jsonMap);
+
+        Map<String,Character> jsMap = new HashMap<>();
+        for ( Entry<Character,String> entry : JSON_ESC_MAP.entrySet() ){
+            jsMap.put(entry.getValue(), entry.getKey());
+        }
+        // these two are valid in Javascript but not JSON.
+        jsMap.put("\\'", '\'');
+        jsMap.put("\\v", (char)0xB);
+        JAVASCRIPT_ESC_MAP = new HashMap<>(jsMap);
+    }
+
+    /**
+     * Return the JSON character escape for the given char,
+     * if any.
+     *
+     * @param c The char to be escaped.
+     * @return The escape if there is one.
+     */
+    static String getEscape( char c )
+    {
+        return JSON_ESC_MAP.get(c);
     }
 
     /**
@@ -698,12 +723,15 @@ public class JSONUtil
                         i += esc.length() - 1;
                         notDone = false;
                     }else if ( jsEscMatcher.find(i) && jsEscMatcher.start() == i ){
-                        // Javascript escapes not permitted for JSON.
+                        // Hex and octal escapes are not permitted for JSON.
+                        // Single character escapes are passed through above except
+                        // \v and \' which are not valid in JSON which are handled here.
                         String esc = jsEscMatcher.group(1);
-                        codePoint = getEscapeChar(esc);
+                        codePoint = char0 = getEscapeChar(esc);
                         i += esc.length() - 1;
                     }else if ( codePointMatcher.find(i) && codePointMatcher.start() == i ){
                         // only get here if it wasn't passed through => useECMA6 is false
+                        // convert it to an inline codepoint or other escape as needed.
                         codePoint = Integer.parseInt(codePointMatcher.group(2),16);
                         if ( codePoint > 0xFFFF ){
                             charCount = 2;
@@ -713,17 +741,12 @@ public class JSONUtil
                         i += codePointMatcher.group(1).length() - charCount;
                     }
                 }
-                if ( notDone ){
+                if ( notDone && codePoint <= '\\' ){
                     // escapes required by the JSON standard.
-                    switch ( codePoint ){
-                        case '"':  json.append('\\').write('"'); notDone = false; break;
-                        case '/':  json.append('\\').write('/'); notDone = false; break;
-                        case '\b': json.append('\\').write('b'); notDone = false; break;
-                        case '\f': json.append('\\').write('f'); notDone = false; break;
-                        case '\n': json.append('\\').write('n'); notDone = false; break;
-                        case '\r': json.append('\\').write('r'); notDone = false; break;
-                        case '\t': json.append('\\').write('t'); notDone = false; break;
-                        case '\\': json.append('\\').write('\\'); notDone = false; break;
+                    String esc = getEscape((char)codePoint);
+                    if ( esc != null ){
+                        json.write(esc);
+                        notDone = false;
                     }
                 }
                 if ( notDone ){
@@ -740,20 +763,16 @@ public class JSONUtil
                             json.write(String.format(CODE_POINT_FMT, codePoint));
                         }else{
                             // normal escape.
+                            json.write(String.format(CODE_UNIT_FMT, (int)char0));
                             if ( charCount > 1 ){
-                                json.write(String.format(CODE_UNIT_FMT, (int)char0));
                                 json.write(String.format(CODE_UNIT_FMT, (int)char1));
-                            }else{
-                                json.write(String.format(CODE_UNIT_FMT, codePoint));
                             }
                         }
                     }else{
                         // Pass it through -- usual case.
+                        json.write(char0);
                         if ( charCount > 1 ){
-                            json.write(char0);
                             json.write(char1);
-                        }else{
-                            json.write((char)codePoint);
                         }
                     }
                 }
@@ -822,6 +841,7 @@ public class JSONUtil
         int i = 0;
         int len = propertyName.length();
         boolean useECMA6 = cfg.isUseECMA6();
+        boolean isFullJSONIdentifierCodePoints = cfg.isFullJSONIdentifierCodePoints();
         Matcher passThroughMatcher = null;
         Matcher jsEscMatcher = null;
         Matcher codePointMatcher = null;
@@ -851,7 +871,7 @@ public class JSONUtil
                 }else if ( jsEscMatcher.find(i) && jsEscMatcher.start() == i ){
                     // also fix bad escapes.
                     String esc = jsEscMatcher.group(1);
-                    codePoint = getEscapeChar(esc);
+                    codePoint = char0 = getEscapeChar(esc);
                     i += esc.length() - 1;
                 }else if ( codePointMatcher.find(i) && codePointMatcher.start() == i ){
                     // only get here if it wasn't passed through.
@@ -862,7 +882,6 @@ public class JSONUtil
                         char1 = Character.lowSurrogate(codePoint);
                     }
                     i += codePointMatcher.group(1).length() - charCount;
-
                 }
             }
             if ( notDone ){
@@ -873,17 +892,22 @@ public class JSONUtil
                     buf.appendCodePoint(codePoint);
                 }else{
                     // Bad code point for an identifier.
-                    if ( useECMA6 && (codePoint < 0x10 || codePoint > 0xFFFF) ){
+                    String esc = null;
+                    if ( isFullJSONIdentifierCodePoints && codePoint <= '\\' ){
+                        esc = getEscape((char)codePoint);
+                    }
+                    if ( esc != null ){
+                        // full JSON identifiers -- use standard JSON character escapes.
+                        buf.append(esc);
+                    }else if ( useECMA6 && (codePoint < 0x10 || codePoint > 0xFFFF) ){
                         // Use ECMAScript 6 code point escape.
                         // only very low or very high code points see an advantage.
                         buf.append(String.format(CODE_POINT_FMT, codePoint));
                     }else{
                         // Use normal escape.
+                        buf.append(String.format(CODE_UNIT_FMT, char0));
                         if ( charCount > 1 ){
-                            buf.append(String.format(CODE_UNIT_FMT, char0));
                             buf.append(String.format(CODE_UNIT_FMT, char1));
-                        }else{
-                            buf.append(String.format(CODE_UNIT_FMT, codePoint));
                         }
                     }
                 }
@@ -949,7 +973,7 @@ public class JSONUtil
         Pattern escapePassThroughPat;
 
         if ( forceString || cfg.isFullJSONIdentifierCodePoints() ){
-            // JSON standard allows all string escapes in identifiers.
+            // JSON standard allows most string escapes in identifiers.
             escapePassThroughPat = cfg.isUseECMA6() ? JSON6_ESCAPE_PASS_THROUGH_PAT
                                                     : JSON5_ESCAPE_PASS_THROUGH_PAT;
         }else{
@@ -1192,7 +1216,9 @@ public class JSONUtil
     static boolean isValidIdentifierStart( int codePoint, JSONConfig cfg )
     {
         if ( cfg.isFullJSONIdentifierCodePoints() ){
-            return codePoint >= ' ' && Character.isDefined(codePoint);
+            return codePoint >= ' ' 
+                   && Character.isDefined(codePoint)
+                   && ! (codePoint <= '\\' && JSON_ESC_MAP.containsKey((char)codePoint));
         }else{
             return codePoint == '_' || codePoint == '$' ||
                     (cfg.isUseECMA6() ? Character.isUnicodeIdentifierStart(codePoint)
@@ -1212,7 +1238,9 @@ public class JSONUtil
     static boolean isValidIdentifierPart( int codePoint, JSONConfig cfg )
     {
         if ( cfg.isFullJSONIdentifierCodePoints() ){
-            return codePoint >= ' ' && Character.isDefined(codePoint);
+            return codePoint >= ' '
+                   && Character.isDefined(codePoint)
+                   && ! (codePoint <= '\\' && JSON_ESC_MAP.containsKey((char)codePoint));
         }else{
             return cfg.isUseECMA6() ? Character.isUnicodeIdentifierPart(codePoint)
                                     : (Character.isDigit(codePoint) ||
