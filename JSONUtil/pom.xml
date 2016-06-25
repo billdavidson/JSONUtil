@@ -57,6 +57,29 @@
     <maven.compiler.source>1.7</maven.compiler.source>
   </properties>
 
+  <!--
+    I swear that the native Javascript stuff worked without this before
+    but then it stopped.  I found this workaround on the web which as
+    near as I can tell, just includes rt.jar in the bootclasspath a
+    second time.
+  -->
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.5.1</version>
+        <configuration>
+          <source>1.7</source>
+          <target>1.7</target>
+          <compilerArguments>
+            <bootclasspath>${java.home}/lib/rt.jar</bootclasspath>
+          </compilerArguments>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
   <dependencies>
     <dependency>
       <groupId>commons-logging</groupId>
