@@ -565,7 +565,7 @@ public class TestJSONUtil
     @Test
     public void testUnEscape() throws ScriptException, NoSuchMethodException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        Map<String,Object> jsonObj = new LinkedHashMap<>();
         String[] strs = {"a\\u0041", "d\\u{41}", "e\\v", "f\\'"};
         JSONConfig cfg = new JSONConfig();
         cfg.setUnEscapeWherePossible(true);
