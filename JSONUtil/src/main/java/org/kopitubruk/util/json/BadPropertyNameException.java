@@ -72,9 +72,9 @@ public final class BadPropertyNameException extends JSONException
         // HashSet discards duplicates.
         Set<Integer> badCodePoints = new LinkedHashSet<Integer>();
         boolean badStart = false;
-
-        Pattern unicodeEscapePat = cfg.isUseECMA6() ? JSONUtil.CODE_UNIT_OR_POINT_PAT
-                                                    : JSONUtil.FREE_CODE_UNIT_PAT;
+        boolean forceString = false;
+        Pattern escapePassThroughPat = JSONUtil.getEscapePassThroughPattern(cfg, forceString);
+        Matcher passThroughMatcher = escapePassThroughPat.matcher(propertyName);
 
         /*
          * Find the bad code points.
@@ -83,24 +83,23 @@ public final class BadPropertyNameException extends JSONException
         StringBuilder codePointList = new StringBuilder();
         while ( i < propertyName.length() ){
             int codePoint = propertyName.codePointAt(i);
-            int cc = Character.charCount(codePoint);
-            if ( JSONUtil.isValidIdentifierStart(codePoint, cfg) ){
-                // OK for start or any other character.
-            }else if ( i > 0 && JSONUtil.isValidIdentifierPart(codePoint, cfg) ){
-                // OK as long as not the starting character.
-            }else if ( codePoint == '\\' ){
-                // check for Unicode escape.
-                Matcher matcher = unicodeEscapePat.matcher(propertyName.substring(i));
-                if ( matcher.find() && matcher.start() == 0 ){
+            int charCount= Character.charCount(codePoint);
+            if ( codePoint == '\\' ){
+                // check for valid escapes.
+                if ( passThroughMatcher.find(i) && passThroughMatcher.start() == i ){
                     // Skip the escape.
-                    i += matcher.group(1).length() - 1;
+                    i += passThroughMatcher.group(1).length() - 1;
                 }else{
-                    // backslash is only allowed for Unicode escapes.
+                    // bad backslash.
                     badCodePoints.add(codePoint);
                     if ( i == 0 ){
                         badStart = true;
                     }
                 }
+            }else if ( i == 0 && JSONUtil.isValidIdentifierStart(codePoint, cfg) ){
+                // OK for start character.
+            }else if ( i > 0 && JSONUtil.isValidIdentifierPart(codePoint, cfg) ){
+                // OK.
             }else{
                 // bad character.
                 badCodePoints.add(codePoint);
@@ -112,7 +111,7 @@ public final class BadPropertyNameException extends JSONException
                 codePointList.append(' ');
             }
             codePointList.append(String.format("%04X", codePoint));
-            i += cc;
+            i += charCount;
         }
 
         StringBuilder message = new StringBuilder();

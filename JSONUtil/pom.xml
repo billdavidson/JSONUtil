@@ -58,7 +58,6 @@
   </properties>
 
   <build>
-
     <plugins>
 
       <plugin>
@@ -93,7 +92,6 @@
       </plugin>
 
     </plugins>
-
   </build>
 
   <dependencies>
