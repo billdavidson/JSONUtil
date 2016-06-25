@@ -751,6 +751,7 @@ public class TestJSONUtil
             jsonObj.put(String.format("b\\x%02X", i), 0);
             jsonObj.put(buf, 0);                            // raw.
             json = JSONUtil.toJSON(jsonObj, cfg);
+            validateJSON(json);
 
             String r = JSONUtil.isValidIdentifierPart(i, cfg) ? String.format("%c", (char)i) : String.format("\\u%04X", i);
 
@@ -769,6 +770,7 @@ public class TestJSONUtil
             jsonObj.put(String.format("b\\x%02X", i), 0);
             jsonObj.put(buf, 0);                            // raw.
             json = JSONUtil.toJSON(jsonObj, cfg);
+            validateJSON(json);
 
             String r = JSONUtil.getEscape((char)i);
             if ( r == null ){
