@@ -608,6 +608,7 @@ public class TestJSONUtil
                 result = i < 0x20 ? String.format("\\u%04X", i) : String.format("%c", (char)i);
             }
             String json = JSONUtil.toJSON(jsonObj, cfg);
+            validateJSON(json);
             assertThat(json, is("{\"x\":\"a"+result+"\",\"y\":\"a"+result+"\"}"));
         }
     }
