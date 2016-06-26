@@ -851,10 +851,7 @@ public class TestJSONUtil
         }else if ( i <= 0xFFFF ){
             cmpBuf.append(String.format("\\u%04X", i));
         }else{
-            StringBuilder m = new StringBuilder();
-            m.setLength(0);
-            m.appendCodePoint(i);
-            cmpBuf.append(String.format("\\u%04X\\u%04X", (int)m.charAt(0), (int)m.charAt(1)));
+            cmpBuf.append(String.format("\\u%04X\\u%04X", (int)Character.highSurrogate(i), (int)Character.lowSurrogate(i)));
         }
     }
 
