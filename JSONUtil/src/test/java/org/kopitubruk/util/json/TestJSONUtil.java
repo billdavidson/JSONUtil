@@ -596,7 +596,7 @@ public class TestJSONUtil
 
         Map<Object,Object> jsonObj = new LinkedHashMap<Object,Object>();
         StringBuilder buf = new StringBuilder("c");
-        StringBuilder m = new StringBuilder();
+        StringBuilder cmpBuf = new StringBuilder();
         JSONConfig cfg = new JSONConfig();
         cfg.setEscapeBadIdentifierCodePoints(true);
         jsonObj.put("x\u0005", 0);
@@ -620,28 +620,31 @@ public class TestJSONUtil
 
             assertThat(json, is("{\"a"+r+"\":0,\"b"+r+"\":0,\"c"+r+"\":0}"));
         }
-        for ( int i = 256; i <= Character.MAX_CODE_POINT; i++ ){
+
+        int maxLen = 1024;
+        buf.setLength(0);
+        buf.append("c");
+        cmpBuf.setLength(0);
+        cmpBuf.append("{\"c");
+        for ( int i = 256, ct = 0; i <= Character.MAX_CODE_POINT; i++ ){
             if ( isNormalCodePoint(i) ){
-                buf.setLength(0);
-                buf.append("c").appendCodePoint(i);
+                buf.appendCodePoint(i);
+                addCmp(i, cmpBuf, cfg);
+                ++ct;;
+            }
+            if ( ct % maxLen == 0 || i == Character.MAX_CODE_POINT ){
                 jsonObj.clear();
                 jsonObj.put(buf, 0);                            // raw.
                 json = JSONUtil.toJSON(jsonObj, cfg);
-                //validateJSON(json);
+                validateJSON(json);
 
-                String r;
-                if ( JSONUtil.isValidIdentifierPart(i, cfg) ){
-                    m.setLength(0);
-                    m.appendCodePoint(i);
-                    r = m.toString();
-                }else if ( i <= 0xFFFF ){
-                    r = String.format("\\u%04X", i);
-                }else{
-                    m.setLength(0);
-                    m.appendCodePoint(i);
-                    r = String.format("\\u%04X\\u%04X", (int)m.charAt(0), (int)m.charAt(1));
-                }
-                assertThat(json, is("{\"c"+r+"\":0}"));
+                cmpBuf.append("\":0}");
+                assertThat(json, is(cmpBuf.toString()));
+
+                buf.setLength(0);
+                buf.append("c");
+                cmpBuf.setLength(0);
+                cmpBuf.append("{\"c");
             }
         }
 
@@ -665,29 +668,51 @@ public class TestJSONUtil
 
             assertThat(json, is("{\"a"+r+"\":0,\"b"+r+"\":0,\"c"+r+"\":0}"));
         }
-        for ( int i = 256; i <= Character.MAX_CODE_POINT; i++ ){
+
+        buf.setLength(0);
+        buf.append("c");
+        for ( int i = 256, ct = 0; i <= Character.MAX_CODE_POINT; i++ ){
             if ( isNormalCodePoint(i) ){
-                buf.setLength(0);
-                buf.append("c").appendCodePoint(i);
+                buf.appendCodePoint(i);
+                addCmp(i, cmpBuf, cfg);
+                ++ct;
+            }
+            if ( ct % maxLen == 0 || i == Character.MAX_CODE_POINT ){
                 jsonObj.clear();
-                jsonObj.put(buf, 0);                            // raw.
+                jsonObj.put(buf, 0);
                 json = JSONUtil.toJSON(jsonObj, cfg);
                 //parseJSON(json);
 
-                String r;
-                if ( JSONUtil.isValidIdentifierPart(i, cfg) ){
-                    m.setLength(0);
-                    m.appendCodePoint(i);
-                    r = m.toString();
-                }else if ( i <= 0xFFFF ){
-                    r = String.format("\\u%04X", i);
-                }else{
-                    m.setLength(0);
-                    m.appendCodePoint(i);
-                    r = String.format("\\u%04X\\u%04X", (int)m.charAt(0), (int)m.charAt(1));
-                }
-                assertThat(json, is("{\"c"+r+"\":0}"));
+                cmpBuf.append("\":0}");
+                assertThat(json, is(cmpBuf.toString()));
+
+                buf.setLength(0);
+                buf.append("c");
+                cmpBuf.setLength(0);
+                cmpBuf.append("{\"c");
             }
+        }
+    }
+
+    /**
+     * Append the expected comparison data for the given code point
+     * to the compare buffer.
+     *
+     * @param i the code point.
+     * @param cmpBuf the compare buffer.
+     * @param cfg the config object.
+     */
+    private void addCmp( int i, StringBuilder cmpBuf, JSONConfig cfg )
+    {
+        if ( JSONUtil.isValidIdentifierPart(i, cfg) ){
+            cmpBuf.appendCodePoint(i);
+        }else if ( i <= 0xFFFF ){
+            cmpBuf.append(String.format("\\u%04X", i));
+        }else{
+            StringBuilder m = new StringBuilder();
+            m.setLength(0);
+            m.appendCodePoint(i);
+            cmpBuf.append(String.format("\\u%04X\\u%04X", (int)m.charAt(0), (int)m.charAt(1)));
         }
     }
 
