@@ -750,6 +750,8 @@ public class JSONUtil
                             t.appendCodePoint(codePoint);
                             char0 = t.charAt(0);
                             char1 = t.charAt(1);
+                        }else{
+                            char0 = (char)codePoint;
                         }
                         i += codePointMatcher.group(1).length() - charCount;
                     }
@@ -895,6 +897,8 @@ public class JSONUtil
                         t.appendCodePoint(codePoint);
                         char0 = t.charAt(0);
                         char1 = t.charAt(1);
+                    }else{
+                        char0 = (char)codePoint;
                     }
                     i += codePointMatcher.group(1).length() - charCount;
                 }
