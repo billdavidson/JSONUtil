@@ -772,7 +772,7 @@ public class TestJSONUtil
             if ( isNormalCodePoint(i) ){
                 buf.appendCodePoint(i);
                 addCmp(i, cmpBuf, cfg);
-                ++ct;;
+                ++ct;
             }
             if ( ct % maxLen == 0 || i == Character.MAX_CODE_POINT ){
                 jsonObj.clear();

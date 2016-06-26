@@ -725,6 +725,8 @@ public class JSONUtil
                             charCount = 2;
                             char0 = Character.highSurrogate(codePoint);
                             char1 = Character.lowSurrogate(codePoint);
+                        }else{
+                            char0 = (char)codePoint;
                         }
                         i += codePointMatcher.group(1).length() - charCount;
                     }
@@ -868,6 +870,8 @@ public class JSONUtil
                         charCount = 2;
                         char0 = Character.highSurrogate(codePoint);
                         char1 = Character.lowSurrogate(codePoint);
+                    }else{
+                        char0 = (char)codePoint;
                     }
                     i += codePointMatcher.group(1).length() - charCount;
                 }
