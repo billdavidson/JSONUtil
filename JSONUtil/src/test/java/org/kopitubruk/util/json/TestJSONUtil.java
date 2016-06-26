@@ -805,7 +805,7 @@ public class TestJSONUtil
                 jsonObj.clear();
                 jsonObj.put(buf, 0);
                 json = JSONUtil.toJSON(jsonObj, cfg);
-                parseJSON(json);
+                //parseJSON(json);
 
                 cmpBuf.append("\":0}");
                 assertThat(json, is(cmpBuf.toString()));
@@ -833,7 +833,10 @@ public class TestJSONUtil
         }else if ( i <= 0xFFFF ){
             cmpBuf.append(String.format("\\u%04X", i));
         }else{
-            cmpBuf.append(String.format("\\u%04X\\u%04X", (int)Character.highSurrogate(i), (int)Character.lowSurrogate(i)));
+            StringBuilder m = new StringBuilder();
+            m.setLength(0);
+            m.appendCodePoint(i);
+            cmpBuf.append(String.format("\\u%04X\\u%04X", (int)m.charAt(0), (int)m.charAt(1)));
         }
     }
 
