@@ -15,6 +15,8 @@
  */
 package org.kopitubruk.util.json;
 
+import static org.kopitubruk.util.json.JSONUtil.gotMatch;
+
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.ResourceBundle;
@@ -75,18 +77,20 @@ public final class BadPropertyNameException extends JSONException
         boolean forceString = false;
         Pattern escapePassThroughPat = JSONUtil.getEscapePassThroughPattern(cfg, forceString);
         Matcher passThroughMatcher = escapePassThroughPat.matcher(propertyName);
+        int passThroughRegionLength = cfg.isUseECMA6() ? 10 : 6;
 
         /*
          * Find the bad code points.
          */
         int i = 0;
+        int len = propertyName.length();
         StringBuilder codePointList = new StringBuilder();
-        while ( i < propertyName.length() ){
+        while ( i < len ){
             int codePoint = propertyName.codePointAt(i);
             int charCount= Character.charCount(codePoint);
             if ( codePoint == '\\' ){
                 // check for valid escapes.
-                if ( passThroughMatcher.find(i) && passThroughMatcher.start() == i ){
+                if ( gotMatch(passThroughMatcher, i, Math.min(i+passThroughRegionLength, len)) ){
                     // Skip the escape.
                     i += passThroughMatcher.group(1).length() - 1;
                 }else{
