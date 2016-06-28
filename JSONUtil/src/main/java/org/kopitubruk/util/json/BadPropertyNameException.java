@@ -15,7 +15,12 @@
  */
 package org.kopitubruk.util.json;
 
+import static java.lang.Math.min;
+import static org.kopitubruk.util.json.JSONUtil.getBundle;
+import static org.kopitubruk.util.json.JSONUtil.getEscapePassThroughPattern;
 import static org.kopitubruk.util.json.JSONUtil.gotMatch;
+import static org.kopitubruk.util.json.JSONUtil.isValidIdentifierPart;
+import static org.kopitubruk.util.json.JSONUtil.isValidIdentifierStart;
 
 import java.util.LinkedHashSet;
 import java.util.Locale;
@@ -61,7 +66,7 @@ public final class BadPropertyNameException extends JSONException
     @Override
     String internalGetMessage( Locale locale )
     {
-        ResourceBundle bundle = JSONUtil.getBundle(locale);
+        ResourceBundle bundle = getBundle(locale);
 
         if ( propertyName == null || propertyName.length() < 1 ){
             return bundle.getString("zeroLengthPropertyName");
@@ -75,7 +80,7 @@ public final class BadPropertyNameException extends JSONException
         Set<Integer> badCodePoints = new LinkedHashSet<>();
         boolean badStart = false;
         boolean forceString = false;
-        Pattern escapePassThroughPat = JSONUtil.getEscapePassThroughPattern(cfg, forceString);
+        Pattern escapePassThroughPat = getEscapePassThroughPattern(cfg, forceString);
         Matcher passThroughMatcher = escapePassThroughPat.matcher(propertyName);
         int passThroughRegionLength = cfg.isUseECMA6() ? 10 : 6;
 
@@ -90,7 +95,7 @@ public final class BadPropertyNameException extends JSONException
             int charCount= Character.charCount(codePoint);
             if ( codePoint == '\\' ){
                 // check for valid escapes.
-                if ( gotMatch(passThroughMatcher, i, Math.min(i+passThroughRegionLength, len)) ){
+                if ( gotMatch(passThroughMatcher, i, min(i+passThroughRegionLength, len)) ){
                     // Skip the escape.
                     i += passThroughMatcher.group(1).length() - 1;
                 }else{
@@ -100,9 +105,9 @@ public final class BadPropertyNameException extends JSONException
                         badStart = true;
                     }
                 }
-            }else if ( i == 0 && JSONUtil.isValidIdentifierStart(codePoint, cfg) ){
+            }else if ( i == 0 && isValidIdentifierStart(codePoint, cfg) ){
                 // OK for start character.
-            }else if ( i > 0 && JSONUtil.isValidIdentifierPart(codePoint, cfg) ){
+            }else if ( i > 0 && isValidIdentifierPart(codePoint, cfg) ){
                 // OK.
             }else{
                 // bad character.

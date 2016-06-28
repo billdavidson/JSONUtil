@@ -15,6 +15,8 @@
  */
 package org.kopitubruk.util.json;
 
+import static java.lang.Math.min;
+
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
@@ -878,7 +880,7 @@ public class JSONUtil
             int charCount = Character.charCount(codePoint);
             if ( codePoint == '\\' ){
                 // check for escapes to pass through.
-                if ( gotMatch(passThroughMatcher, i, Math.min(i+passThroughRegionLength, len)) ){
+                if ( gotMatch(passThroughMatcher, i, min(i+passThroughRegionLength, len)) ){
                     // It's a valid escape.  Pass it through.
                     String esc = passThroughMatcher.group(1);
                     i += esc.length();
@@ -1069,14 +1071,14 @@ public class JSONUtil
             int codePoint = strValue.codePointAt(i);
             int charCount = Character.charCount(codePoint);
             if ( codePoint == '\\' ){
-                if ( gotMatch(jsEscMatcher, i, Math.min(i+MAX_JS_ESC_LENGTH, len)) ){
+                if ( gotMatch(jsEscMatcher, i, min(i+MAX_JS_ESC_LENGTH, len)) ){
                     String esc = jsEscMatcher.group(1);
                     buf.append(getEscapeChar(esc));
                     i += esc.length() - 1;
-                }else if ( gotMatch(codeUnitMatcher, i, Math.min(i+CODE_UNIT_ESC_LENGTH, len)) ){
+                }else if ( gotMatch(codeUnitMatcher, i, min(i+CODE_UNIT_ESC_LENGTH, len)) ){
                     buf.append((char)Integer.parseInt(codeUnitMatcher.group(2),16));
                     i += codeUnitMatcher.group(1).length() - 1;
-                }else if ( gotMatch(codePointMatcher, i, Math.min(i+MAX_CODE_POINT_ESC_LENGTH, len)) ){
+                }else if ( gotMatch(codePointMatcher, i, min(i+MAX_CODE_POINT_ESC_LENGTH, len)) ){
                     buf.appendCodePoint(Integer.parseInt(codePointMatcher.group(2),16));
                     i += codePointMatcher.group(1).length() - 1;
                 }else{
@@ -1478,12 +1480,12 @@ public class JSONUtil
             /**
              * Do the matching for escapes.
              *
-             * @throws IOException For writes to the json writer.
+             * @throws IOException For write errors to the json writer.
              */
             private void doMatches() throws IOException
             {
                 // check for escapes.
-                if ( gotMatch(passThroughMatcher, cp.i, Math.min(cp.i+passThroughRegionLength, cp.len)) ){
+                if ( gotMatch(passThroughMatcher, cp.i, min(cp.i+passThroughRegionLength, cp.len)) ){
                     // pass it through unchanged.
                     String esc = passThroughMatcher.group(1);
                     if ( json != null ){
@@ -1493,13 +1495,13 @@ public class JSONUtil
                     }
                     cp.i += esc.length() - 1;
                     cp.notDone = false;
-                }else if ( gotMatch(jsEscMatcher, cp.i, Math.min(cp.i+MAX_JS_ESC_LENGTH, cp.len)) ){
+                }else if ( gotMatch(jsEscMatcher, cp.i, min(cp.i+MAX_JS_ESC_LENGTH, cp.len)) ){
                     // Hex and octal escapes are not permitted for JSON.
                     // some or all single character escapes may not be allowed either.
                     String esc = jsEscMatcher.group(1);
                     cp.codePoint = cp.char0 = getEscapeChar(esc);
                     cp.i += esc.length() - 1;
-                }else if ( useECMA5 && gotMatch(codePointMatcher, cp.i, Math.min(cp.i+MAX_CODE_POINT_ESC_LENGTH, cp.len)) ){
+                }else if ( useECMA5 && gotMatch(codePointMatcher, cp.i, min(cp.i+MAX_CODE_POINT_ESC_LENGTH, cp.len)) ){
                     // only get here if it wasn't passed through => useECMA6 is false
                     // convert it to an inline codepoint or other escape as needed.
                     cp.codePoint = Integer.parseInt(codePointMatcher.group(2),16);
