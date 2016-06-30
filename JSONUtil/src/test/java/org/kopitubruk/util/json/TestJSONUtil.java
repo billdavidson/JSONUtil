@@ -326,25 +326,10 @@ public class TestJSONUtil
         int jsonOnlyCount = 0;
 
         for ( int i = ' '; i <= Character.MAX_CODE_POINT; i++ ){
-            if ( JSONUtil.isValidIdentifierStart(i, jcfg) ){
-                // ignore - these are tested by testValidPropertyNames()
-            }else if ( isNormalCodePoint(i) ){
-                String propertyName;
-                switch ( i ){
-                    // escape characters as needed.
-                    case '"':
-                    case '/':
-                    case '\\':
-                        escName[1] = i;
-                        propertyName = new String(escName,0,2);
-                        break;
-                    default:
-                        normalIdent[0] = i;
-                        propertyName = new String(normalIdent,0,1);
-                        break;
-                }
+            if ( JSONUtil.isValidIdentifierStart(i, cfg) && ! JSONUtil.isValidIdentifierPart(i, jcfg) ){
+                normalIdent[0] = i;
                 jsonObj.clear();
-                jsonObj.put(propertyName, 0);
+                jsonObj.put(new String(normalIdent,0,1), 0);
                 String json = JSONUtil.toJSON(jsonObj, cfg);
                 // these would fail eval().
                 parseJSON(json);
