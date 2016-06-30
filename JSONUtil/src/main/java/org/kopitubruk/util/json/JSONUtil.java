@@ -88,7 +88,10 @@ import java.util.regex.Pattern;
  *     result of the key's toString() method and the values being property values.
  *     The key's toString() must produce valid Javascript/JSON identifiers and the
  *     values can be almost anything.  Note that this is different than
- *     the org.json library which requires the keys to actually be Strings.
+ *     the org.json library which requires the keys to actually be Strings.  If your
+ *     key's toString() method does not produce valid Javascript/JSON identifiers
+ *     then you can use {@link JSONConfig#setEscapeBadIdentifierCodePoints(boolean)}
+ *     to make it so that they are valid identifiers.
  *   </dd>
  *   <dt>{@link ResourceBundle}</dt>
  *   <dd>
@@ -133,12 +136,14 @@ import java.util.regex.Pattern;
  *   <dd>
  *     If {@link JSONConfig#isEncodeDatesAsStrings()} returns true, then {@link Date}s
  *     will be encoded as ISO 8601 date strings, suitable for handing to new Date(String)
- *     in Javascript.
+ *     in Javascript.  The date format can be changed to something else by
+ *     {@link JSONConfig#setDateGenFormat(java.text.DateFormat)}.
  *     <p>
  *     If {@link JSONConfig#isEncodeDatesAsObjects()} returns true, then {@link Date}s
  *     will be encoded as a call to the Date constructor in Javascript using an ISO 8601
  *     date string.  This works with Javascript eval().  It probably won't work in most
- *     strict JSON parsers.
+ *     strict JSON parsers.  The date format can be changed to something else by
+ *     {@link JSONConfig#setDateGenFormat(java.text.DateFormat)}.
  *   </dd>
  *   <dt>Any other object</dt>
  *   <dd>
@@ -192,7 +197,8 @@ public class JSONUtil
     /**
      * Javascript escapes, including those not permitted in JSON.
      */
-    private static final Pattern JAVASCRIPT_ESC_PAT = Pattern.compile("(\\\\([bfnrtv\\\\/'\"]|(x\\p{XDigit}{2})|([0-3]?[0-7]{1,2})))");
+    private static final Pattern JAVASCRIPT_ESC_PAT =
+            Pattern.compile("(\\\\([bfnrtv\\\\/'\"]|(x\\p{XDigit}{2})|([0-3]?[0-7]{1,2})))");
 
     /**
      * Parse a Unicode code unit escape.
@@ -219,8 +225,7 @@ public class JSONUtil
     /**
      * Escapes to pass through for ECMA5 when escaping bad identifier code points.
      */
-    private static final Pattern ECMA5_ESCAPE_PASS_THROUGH_PAT =
-            Pattern.compile("(\\\\u\\p{XDigit}{4})");
+    private static final Pattern ECMA5_ESCAPE_PASS_THROUGH_PAT = CODE_UNIT_PAT;
 
     /**
      * Escapes to pass through for ECMA6 when escaping bad identifier code points.
@@ -291,7 +296,8 @@ public class JSONUtil
      * characters not permitted by the ECMAScript standard will not work with
      * Javascript eval() but will work with Javascript JSON.parse().
      */
-    private static final Pattern VALID_JSON5_PROPERTY_NAME_PAT = Pattern.compile("^([^\u0000-\u001F\\p{Cn}\"/\\\\]|\\\\[bfnrt\\\\/\"]|\\\\u\\p{XDigit}{4})+$");
+    private static final Pattern VALID_JSON5_PROPERTY_NAME_PAT =
+            Pattern.compile("^([^\u0000-\u001F\\p{Cn}\"/\\\\]|\\\\[bfnrt\\\\/\"]|\\\\u\\p{XDigit}{4})+$");
 
     /**
      * This pattern is for full JSON identifier names. This is much more
@@ -299,7 +305,8 @@ public class JSONUtil
      * characters not permitted by the ECMAScript standard will not work with
      * Javascript eval() but will work with Javascript JSON.parse().
      */
-    private static final Pattern VALID_JSON6_PROPERTY_NAME_PAT = Pattern.compile("^([^\u0000-\u001F\\p{Cn}\"/\\\\]|\\\\[bfnrt\\\\/\"]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})+$");
+    private static final Pattern VALID_JSON6_PROPERTY_NAME_PAT =
+            Pattern.compile("^([^\u0000-\u001F\\p{Cn}\"/\\\\]|\\\\[bfnrt\\\\/\"]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})+$");
 
     /**
      * Maximum length of a ECMAScript 6 code point escape.
@@ -940,22 +947,6 @@ public class JSONUtil
     }
 
     /**
-     * Return true of if the given input contains UTF-16 surrogates.
-     *
-     * @param str the input string.
-     * @return true if the input string contains UTF-16 surrogates. Otherwise false.
-     */
-    private static boolean hasSurrogates( String str )
-    {
-        for ( int i = 0, len = str.length(); i < len; i++ ){
-            if ( Character.isSurrogate(str.charAt(i)) ){
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * Escape surrogate pairs if the config object requires it.
      *
      * @param str The input string.
@@ -988,6 +979,22 @@ public class JSONUtil
             i += charCount;
         }
         return buf.toString();
+    }
+
+    /**
+     * Return true of if the given input contains UTF-16 surrogates.
+     *
+     * @param str the input string.
+     * @return true if the input string contains UTF-16 surrogates. Otherwise false.
+     */
+    private static boolean hasSurrogates( String str )
+    {
+        for ( int i = 0, len = str.length(); i < len; i++ ){
+            if ( Character.isSurrogate(str.charAt(i)) ){
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1104,7 +1111,7 @@ public class JSONUtil
      * Take a string containing a Javascript character escape and return its
      * char value.
      *
-     * @param esc A string containing a Javascript hex, octal or character escape.
+     * @param esc A string containing a Javascript hex, octal or single character escape.
      * @return The char represented by the given escape.
      */
     private static char getEscapeChar( String esc )
@@ -1131,16 +1138,6 @@ public class JSONUtil
     static String getEscape( char c )
     {
         return JSON_ESC_MAP.get(c);
-    }
-
-    /**
-     * Get the chars that the JSON standard requires to be escaped.
-     * @return the chars that the JSON standard requires to be escaped.
-     */
-    static Set<Character> getJsonEscapeChars()
-    {
-        // TreeSet sorts it.
-        return new TreeSet<>(JSON_ESC_MAP.keySet());
     }
 
     /**
@@ -1276,7 +1273,9 @@ public class JSONUtil
 
     /**
      * Shorthand to apply a region to a matcher and find out if the desired
-     * pattern is in that spot.
+     * pattern is in that spot. Using limited regions limits the overhead of
+     * using {@link Matcher#find()} which could be considerable for long
+     * strings.
      *
      * @param matcher The matcher.
      * @param start The start of the region.
@@ -1297,9 +1296,10 @@ public class JSONUtil
     }
 
     /**
-     * Code point data for {@link JSONUtil#writeString(String,Writer,JSONConfig)} and
-     * {@link JSONUtil#escapeBadIdentiferCodePoints(String,JSONConfig)}.  Tracks, updates and
-     * escapes the current code point as needed.
+     * Code point data for
+     * {@link JSONUtil#writeString(String,Writer,JSONConfig)} and
+     * {@link JSONUtil#escapeBadIdentiferCodePoints(String,JSONConfig)}. Tracks,
+     * updates and escapes the current code point as needed.
      */
     private static class CodePointData
     {
@@ -1493,14 +1493,13 @@ public class JSONUtil
                     }else{
                         buf.append(esc);
                     }
-                    cp.i += esc.length() - 1;
+                    cp.i += esc.length() - cp.charCount;
                     cp.notDone = false;
                 }else if ( gotMatch(jsEscMatcher, cp.i, min(cp.i+MAX_JS_ESC_LENGTH, cp.len)) ){
-                    // Hex and octal escapes are not permitted for JSON.
-                    // some or all single character escapes may not be allowed either.
+                    // Any Javascript escapes that didn't make it through the pass through are not allowed.
                     String esc = jsEscMatcher.group(1);
                     cp.codePoint = cp.char0 = getEscapeChar(esc);
-                    cp.i += esc.length() - 1;
+                    cp.i += esc.length() - cp.charCount;
                 }else if ( useECMA5 && gotMatch(codePointMatcher, cp.i, min(cp.i+MAX_CODE_POINT_ESC_LENGTH, cp.len)) ){
                     // only get here if it wasn't passed through => useECMA6 is false
                     // convert it to an inline codepoint or other escape as needed.
@@ -1520,6 +1519,6 @@ public class JSONUtil
                     cp.handler = null;
                 }
             }
-        }
-    }
+        } // class EscapeHandler
+    } // class CodePointData
 }
