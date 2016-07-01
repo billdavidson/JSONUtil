@@ -499,12 +499,7 @@ public class JSONParser
                         }
 
                         // remove trailing whitespace.
-                        int i = buf.length() - 1;
-                        while ( isSpace(buf, i) ){
-                            --i;
-                        }
-                        buf.setLength(i+1);
-                        str = buf.toString();
+                        str = buf.toString().trim();
                     }
 
                     // check for new Date(), numbers, literals and unquoted ids.
@@ -583,21 +578,6 @@ public class JSONParser
             }
 
             return str.toString();
-        }
-
-        /**
-         * Check if the code point at the given position is a space character.
-         *
-         * @param buf The buffer to check.
-         * @param i the place to look.
-         * @return true if the character is a space character.
-         */
-        private boolean isSpace( StringBuilder buf, int i )
-        {
-            if ( i > 0 && Character.isLowSurrogate(buf.charAt(i)) && Character.isHighSurrogate(buf.charAt(i-1)) ){
-                --i;    // go to the high surrogate.
-            }
-            return Character.isSpaceChar(buf.codePointAt(i));
         }
 
         /**
