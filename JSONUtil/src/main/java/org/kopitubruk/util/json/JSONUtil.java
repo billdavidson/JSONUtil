@@ -274,7 +274,8 @@ public class JSONUtil
      * </ul>
      */
     private static final Pattern VALID_ECMA5_PROPERTY_NAME_PAT =
-            Pattern.compile("^(?:[_\\$\\p{L}]|\\\\u\\p{XDigit}{4})(?:[_\\$\\p{L}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4})*$");
+            Pattern.compile("^(?:[_\\$\\p{L}]|\\\\u\\p{XDigit}{4})" +
+                             "(?:[_\\$\\p{L}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4})*$");
 
     /**
      * ECMAScript 6 version of VALID_ECMA5_PROPERTY_NAME_PAT.
@@ -288,7 +289,8 @@ public class JSONUtil
      * </ul>
      */
     private static final Pattern VALID_ECMA6_PROPERTY_NAME_PAT =
-            Pattern.compile("^(?:[_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})(?:[_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*$");
+            Pattern.compile("^(?:[_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})" +
+                             "(?:[_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*$");
 
     /**
      * This pattern is for full JSON identifier names. This is much more
