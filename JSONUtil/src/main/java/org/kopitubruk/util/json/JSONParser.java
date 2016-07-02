@@ -90,7 +90,8 @@ public class JSONParser
      * Recognize unquoted id's
      */
     private static final Pattern UNQUOTED_ID_PAT =
-            Pattern.compile("((?:[_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})(?:[_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*)\\b");
+            Pattern.compile("((?:[_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})" +
+                             "(?:[_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*)\\b");
 
     /**
      * Recognize Javascript floating point.
@@ -236,7 +237,7 @@ public class JSONParser
                     // need an identifier
                     if ( token.tokenType == TokenType.STRING || token.tokenType == TokenType.UNQUOTED_ID ){
                         // got an identifier.
-                        String key = token.value;
+                        String key = JSONUtil.unEscape(token.value);
                         // need a colon
                         token = tokens.nextToken();
                         if ( token.tokenType == TokenType.COLON ){
@@ -297,7 +298,15 @@ public class JSONParser
     {
         switch ( token.tokenType ){
             case STRING:
-                return token.value;
+                JSONConfig cfg = tokens.cfg;
+                String unesc = JSONUtil.unEscape(token.value);
+                if ( cfg.isEncodeDatesAsObjects() || cfg.isEncodeDatesAsStrings() ){
+                    try{
+                        return parseDate(unesc, cfg);
+                    }catch ( ParseException e ){
+                    }
+                }
+                return unesc;
             case FLOATING_POINT_NUMBER:
                 return Double.parseDouble(token.value);
             case INTEGER_NUMBER:
@@ -315,7 +324,7 @@ public class JSONParser
                     return Boolean.valueOf(token.value);
                 }
             case DATE:
-                return parseDate(token.value, tokens.cfg);
+                return parseDate(JSONUtil.unEscape(token.value), tokens.cfg);
             case START_OBJECT:
             case START_ARRAY:
                 return parseTokens(token, tokens);
@@ -368,16 +377,16 @@ public class JSONParser
     private static class TokenReader
     {
         // simple tokens that can be safely shared by all threads.
-        private static final Map<Integer,Token> SIMPLE_TOKENS;
+        private static final Map<Character,Token> SIMPLE_TOKENS;
 
         static {
-            Map<Integer,Token> simpleTokens = new HashMap<>();
-            simpleTokens.put((int)'{', new Token(TokenType.START_OBJECT, null));
-            simpleTokens.put((int)'}', new Token(TokenType.END_OBJECT, null));
-            simpleTokens.put((int)'[', new Token(TokenType.START_ARRAY, null));
-            simpleTokens.put((int)']', new Token(TokenType.END_ARRAY, null));
-            simpleTokens.put((int)',', new Token(TokenType.COMMA, null));
-            simpleTokens.put((int)':', new Token(TokenType.COLON, null));
+            Map<Character,Token> simpleTokens = new HashMap<>();
+            simpleTokens.put('{', new Token(TokenType.START_OBJECT, null));
+            simpleTokens.put('}', new Token(TokenType.END_OBJECT, null));
+            simpleTokens.put('[', new Token(TokenType.START_ARRAY, null));
+            simpleTokens.put(']', new Token(TokenType.END_ARRAY, null));
+            simpleTokens.put(',', new Token(TokenType.COMMA, null));
+            simpleTokens.put(':', new Token(TokenType.COLON, null));
             SIMPLE_TOKENS = new HashMap<>(simpleTokens);
         }
 
@@ -420,9 +429,6 @@ public class JSONParser
                 return result;
             }
 
-            // create dates if applicable.
-            boolean doDateStrings = cfg.isEncodeDatesAsObjects() || cfg.isEncodeDatesAsStrings();
-
             // get to the first non space code point.
             int codePoint = nextCodePoint();
             while ( codePoint >= 0 && Character.isSpaceChar(codePoint) ){
@@ -431,67 +437,49 @@ public class JSONParser
             if ( codePoint < 0 ){
                 return null;                // end of input.
             }
+            char ch = codePoint <= 0xFFFF ? (char)codePoint : 0;
 
             // look for the token.
-            switch ( codePoint ){
+            switch ( ch ){
                 case '{':
                 case '}':
                 case '[':
                 case ']':
                 case ',':
                 case ':':
-                    return SIMPLE_TOKENS.get(codePoint);
+                    return SIMPLE_TOKENS.get(ch);
                 case '"':
                 case '\'':
-                    // string or quoted identifier
-                    char q = (char)codePoint;
-                    String unesc = JSONUtil.unEscape(getQuotedString(q));
-                    Date dt = null;
-                    if ( doDateStrings ){
-                        try{
-                            dt = parseDate(unesc, cfg);
-                        }catch ( ParseException e ){
-                        }
-                    }
-                    if ( dt != null ){
-                        return new Token(TokenType.DATE, unesc);
-                    }else{
-                        return new Token(TokenType.STRING, unesc);
-                    }
+                    // string or quoted identifier or date string.
+                    return new Token(TokenType.STRING, getQuotedString(ch));
                 default:
                     // something else.  need to go to the next token or end of input
                     // to get this token.
                     String str;
                     {
                         StringBuilder buf = new StringBuilder();
-                        char ch = codePoint <= 0xFFFF ? (char)codePoint : 0;
                         int escapeCount = 0;
-                        while ( true ){
-                            if ( codePoint == '\\' ){
-                                // track escapes.
-                                ++escapeCount;
+                        do{
+                            ch = codePoint <= 0xFFFF ? (char)codePoint : 0;
+                            if ( ch == '\\' ){
+                                ++escapeCount;          // track escapes.
                                 buf.append(ch);
-                            }else if ( (codePoint == '\'' || codePoint == '"') && escapeCount % 2 == 0 ){
-                                // strings can be embedded in "new Date()"
-                                buf.appendCodePoint(codePoint);
-                                buf.append(getQuotedString((char)codePoint));
-                                buf.appendCodePoint(codePoint);
+                            }else if ( (ch == '\'' || ch == '"') && escapeCount % 2 == 0 ){
+                                buf.append(ch);
+                                buf.append(getQuotedString(ch));
+                                buf.append(ch);
                                 escapeCount = 0;
-                            }else if ( SIMPLE_TOKENS.containsKey(codePoint) ){
-                                // ran into next token.  save it and stop.
-                                extraToken = SIMPLE_TOKENS.get(codePoint);
-                                break;
                             }else{
-                                buf.appendCodePoint(codePoint);
-                                escapeCount = 0;
+                                extraToken = SIMPLE_TOKENS.get(ch);
+                                if ( extraToken == null ){
+                                    buf.appendCodePoint(codePoint);
+                                    escapeCount = 0;
+                                }else{
+                                    break;              // ran into next token.  stop.
+                                }
                             }
                             codePoint = nextCodePoint();
-                            if ( codePoint < 0 ){
-                                // end of input.
-                                break;
-                            }
-                            ch = codePoint <= 0xFFFF ? (char)codePoint : 0;
-                        }
+                        }while ( codePoint >= 0 );
 
                         // remove trailing whitespace.
                         str = buf.toString().trim();
@@ -501,8 +489,7 @@ public class JSONParser
                     Matcher matcher = NEW_DATE.matcher(str);
                     if ( matcher.find() && matcher.start() == 0 ){
                         String qs = matcher.group(2);
-                        unesc = JSONUtil.unEscape(qs.substring(1, qs.length()-1));
-                        return new Token(TokenType.DATE, unesc);
+                        return new Token(TokenType.DATE, qs.substring(1, qs.length()-1));
                     }else{
                         matcher = JAVASCRIPT_FLOATING_POINT_PAT.matcher(str);
                         if ( matcher.find() && matcher.start() == 0 ){
@@ -522,7 +509,7 @@ public class JSONParser
                                     matcher = UNQUOTED_ID_PAT.matcher(str);
                                     if ( matcher.find() && matcher.start() == 0 ){
                                         String id = matcher.group(1);
-                                        return new Token(TokenType.UNQUOTED_ID, JSONUtil.unEscape(id));
+                                        return new Token(TokenType.UNQUOTED_ID, id);
                                     }else{
                                         throw new JSONParserException(str, charCount, cfg);
                                     }
