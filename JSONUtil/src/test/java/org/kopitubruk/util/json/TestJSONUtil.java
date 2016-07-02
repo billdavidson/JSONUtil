@@ -23,6 +23,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.math.BigDecimal;
@@ -116,7 +117,8 @@ public class TestJSONUtil
         try{
             // Get the Javascript engine and load the validation javascript file into it.
             ScriptEngine engine = new ScriptEngineManager().getEngineByExtension("js");
-            engine.eval(new FileReader(TestJSONUtil.class.getResource(validateJs).getFile()));
+            String validateJsFile = TestJSONUtil.class.getResource(validateJs).getFile();
+            engine.eval(new BufferedReader(new FileReader(validateJsFile)));
             invocable = (Invocable)engine;
         }catch ( ScriptException|FileNotFoundException e ){
             // Can't validate any JSON.
@@ -157,6 +159,7 @@ public class TestJSONUtil
         // make sure it parses.
         Object result = null;
         try{
+            // this sends the raw JSON data to the function as an argument.
             result = invocable.invokeFunction(func, json);
         }catch ( ScriptException e ){
             boolean lastCode = false;
@@ -181,7 +184,6 @@ public class TestJSONUtil
             }
             s_log.error(buf.toString(), e);
             throw e;
-            //System.exit(-1);
         }catch ( NoSuchMethodException e ){
             s_log.error("Couldn't invoke "+func+"()", e);
             throw e;

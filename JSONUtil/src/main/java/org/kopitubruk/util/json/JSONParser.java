@@ -108,7 +108,7 @@ public class JSONParser
     /**
      * Recognize an embedded new Date().
      */
-    private static final Pattern NEW_DATE = Pattern.compile("(new\\s+Date\\s*\\(\\s*('[^']+'|\"[^\"]+\")\\s*\\))");
+    private static final Pattern NEW_DATE_PAT = Pattern.compile("(new\\s+Date\\s*\\(\\s*('[^']+'|\"[^\"]+\")\\s*\\))");
 
     /**
      * Types of tokens in a JSON input string.
@@ -248,18 +248,17 @@ public class JSONParser
                             throw new JSONParserException(TokenType.COLON, token.tokenType, tokens.cfg);
                         }
                     }else if ( token.tokenType == TokenType.END_OBJECT ){
-                        // empty object; break out of loop.
-                        break;
+                        break;                                  // empty object; break out of loop.
                     }else{
                         throw new JSONParserException(TokenType.END_OBJECT, token.tokenType, tokens.cfg);
                     }
                     token = tokens.nextToken();
                     if ( token.tokenType == TokenType.END_OBJECT ){
-                        // end of object; break out of loop.
-                        break;
+                        break;                                  // end of object; break out of loop.
                     }else if ( token.tokenType == TokenType.COMMA ){
-                        // next field.
-                        token = tokens.nextToken();
+                        token = tokens.nextToken();             // next field.
+                    }else{
+                        throw new JSONParserException(TokenType.END_OBJECT, token.tokenType, tokens.cfg);
                     }
                 }
                 // minimize memory usage.
@@ -271,11 +270,11 @@ public class JSONParser
                     list.add(getValue(token, tokens));
                     token = tokens.nextToken();
                     if ( token.tokenType == TokenType.END_ARRAY ){
-                        // end of array.
-                        break;
+                        break;                                  // end of array.
                     }else if ( token.tokenType == TokenType.COMMA ){
-                        // next item.
-                        token = tokens.nextToken();
+                        token = tokens.nextToken();             // next item.
+                    }else{
+                        throw new JSONParserException(TokenType.END_ARRAY, token.tokenType, tokens.cfg);
                     }
                 }
                 // minimize memory usage.
@@ -466,17 +465,17 @@ public class JSONParser
                                 ++escapeCount;          // track escapes.
                                 buf.append(ch);
                             }else if ( (ch == '\'' || ch == '"') && escapeCount % 2 == 0 ){
-                                buf.append(ch);
-                                buf.append(getQuotedString(ch));
-                                buf.append(ch);
+                                buf.append(ch)
+                                   .append(getQuotedString(ch))
+                                   .append(ch);
                                 escapeCount = 0;
                             }else{
                                 extraToken = SIMPLE_TOKENS.get(ch);
-                                if ( extraToken == null ){
+                                if ( extraToken != null ){
+                                    break;              // ran into next token.  stop.
+                                }else{
                                     buf.appendCodePoint(codePoint);
                                     escapeCount = 0;
-                                }else{
-                                    break;              // ran into next token.  stop.
                                 }
                             }
                             codePoint = nextCodePoint();
@@ -487,37 +486,32 @@ public class JSONParser
                     }
 
                     // check for new Date(), numbers, literals and unquoted ids.
-                    Matcher matcher = NEW_DATE.matcher(str);
+                    Matcher matcher = NEW_DATE_PAT.matcher(str);
                     if ( matcher.find() && matcher.start() == 0 ){
                         String qs = matcher.group(2);
                         return new Token(TokenType.DATE, qs.substring(1, qs.length()-1));
-                    }else{
-                        matcher = JAVASCRIPT_FLOATING_POINT_PAT.matcher(str);
-                        if ( matcher.find() && matcher.start() == 0 ){
-                            String number = matcher.group(1);
-                            return new Token(TokenType.FLOATING_POINT_NUMBER, number);
-                        }else{
-                            matcher = JAVASCRIPT_INTEGER_PAT.matcher(str);
-                            if ( matcher.find() && matcher.start() == 0 ){
-                                String number = matcher.group(1);
-                                return new Token(TokenType.INTEGER_NUMBER, number);
-                            }else{
-                                matcher = LITERAL_PAT.matcher(str);
-                                if ( matcher.find() && matcher.start() == 0 ){
-                                    String literal = matcher.group(1);
-                                    return new Token(TokenType.LITERAL, literal);
-                                }else{
-                                    matcher = UNQUOTED_ID_PAT.matcher(str);
-                                    if ( matcher.find() && matcher.start() == 0 ){
-                                        String id = matcher.group(1);
-                                        return new Token(TokenType.UNQUOTED_ID, id);
-                                    }else{
-                                        throw new JSONParserException(str, charCount, cfg);
-                                    }
-                                }
-                            }
-                        }
                     }
+                    matcher = JAVASCRIPT_FLOATING_POINT_PAT.matcher(str);
+                    if ( matcher.find() && matcher.start() == 0 ){
+                        String number = matcher.group(1);
+                        return new Token(TokenType.FLOATING_POINT_NUMBER, number);
+                    }
+                    matcher = JAVASCRIPT_INTEGER_PAT.matcher(str);
+                    if ( matcher.find() && matcher.start() == 0 ){
+                        String number = matcher.group(1);
+                        return new Token(TokenType.INTEGER_NUMBER, number);
+                    }
+                    matcher = LITERAL_PAT.matcher(str);
+                    if ( matcher.find() && matcher.start() == 0 ){
+                        String literal = matcher.group(1);
+                        return new Token(TokenType.LITERAL, literal);
+                    }
+                    matcher = UNQUOTED_ID_PAT.matcher(str);
+                    if ( matcher.find() && matcher.start() == 0 ){
+                        String id = matcher.group(1);
+                        return new Token(TokenType.UNQUOTED_ID, id);
+                    }
+                    throw new JSONParserException(str, charCount, cfg);
             }
         }
 
@@ -537,7 +531,7 @@ public class JSONParser
             while ( true ){
                 int nextChar = json.read();
                 if ( nextChar < 0 ){
-                    throw new JSONParserException(q, cfg);
+                    throw new JSONParserException(q, cfg);  // missing close quote.
                 }else{
                     ++charCount;
                     char ch = (char)nextChar;

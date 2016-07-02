@@ -79,8 +79,8 @@ public final class BadPropertyNameException extends JSONException
         // HashSet discards duplicates.
         Set<Integer> badCodePoints = new LinkedHashSet<>();
         boolean badStart = false;
-        boolean forceString = false;
-        Pattern escapePassThroughPat = getEscapePassThroughPattern(cfg, forceString);
+        boolean useSingleLetterEscapes = cfg.isFullJSONIdentifierCodePoints();
+        Pattern escapePassThroughPat = getEscapePassThroughPattern(cfg, useSingleLetterEscapes);
         Matcher passThroughMatcher = escapePassThroughPat.matcher(propertyName);
         int passThroughRegionLength = cfg.isUseECMA6() ? 10 : 6;
 
