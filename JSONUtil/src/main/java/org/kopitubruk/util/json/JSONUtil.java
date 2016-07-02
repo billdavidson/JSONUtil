@@ -1294,7 +1294,7 @@ public class JSONUtil
         }
 
         /**
-         * Next codepoint for {@link JSONUtil#writeString(String,Writer,JSONConfig)}.
+         * Set up the next codepoint and handle escapes as appropriate.
          *
          * @return true if there's another code point.
          */
@@ -1302,12 +1302,16 @@ public class JSONUtil
         {
             if ( (i+charCount) < len ){
                 i += charCount;
+
+                // set up code point and char data.
                 codePoint = strValue.codePointAt(i);
                 charCount = Character.charCount(codePoint);
                 chars[0] = strValue.charAt(i);
                 if ( charCount > 1 ){
                     chars[1] = strValue.charAt(i+1);
                 }
+
+                // handle escapes as appropriate.
                 esc = null;
                 if ( haveEscape && codePoint == '\\' ){
                     // check for escapes.
