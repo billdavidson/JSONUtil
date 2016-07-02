@@ -36,7 +36,6 @@ public class JSONParserException extends JSONException
     private long index = 0;
     private int high = 0;
     private int low = 0;
-    private boolean endOfInput = false;
     private boolean malformedCodePoint = false;
 
     /**
@@ -92,19 +91,6 @@ public class JSONParserException extends JSONException
     }
 
     /**
-     * Constructor for unexpected end of input.
-     *
-     * @param idx THe number of characters read.
-     * @param cfg the config object.
-     */
-    JSONParserException( long idx, JSONConfig cfg )
-    {
-        super(cfg);
-        index = idx;
-        endOfInput = true;
-    }
-
-    /**
      * Constructor for malformed code point.
      *
      * @param high The high surrogate.
@@ -138,8 +124,6 @@ public class JSONParserException extends JSONException
                 default:
                     return String.format(bundle.getString("expectedValue"), String.valueOf(tokenType));
             }
-        }else if ( endOfInput ){
-            return String.format(bundle.getString("endOfInput"), index);
         }else if ( malformedCodePoint ){
             return String.format(bundle.getString("malformedCodePoint"), high, low, index);
         }else if ( e != null ){

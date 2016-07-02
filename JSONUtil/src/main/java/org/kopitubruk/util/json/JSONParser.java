@@ -204,8 +204,8 @@ public class JSONParser
     {
         JSONConfig jcfg = cfg == null ? new JSONConfig() : cfg;
 
+        TokenReader tokens = new TokenReader(json, jcfg);
         try {
-            TokenReader tokens = new TokenReader(json, jcfg);
             return parseTokens(tokens.nextToken(), tokens);
         }catch ( JSONException|IOException e ){
             throw e;
@@ -537,7 +537,7 @@ public class JSONParser
             while ( true ){
                 int nextChar = json.read();
                 if ( nextChar < 0 ){
-                    throw new JSONParserException(charCount, cfg);
+                    throw new JSONParserException(q, cfg);
                 }else{
                     ++charCount;
                     char ch = (char)nextChar;
