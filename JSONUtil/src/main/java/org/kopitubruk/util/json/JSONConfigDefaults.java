@@ -230,7 +230,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             try{
                 Context ctx = JNDIUtil.getEnvContext(pkgName.replaceAll("\\.", "/"));
 
-                if ( loggingProperty != null ){
+                if ( loggingProperty == null ){
                     // logging was not set by a system property. allow JNDI override.
                     logging = getBoolean(ctx, loggingName, logging);
                     if ( logging ){
@@ -241,6 +241,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                         s_log = null;
                     }
                 }
+
+                registerMBean = getBoolean(ctx, registerMBeanName, registerMBean);
 
                 // locale.
                 String languageTag = getString(ctx, "locale", null);
@@ -265,8 +267,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                         d.addDateParseFormat(dpf);
                     }
                 }
-
-                registerMBean = getBoolean(ctx, registerMBeanName, registerMBean);
 
                 // validation flags.
                 d.setValidatePropertyNames(getBoolean(ctx, "validatePropertyNames", validatePropertyNames));
@@ -329,6 +329,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     /**
      * Reset all defaults to their original unmodified values.  This
      * overrides JNDI and previous MBean changes.
+     * <p>
+     * Accessible via MBean server.
      */
     public void setCodeDefaults()
     {
@@ -710,7 +712,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Clear date generation format.
+     * Clear date generation format. This means that if any special date
+     * generation handling is enabled, then it will use the default ISO 8601
+     * format.
      * <p>
      * Accessible via MBean server.
      *

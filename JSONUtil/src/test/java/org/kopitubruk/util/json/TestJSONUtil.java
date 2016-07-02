@@ -23,6 +23,8 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.Writer;
 import java.math.BigDecimal;
@@ -30,7 +32,6 @@ import java.math.BigInteger;
 import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
-//import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -51,12 +52,13 @@ import javax.naming.NamingException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.BeforeClass;
-//import org.junit.Rule;
 import org.junit.Test;
+
+//import org.junit.Rule;
+//import java.text.SimpleDateFormat;
 //import org.junit.rules.TestRule;
 //import org.junit.rules.TestWatcher;
 //import org.junit.runner.Description;
-
 /**
  * Tests for JSONUtil.  Java 5 does not support a scripting engine so
  * the output cannot be validated against a Javascript engine.
@@ -204,27 +206,12 @@ public class TestJSONUtil
         int jsonOnlyCount = 0;
 
         for ( int i = ' '; i <= Character.MAX_CODE_POINT; i++ ){
-            if ( JSONUtil.isValidIdentifierStart(i, jcfg) ){
-                // ignore - these are tested by testValidPropertyNames()
-            }else if ( isNormalCodePoint(i) ){
-                String propertyName;
-                switch ( i ){
-                    // escape characters as needed.
-                    case '"':
-                    case '/':
-                    case '\\':
-                        escName[1] = i;
-                        propertyName = new String(escName,0,2);
-                        break;
-                    default:
-                        normalIdent[0] = i;
-                        propertyName = new String(normalIdent,0,1);
-                        break;
-                }
+            if ( JSONUtil.isValidIdentifierStart(i, cfg) && ! JSONUtil.isValidIdentifierPart(i, jcfg) ){
+                normalIdent[0] = i;
                 jsonObj.clear();
-                jsonObj.put(propertyName, 0);
-                //String json = 
-                JSONUtil.toJSON(jsonObj, cfg);
+                jsonObj.put(new String(normalIdent,0,1), 0);
+                //String json =
+                        JSONUtil.toJSON(jsonObj, cfg);
                 // these would fail eval().
                 //parseJSON(json);
                 ++jsonOnlyCount;
@@ -1016,13 +1003,13 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
 
         cfg.setEncodeNumericStringsAsNumbers(false);
-        //String json = 
+        //String json =
                 JSONUtil.toJSON(bundle, cfg);
         // validateJSON(json);
         //assertThat(json, is("{\"a\":\"1\",\"b\":\"2\",\"c\":\"3\",\"d\":\"4\",\"e\":\"5\",\"f\":\"6\",\"g\":\"7\",\"h\":\"8\",\"i\":\"9\",\"j\":\"10\",\"k\":\"11\",\"l\":\"12\",\"m\":\"13\",\"n\":\"14\",\"o\":\"15\",\"p\":\"16\",\"q\":\"17\",\"r\":\"18\",\"s\":\"19\",\"t\":\"20\",\"u\":\"21\",\"v\":\"22\",\"w\":\"23\",\"x\":\"24\",\"y\":\"25\",\"z\":\"26\"}"));
 
         cfg.setEncodeNumericStringsAsNumbers(true);
-        //json = 
+        //json =
                 JSONUtil.toJSON(bundle, cfg);
         // validateJSON(json);
         //assertThat(json, is("{\"a\":1,\"b\":2,\"c\":3,\"d\":4,\"e\":5,\"f\":6,\"g\":7,\"h\":8,\"i\":9,\"j\":10,\"k\":11,\"l\":12,\"m\":13,\"n\":14,\"o\":15,\"p\":16,\"q\":17,\"r\":18,\"s\":19,\"t\":20,\"u\":21,\"v\":22,\"w\":23,\"x\":24,\"y\":25,\"z\":26}"));
