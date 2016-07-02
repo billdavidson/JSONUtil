@@ -259,7 +259,8 @@ public class JSONParser
                         break;
                     }else if ( token.tokenType == TokenType.COMMA ){
                         // next field.
-                        token = tokens.nextToken();                        }
+                        token = tokens.nextToken();
+                    }
                 }
                 // minimize memory usage.
                 return new LinkedHashMap<>(map);
