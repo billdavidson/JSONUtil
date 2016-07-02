@@ -23,15 +23,15 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.Writer;
-import java.io.FileReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
-//import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -56,12 +56,13 @@ import javax.script.ScriptException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.BeforeClass;
-//import org.junit.Rule;
 import org.junit.Test;
+
+//import org.junit.Rule;
+//import java.text.SimpleDateFormat;
 //import org.junit.rules.TestRule;
 //import org.junit.rules.TestWatcher;
 //import org.junit.runner.Description;
-
 /**
  * Tests for JSONUtil. Most of the produced JSON is put through Java's script
  * engine so that it will be tested that it parses without error. In most cases,
@@ -113,7 +114,8 @@ public class TestJSONUtil
         try{
             // Get the Javascript engine and load the validation javascript file into it.
             ScriptEngine engine = new ScriptEngineManager().getEngineByExtension("js");
-            engine.eval(new FileReader(TestJSONUtil.class.getResource(validateJs).getFile()));
+            String validateJsFile = TestJSONUtil.class.getResource(validateJs).getFile();
+            engine.eval(new BufferedReader(new FileReader(validateJsFile)));
             invocable = (Invocable)engine;
         }catch ( Exception e ){
             // Can't validate any JSON.
@@ -155,6 +157,7 @@ public class TestJSONUtil
         // make sure it parses.
         Object result = null;
         try{
+            // this sends the raw JSON data to the function as an argument.
             result = invocable.invokeFunction(func, json);
         }catch ( ScriptException e ){
             boolean lastCode = false;
@@ -179,7 +182,6 @@ public class TestJSONUtil
             }
             s_log.error(buf.toString(), e);
             throw e;
-            //System.exit(-1);
         }catch ( NoSuchMethodException e ){
             s_log.error("Couldn't invoke "+func+"()", e);
             throw e;
@@ -310,26 +312,12 @@ public class TestJSONUtil
         int jsonOnlyCount = 0;
 
         for ( int i = ' '; i <= Character.MAX_CODE_POINT; i++ ){
-            if ( JSONUtil.isValidIdentifierStart(i, jcfg) ){
-                // ignore - these are tested by testValidPropertyNames()
-            }else if ( isNormalCodePoint(i) ){
-                String propertyName;
-                switch ( i ){
-                    // escape characters as needed.
-                    case '"':
-                    case '/':
-                    case '\\':
-                        escName[1] = i;
-                        propertyName = new String(escName,0,2);
-                        break;
-                    default:
-                        normalIdent[0] = i;
-                        propertyName = new String(normalIdent,0,1);
-                        break;
-                }
+            if ( JSONUtil.isValidIdentifierStart(i, cfg) && ! JSONUtil.isValidIdentifierPart(i, jcfg) ){
+                normalIdent[0] = i;
                 jsonObj.clear();
-                jsonObj.put(propertyName, 0);
-                String json = JSONUtil.toJSON(jsonObj, cfg);
+                jsonObj.put(new String(normalIdent,0,1), 0);
+                //String json =
+                        JSONUtil.toJSON(jsonObj, cfg);
                 // these would fail eval().
                 //parseJSON(json);
                 ++jsonOnlyCount;

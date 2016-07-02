@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Bill Davidson
+ * Copyright 2015-2016 Bill Davidson
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,10 +30,13 @@ public class JSONParserException extends JSONException
 {
     private String badData = null;
     private Character quote = null;
+    private Exception e = null;
     private TokenType expectedTokenType = null;
     private TokenType tokenType = null;
-    private int index = 0;
-    private Exception e = null;
+    private long index = 0;
+    private int high = 0;
+    private int low = 0;
+    private boolean malformedCodePoint = false;
 
     /**
      * Constructor for bad data in JSON string.
@@ -42,7 +45,7 @@ public class JSONParserException extends JSONException
      * @param idx The exact index of the bad data.
      * @param cfg The config object.
      */
-    JSONParserException( String bd, int idx, JSONConfig cfg )
+    JSONParserException( String bd, long idx, JSONConfig cfg )
     {
         super(cfg);
         badData = bd;
@@ -87,6 +90,21 @@ public class JSONParserException extends JSONException
         this.e = e;
     }
 
+    /**
+     * Constructor for malformed code point.
+     *
+     * @param high The high surrogate.
+     * @param low The low surrogate.
+     * @param idx The position in the input.
+     * @param cfg the config object.
+     */
+    JSONParserException( int high, int low, long idx, JSONConfig cfg )
+    {
+        super(cfg);
+        index = idx;
+        malformedCodePoint = true;
+    }
+
     /* (non-Javadoc)
      * @see org.kopitubruk.util.json.JSONException#internalGetMessage(java.util.Locale)
      */
@@ -106,29 +124,13 @@ public class JSONParserException extends JSONException
                 default:
                     return String.format(bundle.getString("expectedValue"), String.valueOf(tokenType));
             }
+        }else if ( malformedCodePoint ){
+            return String.format(bundle.getString("malformedCodePoint"), high, low, index);
         }else if ( e != null ){
             return e.getLocalizedMessage();
         }else{
             String str = badData == null ? "" : badData;
-            int pos = 10;
-            if ( str.length() > 30 ){
-                int begin = index - 10;
-                int end = index + 20;
-                if ( begin < 0 ){
-                    end -= begin;
-                    pos += begin;
-                    begin = 0;
-                }
-                end = Math.min(end, str.length());
-                str = str.substring(begin, end);
-            }else{
-                pos = index;
-            }
-            StringBuilder buf = new StringBuilder(Math.max(pos-1, 0));
-            for ( int i = 0; i < pos; i++ ){
-                buf.append(' ');
-            }
-            return String.format(bundle.getString("unrecognizedData"), str, buf.toString());
+            return String.format(bundle.getString("unrecognizedData"), str, index);
         }
     }
 
