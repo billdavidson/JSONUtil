@@ -730,14 +730,14 @@ public class JSONUtil
                     // check if it needs to be escaped.
                     boolean doEscape = (escapeNonAscii && cp.codePoint > 127)
                             || (escapeSurrogates && cp.charCount > 1)
-                            || cp.codePoint < 0x20                     // JSON standard.
+                            || cp.codePoint < 0x20                  // JSON standard.
                             || ! Character.isDefined(cp.codePoint)
                             || (ckForce && gotMatch(forceEscapeMatcher, cp.i, cp.i+cp.charCount));
 
                     if ( doEscape ){
-                        json.append(cp.getEscapeString());              // escape it.
+                        json.write(cp.getEscapeString());           // escape it.
                     }else{
-                        json.write(cp.getCodePointChars());           // Pass it through -- usual case.
+                        json.write(cp.chars, 0, cp.charCount);      // Pass it through -- usual case.
                     }
                 }
             }
@@ -808,9 +808,9 @@ public class JSONUtil
             if ( cp.esc != null ){
                 buf.append(cp.esc);                     // have valid escape
             }else if ( cp.i > 0 && isValidIdentifierPart(cp.codePoint, cfg) ){
-                buf.append(cp.getCodePointChars());
+                buf.append(cp.chars, 0, cp.charCount);
             }else if ( cp.i == 0 && isValidIdentifierStart(cp.codePoint, cfg) ){
-                buf.append(cp.getCodePointChars());
+                buf.append(cp.chars, 0, cp.charCount);
             }else{
                 buf.append(cp.getEscapeString());       // Bad code point for an identifier.
             }
@@ -1268,9 +1268,7 @@ public class JSONUtil
         private int charCount;
         private int len;
         private int i;
-        private char char0;
-        private char char1;
-        private char[] str1;
+        private char[] chars;
         private boolean haveEscape;
         private boolean useECMA6;
         private boolean useSingleLetterEscapes;
@@ -1287,7 +1285,7 @@ public class JSONUtil
             this.strValue = strValue;
             this.useECMA6 = cfg.isUseECMA6();
             this.useSingleLetterEscapes = useSingleLetterEscapes;
-            str1 = new char[1];
+            chars = new char[2];
             i = 0;
             len = strValue.length();
             charCount = 0;
@@ -1308,15 +1306,17 @@ public class JSONUtil
                 i += charCount;
                 codePoint = strValue.codePointAt(i);
                 charCount = Character.charCount(codePoint);
-                char0 = strValue.charAt(i);
-                char1 = charCount > 1 ? strValue.charAt(i+1) : 0;
+                chars[0] = strValue.charAt(i);
+                if ( charCount > 1 ){
+                    chars[1] = strValue.charAt(i+1);
+                }
                 esc = null;
                 if ( haveEscape && codePoint == '\\' ){
                     // check for escapes.
                     handler.doMatches();
                 }
                 if ( useSingleLetterEscapes && esc == null && codePoint <= '\\' ){
-                    esc = getEscape(char0);     // single letter escapes for JSON.
+                    esc = getEscape(chars[0]);     // single letter escapes for JSON.
                 }
                 return true;
             }else{
@@ -1325,26 +1325,8 @@ public class JSONUtil
         }
 
         /**
-         * Get the current code point in String form.
-         * 
-         * @return the current code point in String form.
-         */
-        private char[] getCodePointChars()
-        {
-            if ( charCount > 1 ){
-                char[] str2 = new char[2];
-                str2[0] = char0;
-                str2[1] = char1;
-                return str2;
-            }else{
-                str1[0] = char0;
-                return str1;
-            }
-        }
-
-        /**
          * Get the escaped version of the current code point.
-         * 
+         *
          * @return the escaped version of the current code point.
          */
         private String getEscapeString()
@@ -1357,9 +1339,9 @@ public class JSONUtil
             }else{
                 // Use normal escape.
                 if ( charCount > 1 ){
-                    return String.format(TWO_CODE_UNIT_FMT, (int)char0, (int)char1);
+                    return String.format(TWO_CODE_UNIT_FMT, (int)chars[0], (int)chars[1]);
                 }else{
-                    return String.format(CODE_UNIT_FMT, (int)char0);
+                    return String.format(CODE_UNIT_FMT, (int)chars[0]);
                 }
             }
         }
@@ -1424,19 +1406,19 @@ public class JSONUtil
                     cp.i += cp.esc.length() - cp.charCount;
                 }else if ( gotMatch(jsEscMatcher, cp.i, min(cp.i+MAX_JS_ESC_LENGTH, cp.len)) ){
                     // Any Javascript escapes that didn't make it through the pass through are not allowed.
-                    String esc = jsEscMatcher.group(1);
-                    cp.codePoint = cp.char0 = getEscapeChar(esc);
-                    cp.i += esc.length() - cp.charCount;
+                    String jsEsc = jsEscMatcher.group(1);
+                    cp.codePoint = cp.chars[0] = getEscapeChar(jsEsc);
+                    cp.i += jsEsc.length() - cp.charCount;
                 }else if ( useECMA5 && gotMatch(codePointMatcher, cp.i, min(cp.i+MAX_CODE_POINT_ESC_LENGTH, cp.len)) ){
                     // only get here if it wasn't passed through => useECMA6 is false
                     // convert it to an inline codepoint or other escape as needed.
                     cp.codePoint = Integer.parseInt(codePointMatcher.group(2),16);
                     if ( cp.codePoint > 0xFFFF ){
                         cp.charCount = 2;
-                        cp.char0 = Character.highSurrogate(cp.codePoint);
-                        cp.char1 = Character.lowSurrogate(cp.codePoint);
+                        cp.chars[0] = Character.highSurrogate(cp.codePoint);
+                        cp.chars[1] = Character.lowSurrogate(cp.codePoint);
                     }else{
-                        cp.char0 = (char)cp.codePoint;
+                        cp.chars[0] = (char)cp.codePoint;
                     }
                     cp.i += codePointMatcher.group(1).length() - cp.charCount;
                 }
