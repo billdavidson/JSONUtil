@@ -15,9 +15,9 @@
  */
 package org.kopitubruk.util.json;
 
-import static java.lang.Math.min;
 import static org.kopitubruk.util.json.JSONUtil.getBundle;
 import static org.kopitubruk.util.json.JSONUtil.getEscapePassThroughPattern;
+import static org.kopitubruk.util.json.JSONUtil.getEscapePassThroughRegionLength;
 import static org.kopitubruk.util.json.JSONUtil.gotMatch;
 import static org.kopitubruk.util.json.JSONUtil.isValidIdentifierPart;
 import static org.kopitubruk.util.json.JSONUtil.isValidIdentifierStart;
@@ -28,6 +28,8 @@ import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.kopitubruk.util.json.JSONUtil.CodePointData;
 
 /**
  * Exception for handling bad Javascript property identifiers for
@@ -82,45 +84,41 @@ public final class BadPropertyNameException extends JSONException
         boolean useSingleLetterEscapes = cfg.isFullJSONIdentifierCodePoints();
         Pattern escapePassThroughPat = getEscapePassThroughPattern(cfg, useSingleLetterEscapes);
         Matcher passThroughMatcher = escapePassThroughPat.matcher(propertyName);
-        int passThroughRegionLength = cfg.isUseECMA6() ? 10 : 6;
+        int passThroughRegionLength = getEscapePassThroughRegionLength(cfg);
 
         /*
          * Find the bad code points.
          */
-        int i = 0;
-        int len = propertyName.length();
         StringBuilder codePointList = new StringBuilder();
-        while ( i < len ){
-            int codePoint = propertyName.codePointAt(i);
-            int charCount= Character.charCount(codePoint);
-            if ( codePoint == '\\' ){
+        CodePointData cp = new CodePointData(propertyName, cfg);
+        while ( cp.next() ){
+            if ( cp.codePoint == '\\' ){
                 // check for valid escapes.
-                if ( gotMatch(passThroughMatcher, i, min(i+passThroughRegionLength, len)) ){
+                if ( gotMatch(passThroughMatcher, cp.i, cp.end(passThroughRegionLength)) ){
                     // Skip the escape.
-                    i += passThroughMatcher.group(1).length() - 1;
+                    cp.i += passThroughMatcher.group(1).length() - cp.charCount;
                 }else{
                     // bad backslash.
-                    badCodePoints.add(codePoint);
-                    if ( i == 0 ){
+                    badCodePoints.add(cp.codePoint);
+                    if ( cp.i == 0 ){
                         badStart = true;
                     }
                 }
-            }else if ( i == 0 && isValidIdentifierStart(codePoint, cfg) ){
+            }else if ( cp.i == 0 && isValidIdentifierStart(cp.codePoint, cfg) ){
                 // OK for start character.
-            }else if ( i > 0 && isValidIdentifierPart(codePoint, cfg) ){
+            }else if ( cp.i > 0 && isValidIdentifierPart(cp.codePoint, cfg) ){
                 // OK.
             }else{
                 // bad character.
-                badCodePoints.add(codePoint);
-                if ( i == 0 ){
+                badCodePoints.add(cp.codePoint);
+                if ( cp.i == 0 ){
                     badStart = true;
                 }
             }
-            if ( i > 0 ){
+            if ( cp.i > 0 ){
                 codePointList.append(' ');
             }
-            codePointList.append(String.format("%04X", codePoint));
-            i += charCount;
+            codePointList.append(String.format("%04X", cp.codePoint));
         }
 
         StringBuilder message = new StringBuilder();
