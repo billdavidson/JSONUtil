@@ -16,6 +16,8 @@
 package org.kopitubruk.util.json;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
 import java.text.DateFormat;
@@ -30,12 +32,13 @@ import java.util.regex.Pattern;
 
 /**
  * This is a JSON parser. It accepts a fairly loose version of JSON. Essentially
- * it tries to allow anything Javascript eval() allows (within reason) so it lets
- * you use single quotes instead of double quotes if you want and all versions of
- * Javascript numbers are allowed. Unquoted identifiers are also permitted. Escapes
- * in strings are converted to their proper characters and all Javascript escapes
- * are permitted.  Identifiers which contain code points which are permitted by
- * the JSON standard but not by the ECMAScript standard must be quoted.
+ * it tries to allow anything Javascript eval() allows (within reason) so it
+ * lets you use single quotes instead of double quotes if you want and all
+ * versions of Javascript numbers are allowed. Unquoted identifiers are also
+ * permitted. Escapes in strings are converted to their proper characters and
+ * all Javascript escapes are permitted. Identifiers which contain code points
+ * which are permitted by the JSON standard but not by the ECMAScript standard
+ * must be quoted.
  * <p>
  * Javascript objects are converted to {@link LinkedHashMap}s with the
  * identifiers being the keys.
@@ -50,19 +53,23 @@ import java.util.regex.Pattern;
  * <p>
  * If the {@link JSONConfig#isEncodeDatesAsObjects()} or
  * {@link JSONConfig#isEncodeDatesAsStrings()} returns true, then strings that
- * look like dates will be converted to {@link Date} objects. By default, parsing
- * formats support ISO 8601 extended format that include data down to seconds.
- * Fractions of seconds and time zone offsets are optional.  Other formats can
- * be added with calls to {@link JSONConfig#addDateParseFormat(DateFormat)} or
- * its variants and passing the config object to the parser. Custom formats that
- * you add will be tried before the default ISO 8601 formats.
+ * look like dates will be converted to {@link Date} objects. By default,
+ * parsing formats support ISO 8601 extended format that include data down to
+ * seconds. Fractions of seconds and time zone offsets are optional. Other
+ * formats can be added with calls to
+ * {@link JSONConfig#addDateParseFormat(DateFormat)} or its variants and passing
+ * the config object to the parser. Custom formats that you add will be tried
+ * before the default ISO 8601 formats.
  * <p>
  * Calls to the new Date(String) constructor from Javascript are converted to
  * {@link Date}s.
  * <p>
  * JSON input can be fed to this class either as a {@link String} or as a
- * {@link Reader} input stream, which may be useful and save memory when reading
- * from files or other streams.
+ * {@link Reader}, which may be useful and save memory when reading from files
+ * or other input sources. If you wish to use an {@link InputStream} instead
+ * then you should wrap it in an {@link InputStreamReader} which is a
+ * {@link Reader} that will convert the bytes from the {@link InputStream} from
+ * bytes to chars using the appropriate character set.
  *
  * @author Bill Davidson
  * @since 1.2
@@ -140,17 +147,6 @@ public class JSONParser
             tokenType = tt;
             value = val;
         }
-
-        /**
-         * Make a token.
-         *
-         * @param tt the token type
-         */
-        Token( TokenType tt )
-        {
-            tokenType = tt;
-            value = null;
-        }
     }
 
     /**
@@ -209,11 +205,10 @@ public class JSONParser
 
         try {
             TokenReader tokens = new TokenReader(json, jcfg);
-            Token token = tokens.nextToken();
-            return parseTokens(token, tokens);
-        }catch ( JSONException e ){
+            return parseTokens(tokens.nextToken(), tokens);
+        }catch ( JSONException|IOException e ){
             throw e;
-        }catch ( ParseException|RuntimeException e ){
+        }catch ( Exception e ){
             throw new JSONParserException(e, jcfg);
         }
     }
@@ -377,12 +372,12 @@ public class JSONParser
 
         static {
             Map<Integer,Token> simpleTokens = new HashMap<>();
-            simpleTokens.put((int)'{', new Token(TokenType.START_OBJECT));
-            simpleTokens.put((int)'}', new Token(TokenType.END_OBJECT));
-            simpleTokens.put((int)'[', new Token(TokenType.START_ARRAY));
-            simpleTokens.put((int)']', new Token(TokenType.END_ARRAY));
-            simpleTokens.put((int)',', new Token(TokenType.COMMA));
-            simpleTokens.put((int)':', new Token(TokenType.COLON));
+            simpleTokens.put((int)'{', new Token(TokenType.START_OBJECT, null));
+            simpleTokens.put((int)'}', new Token(TokenType.END_OBJECT, null));
+            simpleTokens.put((int)'[', new Token(TokenType.START_ARRAY, null));
+            simpleTokens.put((int)']', new Token(TokenType.END_ARRAY, null));
+            simpleTokens.put((int)',', new Token(TokenType.COMMA, null));
+            simpleTokens.put((int)':', new Token(TokenType.COLON, null));
             SIMPLE_TOKENS = new HashMap<>(simpleTokens);
         }
 
@@ -429,9 +424,9 @@ public class JSONParser
             boolean doDateStrings = cfg.isEncodeDatesAsObjects() || cfg.isEncodeDatesAsStrings();
 
             // get to the first non space code point.
-            int codePoint = nextCodePoint(json);
+            int codePoint = nextCodePoint();
             while ( codePoint >= 0 && Character.isSpaceChar(codePoint) ){
-                codePoint = nextCodePoint(json);
+                codePoint = nextCodePoint();
             }
             if ( codePoint < 0 ){
                 return null;                // end of input.
@@ -490,7 +485,7 @@ public class JSONParser
                                 buf.appendCodePoint(codePoint);
                                 escapeCount = 0;
                             }
-                            codePoint = nextCodePoint(json);
+                            codePoint = nextCodePoint();
                             if ( codePoint < 0 ){
                                 // end of input.
                                 break;
@@ -587,7 +582,7 @@ public class JSONParser
          * @return the code point.
          * @throws IOException If there's a problem with I/O.
          */
-        private int nextCodePoint( Reader json ) throws IOException
+        private int nextCodePoint() throws IOException
         {
             int codePoint = json.read();
 
@@ -605,5 +600,5 @@ public class JSONParser
 
             return codePoint;
         }
-    }
+    } // class TokenReader
 }
