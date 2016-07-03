@@ -1309,17 +1309,38 @@ public class TestJSONUtil
         jsonObj.put("d",il);
         Object[] objs = new Object[3];
         objs[0] = null;
-        objs[1] = (JSONAble)(jsonConfig, json) ->
+        objs[1] = new JSONAble()
+                  {
+                      @Override
+                      public void toJSON( JSONConfig jsonConfig, Writer json ) throws BadPropertyNameException, DataStructureLoopException, IOException
                       {
                           JSONConfig cfg = jsonConfig == null ? new JSONConfig() : jsonConfig;
-                          Map<String,Object> stuff = new LinkedHashMap<>();
-                          stuff.put("a", 0);
-                          stuff.put("b", 2);
+                          Map<String,Object> jsonObj = new LinkedHashMap<>();
+                          jsonObj.put("a", 0);
+                          jsonObj.put("b", 2);
                           int[] ar = {1, 2, 3};
-                          stuff.put("x", ar);
+                          jsonObj.put("x", ar);
 
-                          JSONUtil.toJSON(stuff, cfg, json);
-                     };
+                          JSONUtil.toJSON(jsonObj, cfg, json);
+                      }
+
+                      @Override
+                      public String toJSON()
+                      {
+                          return null;
+                      }
+
+                      @Override
+                      public String toJSON( JSONConfig jsonConfig )
+                      {
+                          return null;
+                      }
+
+                      @Override
+                      public void toJSON( Writer json ) throws IOException
+                      {
+                      }
+                  };
         objs[2] = il;
         jsonObj.put("e", objs);
 
