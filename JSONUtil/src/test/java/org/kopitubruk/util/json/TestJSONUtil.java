@@ -1263,7 +1263,7 @@ public class TestJSONUtil
     @Test
     public void testIndent() throws NoSuchMethodException, ScriptException
     {
-        Map<String,Object> jsonObj = new LinkedHashMap<>();
+        Map<String,Object> jsonObj = new LinkedHashMap<String,Object>();
         jsonObj.put("a",1);
         jsonObj.put("b","x");
         String[] ia = {"1","2","3"};
@@ -1278,7 +1278,7 @@ public class TestJSONUtil
                       public void toJSON( JSONConfig jsonConfig, Writer json ) throws BadPropertyNameException, DataStructureLoopException, IOException
                       {
                           JSONConfig cfg = jsonConfig == null ? new JSONConfig() : jsonConfig;
-                          Map<String,Object> jsonObj = new LinkedHashMap<>();
+                          Map<String,Object> jsonObj = new LinkedHashMap<String,Object>();
                           jsonObj.put("a", 0);
                           jsonObj.put("b", 2);
                           int[] ar = {1, 2, 3};
