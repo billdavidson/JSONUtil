@@ -557,6 +557,9 @@ public class JSONUtil
 
                 // make a Javascript object with the keys as the property names.
                 json.write('{');
+                IndentPadding pad = cfg.getPad();
+                String padding = IndentPadding.incPadding(cfg);
+
                 boolean didStart = false;
                 for ( Object key : keys ){
                     if ( didStart ){
@@ -564,6 +567,8 @@ public class JSONUtil
                     }else{
                         didStart = true;
                     }
+                    json.write(padding);
+
                     // apply any escapes and do validation as per the config flags.
                     String propertyName = getPropertyName(key, cfg, propertyNames);
                     boolean doQuote = quoteIdentifier ||
@@ -578,13 +583,22 @@ public class JSONUtil
                     }
                     json.write(':');
                     Object value = isMap ? map.get(key) : bundle.getObject((String)key);
+                    boolean extraIndent = pad != null && isRecursible(value);
+                    if ( extraIndent ){
+                        IndentPadding.incPadding(cfg, json);
+                    }
                     // recurse on the value.
                     appendPropertyValue(value, json, cfg);
+                    if ( extraIndent ){
+                        IndentPadding.decPadding(cfg);
+                    }
                 }
+                IndentPadding.decPadding(cfg, json);
                 json.write('}');
             }else{
                 // make an array.
                 json.write('[');
+                String padding = IndentPadding.incPadding(cfg);
                 boolean didStart = false;
                 if ( propertyValue instanceof Iterable ){
                     Iterable<?> iterable = (Iterable<?>)propertyValue;
@@ -594,6 +608,7 @@ public class JSONUtil
                         }else{
                             didStart = true;
                         }
+                        json.write(padding);
                         // recurse on the value.
                         appendPropertyValue(value, json, cfg);
                     }
@@ -605,6 +620,7 @@ public class JSONUtil
                         }else{
                             didStart = true;
                         }
+                        json.write(padding);
                         // recurse on the value.
                         appendPropertyValue(enumeration.nextElement(), json, cfg);
                     }
@@ -616,10 +632,12 @@ public class JSONUtil
                         if ( i > 0 ){
                             json.write(',');
                         }
+                        json.write(padding);
                         // recurse on the value.
                         appendPropertyValue(Array.get(array, i), json, cfg);
                     }
                 }
+                IndentPadding.decPadding(cfg, json);
                 json.write(']');
             }
         }
@@ -1289,7 +1307,6 @@ public class JSONUtil
 
             // no escaping with this one.
             useSingleLetterEscapes = false;
-            handler = null;
             haveEscape = false;
         }
 

@@ -124,6 +124,8 @@ public class JSONConfig implements Serializable, Cloneable
      */
     private List<DateFormat> dateParseFormats = null;
 
+    private IndentPadding pad = null;
+
     // various flags.  see their setters.
     private boolean validatePropertyNames;
     private boolean detectDataStructureLoops;
@@ -568,6 +570,28 @@ public class JSONConfig implements Serializable, Cloneable
     {
         customDateParseFormats = null;
         dateParseFormats = null;
+    }
+
+    /**
+     * Get the padding object.
+     *
+     * @return the padding object.
+     * @since 1.7
+     */
+    public IndentPadding getPad()
+    {
+        return pad;
+    }
+
+    /**
+     * Set the padding object.
+     *
+     * @param pad the padding object.
+     * @since 1.7
+     */
+    public void setPad( IndentPadding pad )
+    {
+        this.pad = pad;
     }
 
     /**
