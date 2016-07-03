@@ -585,12 +585,12 @@ public class JSONUtil
                     Object value = isMap ? map.get(key) : bundle.getObject((String)key);
                     boolean extraIndent = pad != null && isRecursible(value);
                     if ( extraIndent ){
-                        padding = IndentPadding.incPadding(cfg, json);
+                        IndentPadding.incPadding(cfg, json);
                     }
                     // recurse on the value.
                     appendPropertyValue(value, json, cfg);
                     if ( extraIndent ){
-                        padding = IndentPadding.decPadding(cfg);
+                        IndentPadding.decPadding(cfg);
                     }
                 }
                 IndentPadding.decPadding(cfg, json);
@@ -1307,7 +1307,6 @@ public class JSONUtil
 
             // no escaping with this one.
             useSingleLetterEscapes = false;
-            handler = null;
             haveEscape = false;
         }
 

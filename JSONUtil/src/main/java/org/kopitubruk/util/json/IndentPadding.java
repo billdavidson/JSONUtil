@@ -32,8 +32,6 @@ import java.io.Writer;
  */
 public class IndentPadding
 {
-    private static final String EMPTY_STRING = "";
-
     private int indent = 4;
     private int level = 0;
     private char space = ' ';
@@ -170,7 +168,7 @@ public class IndentPadding
             pad.incrementLevel();
             padding = pad.getPadding();
         }else{
-            padding = EMPTY_STRING;
+            padding = "";
         }
         return padding;
     }
@@ -180,21 +178,15 @@ public class IndentPadding
      *
      * @param cfg The config object.
      * @param json The writer.
-     * @return The padding.
      * @throws IOException if there's an I/O error.
      */
-    public static String incPadding( JSONConfig cfg, Writer json ) throws IOException
+    public static void incPadding( JSONConfig cfg, Writer json ) throws IOException
     {
         IndentPadding pad = cfg.getPad();
-        String padding;
         if ( pad != null ){
             pad.incrementLevel();
-            padding = pad.getPadding();
-            json.write(padding);
-        }else{
-            padding = EMPTY_STRING;
+            json.write(pad.getPadding());
         }
-        return padding;
     }
 
     /**
@@ -217,17 +209,13 @@ public class IndentPadding
      * Decrement the padding and return it.
      *
      * @param cfg The config object.
-     * @return The padding.
      * @throws IOException if there's an I/O error.
      */
-    public static String decPadding( JSONConfig cfg ) throws IOException
+    public static void decPadding( JSONConfig cfg ) throws IOException
     {
         IndentPadding pad = cfg.getPad();
         if ( pad != null ){
             pad.decrementLevel();
-            return pad.getPadding();
-        }else{
-            return EMPTY_STRING;
         }
     }
 }

@@ -1307,7 +1307,7 @@ public class TestJSONUtil
         cfg.setPad(pad);
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
-        System.out.println(json);
+        //System.out.println(json);
     }
 
     /**
