@@ -1255,6 +1255,69 @@ public class TestJSONUtil
     }
 
     /**
+     * Test indenting.
+     *
+     * @throws ScriptException if the JSON doesn't evaluate properly.
+     * @throws NoSuchMethodException If it can't find the Javascript function to use for validation.
+     */
+    @Test
+    public void testIndent() throws NoSuchMethodException, ScriptException
+    {
+        Map<String,Object> jsonObj = new LinkedHashMap<>();
+        jsonObj.put("a",1);
+        jsonObj.put("b","x");
+        String[] ia = {"1","2","3"};
+        List<String> il = Arrays.asList(ia);
+        jsonObj.put("c",ia);
+        jsonObj.put("d",il);
+        Object[] objs = new Object[3];
+        objs[0] = null;
+        objs[1] = new JSONAble()
+                  {
+                      @Override
+                      public void toJSON( JSONConfig jsonConfig, Writer json ) throws BadPropertyNameException, DataStructureLoopException, IOException
+                      {
+                          JSONConfig cfg = jsonConfig == null ? new JSONConfig() : jsonConfig;
+                          Map<String,Object> jsonObj = new LinkedHashMap<>();
+                          jsonObj.put("a", 0);
+                          jsonObj.put("b", 2);
+                          int[] ar = {1, 2, 3};
+                          jsonObj.put("x", ar);
+
+                          JSONUtil.toJSON(jsonObj, cfg, json);
+                      }
+
+                      @Override
+                      public String toJSON()
+                      {
+                          return null;
+                      }
+
+                      @Override
+                      public String toJSON( JSONConfig jsonConfig )
+                      {
+                          return null;
+                      }
+
+                      @Override
+                      public void toJSON( Writer json ) throws IOException
+                      {
+                      }
+                  };
+        objs[2] = il;
+        jsonObj.put("e", objs);
+
+        JSONConfig cfg = new JSONConfig();
+        IndentPadding pad = new IndentPadding();
+        pad.setIndent(1);
+        pad.setSpace('\t');
+        cfg.setPad(pad);
+        String json = JSONUtil.toJSON(jsonObj, cfg);
+        validateJSON(json);
+        //System.out.println(json);
+    }
+
+    /**
      * Return true if the character is defined and not a surrogate.
      *
      * @param codePoint The code point to check.
