@@ -1305,7 +1305,7 @@ public class TestJSONUtil
         cfg.setIndentPadding(new IndentPadding("\t", String.format("%n")));
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
-        System.out.println(json);
+        //System.out.println(json);
     }
 
     /**
