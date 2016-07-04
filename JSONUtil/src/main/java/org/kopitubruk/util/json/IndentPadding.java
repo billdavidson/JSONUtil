@@ -203,7 +203,7 @@ public class IndentPadding implements Cloneable
      * @param cfg The config object.
      * @return The padding.
      */
-    public static String incPadding( JSONConfig cfg )
+    static String incPadding( JSONConfig cfg )
     {
         IndentPadding pad = cfg.getIndentPadding();
         String padding;
@@ -223,7 +223,7 @@ public class IndentPadding implements Cloneable
      * @param json The writer.
      * @throws IOException if there's an I/O error.
      */
-    public static void incPadding( JSONConfig cfg, Writer json ) throws IOException
+    static void incPadding( JSONConfig cfg, Writer json ) throws IOException
     {
         IndentPadding pad = cfg.getIndentPadding();
         if ( pad != null ){
@@ -239,7 +239,7 @@ public class IndentPadding implements Cloneable
      * @param json The writer.
      * @throws IOException if there's an I/O error.
      */
-    public static void decPadding( JSONConfig cfg, Writer json ) throws IOException
+    static void decPadding( JSONConfig cfg, Writer json ) throws IOException
     {
         IndentPadding pad = cfg.getIndentPadding();
         if ( pad != null ){
@@ -254,7 +254,7 @@ public class IndentPadding implements Cloneable
      * @param cfg The config object.
      * @throws IOException if there's an I/O error.
      */
-    public static void decPadding( JSONConfig cfg ) throws IOException
+    static void decPadding( JSONConfig cfg ) throws IOException
     {
         IndentPadding pad = cfg.getIndentPadding();
         if ( pad != null ){
