@@ -31,7 +31,7 @@ import java.io.Writer;
  * If you reuse JSONConfig objects in the same thread, then you should probably
  * call {@link #reset()} before calling JSONUtil's toJSON() methods just to be
  * safe (but not inside {@link JSONAble}s that have a JSONConfig object sent to
- * them).
+ * them and use JSONUtil to generate their JSON).
  *
  * @author Bill Davidson
  * @since 1.7
