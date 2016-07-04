@@ -75,6 +75,7 @@ public class IndentPadding implements Cloneable
      *
      * @see java.lang.Object#clone()
      */
+    @Override
     public IndentPadding clone()
     {
         return new IndentPadding(indent, newLine);
