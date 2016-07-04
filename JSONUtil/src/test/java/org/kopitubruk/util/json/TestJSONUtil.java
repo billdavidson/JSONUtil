@@ -57,6 +57,7 @@ import org.junit.Test;
 //import org.junit.rules.TestRule;
 //import org.junit.rules.TestWatcher;
 //import org.junit.runner.Description;
+
 /**
  * Tests for JSONUtil.  Java 5 does not support a scripting engine so
  * the output cannot be validated against a Javascript engine.
@@ -1115,7 +1116,7 @@ public class TestJSONUtil
         IndentPadding pad = new IndentPadding();
         pad.setIndent(1);
         pad.setSpace('\t');
-        cfg.setPad(pad);
+        cfg.setIndentPadding(pad);
         //String json =
                 JSONUtil.toJSON(jsonObj, cfg);
         //validateJSON(json);

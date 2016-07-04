@@ -24,20 +24,68 @@ import java.io.Writer;
  * show nesting.
  * <p>
  * To use this, create the object and set any parameters you like and call
- * {@link JSONConfig#setPad(IndentPadding)} to add it to your config object and
- * use it when you convert to JSON.
+ * {@link JSONConfig#setIndentPadding(IndentPadding)} to add it to your config
+ * object and use it when you convert to JSON.
+ * <p>
+ * This class is NOT thread safe. Do not reuse this object in different threads.
+ * If you reuse JSONConfig objects in the same thread, then you should probably
+ * call {@link #reset()} before calling JSONUtil's toJSON() methods just to be
+ * safe (but not inside {@link JSONAble}s that have a JSONConfig object sent
+ * to them).
  *
  * @author Bill Davidson
  * @since 1.7
  */
-public class IndentPadding
+public class IndentPadding implements Cloneable
 {
-    private int indent = 4;
-    private int level = 0;
-    private char space = ' ';
-    private String newLine = "\n";
-    private StringBuilder paddingBuf = new StringBuilder();
-    private String padding = null;
+    // config data
+    private int indent;
+    private char space;
+    private String newLine;
+
+    // operating data.
+    private StringBuilder paddingBuf;
+    private String padding;
+    private int level;
+
+    /**
+     * Create an indent padding object.
+     */
+    public IndentPadding()
+    {
+        indent = 4;
+        space = ' ';
+        newLine = "\n";
+
+        reset();
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see java.lang.Object#clone()
+     */
+    public IndentPadding clone()
+    {
+        IndentPadding result = new IndentPadding();
+
+        // copy the config data only.
+        result.indent = indent;
+        result.space = space;
+        result.newLine = newLine;
+
+        return result;
+    }
+
+    /**
+     * Reset this object's operating data.
+     */
+    public void reset()
+    {
+        level = 0;
+        paddingBuf = new StringBuilder();
+        padding = null;
+    }
 
     /**
      * Get the number of space characters to use for each indent level.
@@ -50,9 +98,11 @@ public class IndentPadding
     }
 
     /**
-     * Set the number of space characters to use for each indent level (default 4).
+     * Set the number of space characters to use for each indent level (default
+     * 4).
      *
-     * @param indent The number of space characters to use for each indent level.
+     * @param indent The number of space characters to use for each indent
+     *            level.
      */
     public void setIndent( int indent )
     {
@@ -84,7 +134,8 @@ public class IndentPadding
     }
 
     /**
-     * Increment the level of indent.
+     * Increment the level of indent.  The level is the number
+     * of indents currently being used.
      */
     public void incrementLevel()
     {
@@ -92,7 +143,7 @@ public class IndentPadding
     }
 
     /**
-     * Increment the level of indent.
+     * Decrement the level of indent.
      */
     public void decrementLevel()
     {
@@ -162,7 +213,7 @@ public class IndentPadding
      */
     public static String incPadding( JSONConfig cfg )
     {
-        IndentPadding pad = cfg.getPad();
+        IndentPadding pad = cfg.getIndentPadding();
         String padding;
         if ( pad != null ){
             pad.incrementLevel();
@@ -182,7 +233,7 @@ public class IndentPadding
      */
     public static void incPadding( JSONConfig cfg, Writer json ) throws IOException
     {
-        IndentPadding pad = cfg.getPad();
+        IndentPadding pad = cfg.getIndentPadding();
         if ( pad != null ){
             pad.incrementLevel();
             json.write(pad.getPadding());
@@ -198,7 +249,7 @@ public class IndentPadding
      */
     public static void decPadding( JSONConfig cfg, Writer json ) throws IOException
     {
-        IndentPadding pad = cfg.getPad();
+        IndentPadding pad = cfg.getIndentPadding();
         if ( pad != null ){
             pad.decrementLevel();
             json.write(pad.getPadding());
@@ -213,7 +264,7 @@ public class IndentPadding
      */
     public static void decPadding( JSONConfig cfg ) throws IOException
     {
-        IndentPadding pad = cfg.getPad();
+        IndentPadding pad = cfg.getIndentPadding();
         if ( pad != null ){
             pad.decrementLevel();
         }
