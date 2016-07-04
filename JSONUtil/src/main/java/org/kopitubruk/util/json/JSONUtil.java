@@ -452,6 +452,10 @@ public class JSONUtil
         }catch ( Exception e ){
             // in case the original calling code catches the exception and reuses the JSONConfig.
             jcfg.clearObjStack();
+            IndentPadding pad = jcfg.getIndentPadding();
+            if ( pad != null ){
+                pad.reset();
+            }
             throw e;
         }
     }
@@ -557,7 +561,7 @@ public class JSONUtil
 
                 // make a Javascript object with the keys as the property names.
                 json.write('{');
-                IndentPadding pad = cfg.getPad();
+                boolean havePadding = cfg.getIndentPadding() != null;
                 String padding = IndentPadding.incPadding(cfg);
 
                 boolean didStart = false;
@@ -583,7 +587,7 @@ public class JSONUtil
                     }
                     json.write(':');
                     Object value = isMap ? map.get(key) : bundle.getObject((String)key);
-                    boolean extraIndent = pad != null && isRecursible(value);
+                    boolean extraIndent = havePadding && isRecursible(value);
                     if ( extraIndent ){
                         IndentPadding.incPadding(cfg, json);
                     }
@@ -1300,8 +1304,8 @@ public class JSONUtil
             // stuff that's common to both.
             this.strValue = strValue;
             chars = new char[2];
-            i = 0;
             len = strValue.length();
+            i = 0;
             charCount = 0;
             useECMA6 = cfg.isUseECMA6();
 

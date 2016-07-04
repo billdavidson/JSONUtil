@@ -31,7 +31,6 @@ import java.math.BigInteger;
 import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
-//import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -56,13 +55,15 @@ import javax.script.ScriptException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.BeforeClass;
-//import org.junit.Rule;
 import org.junit.Test;
+
+import jdk.nashorn.api.scripting.ScriptObjectMirror;
+
+//import java.text.SimpleDateFormat;
+//import org.junit.Rule;
 //import org.junit.rules.TestRule;
 //import org.junit.rules.TestWatcher;
 //import org.junit.runner.Description;
-
-import jdk.nashorn.api.scripting.ScriptObjectMirror;
 
 /**
  * Tests for JSONUtil. Most of the produced JSON is put through Java's script
@@ -1304,7 +1305,7 @@ public class TestJSONUtil
         IndentPadding pad = new IndentPadding();
         pad.setIndent(1);
         pad.setSpace('\t');
-        cfg.setPad(pad);
+        cfg.setIndentPadding(pad);
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
         //System.out.println(json);
