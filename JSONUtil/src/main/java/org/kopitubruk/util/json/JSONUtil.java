@@ -350,7 +350,7 @@ public class JSONUtil
      * escaped unless full JSON identifier code points is defined
      * in which case the JSON should not be used with eval().
      */
-    private static final Set<Character> OTHER_ESC_SET;
+    private static final Set<Character> EVAL_ESC_SET;
 
     /**
      * Initialize JSON_ESC_MAP && JAVASCRIPT_ESC_MAP.
@@ -376,10 +376,10 @@ public class JSONUtil
         javascriptEscMap.put("\\v", (char)0xB);
         JAVASCRIPT_ESC_MAP = new HashMap<>(javascriptEscMap);
 
-        Set<Character> otherEscSet = new HashSet<>();
-        otherEscSet.add((char)0x2028);              // line separator
-        otherEscSet.add((char)0x2029);              // paragraph separator
-        OTHER_ESC_SET = new HashSet<>(otherEscSet);
+        Set<Character> evalEscSet = new HashSet<>();
+        evalEscSet.add((char)0x2028);              // line separator
+        evalEscSet.add((char)0x2029);              // paragraph separator
+        EVAL_ESC_SET = new HashSet<>(evalEscSet);
     }
 
     /**
@@ -1241,7 +1241,7 @@ public class JSONUtil
         private boolean haveSlash;
         private boolean useECMA6;
         private boolean useSingleLetterEscapes;
-        private boolean ecmaScriptIdentifiers;
+        private boolean supportEval;
         private boolean escapeNonAscii;
         private boolean escapeSurrogates;
 
@@ -1287,7 +1287,7 @@ public class JSONUtil
             // enable escaping as needed.
             processEscapes = true;
             this.useSingleLetterEscapes = useSingleLetterEscapes;
-            ecmaScriptIdentifiers = ! cfg.isFullJSONIdentifierCodePoints();
+            supportEval = ! cfg.isFullJSONIdentifierCodePoints();
             escapeNonAscii = cfg.isEscapeNonAscii();
             escapeSurrogates = cfg.isEscapeSurrogates();
             handler = new EscapeHandler(this, cfg);
@@ -1366,7 +1366,7 @@ public class JSONUtil
                                  (escapeSurrogates && charCount > 1) ||
                                  codePoint < 0x20 ||
                                  ! Character.isDefined(codePoint) ||
-                                 (ecmaScriptIdentifiers && OTHER_ESC_SET.contains(chars[0]))) ){
+                                 (supportEval && EVAL_ESC_SET.contains(chars[0]))) ){
                 esc = getEscapeString();
             }
         }
