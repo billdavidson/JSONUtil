@@ -697,11 +697,14 @@ public class JSONConfig implements Serializable, Cloneable
      * the ECMAScript standard will cause an error if parsed by Javascript
      * eval().
      *
-     * @param dflt If true, then allow all code points permitted by the JSON standard in identifiers.
+     * @param fullJSONIdentifierCodePoints If true, then allow all code points permitted by the JSON standard in identifiers.
      */
-    public void setFullJSONIdentifierCodePoints( boolean dflt )
+    public void setFullJSONIdentifierCodePoints( boolean fullJSONIdentifierCodePoints )
     {
-        fullJSONIdentifierCodePoints = dflt;
+        this.fullJSONIdentifierCodePoints = fullJSONIdentifierCodePoints;
+        if ( fullJSONIdentifierCodePoints ){
+            quoteIdentifier = true;
+        }
     }
 
     /**
@@ -865,7 +868,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public void setQuoteIdentifier( boolean quoteIdentifier )
     {
-        this.quoteIdentifier = quoteIdentifier;
+        this.quoteIdentifier = fullJSONIdentifierCodePoints || quoteIdentifier;
     }
 
     /**
@@ -938,6 +941,16 @@ public class JSONConfig implements Serializable, Cloneable
         if ( encodeDatesAsObjects ){
             encodeDatesAsStrings = false;
         }
+    }
+
+    /**
+     * Find out if special date formatting is enabled.
+     *
+     * @return true if encodeDatesAsObjects or encodeDatesAsStrings is true.
+     */
+    public boolean isFormatDates()
+    {
+        return encodeDatesAsStrings || encodeDatesAsObjects;
     }
 
     private static final long serialVersionUID = 1L;
