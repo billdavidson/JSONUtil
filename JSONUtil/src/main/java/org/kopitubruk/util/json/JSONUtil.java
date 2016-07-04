@@ -181,16 +181,6 @@ public class JSONUtil
     private static final Pattern OCTAL_NUMBER_PAT = Pattern.compile("^-?0[0-7]+$");
 
     /**
-     * Some characters break lines which breaks quotes.  Recognize them so that they
-     * can be escaped properly.
-     * <ul>
-     *   <li>\p{Zl} - Line Separator</li>
-     *   <li>\p{Zp} - Paragraph Separator</li>
-     * </ul>
-     */
-    private static final Pattern FORCE_ESCAPE_PAT = Pattern.compile("[\\p{Zl}\\p{Zp}]");
-
-    /**
      * Javascript escapes, including those not permitted in JSON.
      */
     private static final Pattern JAVASCRIPT_ESC_PAT =
@@ -356,6 +346,13 @@ public class JSONUtil
     private static final Map<Character,String> JSON_ESC_MAP;
 
     /**
+     * These will break strings in eval() and so they need to be
+     * escaped unless full JSON identifier code points is defined
+     * in which case the JSON should not be used with eval().
+     */
+    private static final Set<Character> OTHER_ESC_SET;
+
+    /**
      * Initialize JSON_ESC_MAP && JAVASCRIPT_ESC_MAP.
      */
     static {
@@ -378,6 +375,11 @@ public class JSONUtil
         javascriptEscMap.put("\\'", '\'');
         javascriptEscMap.put("\\v", (char)0xB);
         JAVASCRIPT_ESC_MAP = new HashMap<>(javascriptEscMap);
+
+        Set<Character> otherEscSet = new HashSet<>();
+        otherEscSet.add((char)0x2028);              // line separator
+        otherEscSet.add((char)0x2029);              // paragraph separator
+        OTHER_ESC_SET = new HashSet<>(otherEscSet);
     }
 
     /**
@@ -688,15 +690,14 @@ public class JSONUtil
         }else if ( propertyValue instanceof Boolean ){
             // boolean values go literal -- no quotes.
             json.write(propertyValue.toString());
-        }else if ( propertyValue instanceof Date && cfg.isEncodeDatesAsObjects() ){
-            // non-standard JSON but should work with Javascript eval().
-            Date date = (Date)propertyValue;
-            json.write("new Date(");
-            writeString(cfg.getDateGenFormat().format(date), json, cfg);
-            json.write(')');
-        }else if ( propertyValue instanceof Date && cfg.isEncodeDatesAsStrings() ){
-            Date date = (Date)propertyValue;
-            writeString(cfg.getDateGenFormat().format(date), json, cfg);
+        }else if ( propertyValue instanceof Date && cfg.isFormatDates() ){
+            if ( cfg.isEncodeDatesAsObjects() ){
+                json.write("new Date(");
+            }
+            writeString(cfg.getDateGenFormat().format((Date)propertyValue), json, cfg);
+            if ( cfg.isEncodeDatesAsObjects() ){
+                json.write(')');
+            }
         }else{
             // Use the toString() method for the value and write it out as a string.
             writeString(propertyValue.toString(), json, cfg);
@@ -717,45 +718,18 @@ public class JSONUtil
             // no quotes.
             json.write(strValue);
         }else{
-            // need to do escapes as required by ECMA JSON spec.
-            boolean escapeNonAscii = cfg.isEscapeNonAscii();
-            boolean escapeSurrogates = cfg.isEscapeSurrogates();
             boolean useSingleLetterEscapes = true;
             if ( cfg.isUnEscapeWherePossible() ){
                 strValue = unEscape(strValue, cfg);
-            }
-
-            // shouldn't use eval() with full JSON id code points.
-            Matcher forceEscapeMatcher = null;
-            boolean ckForce = ! cfg.isFullJSONIdentifierCodePoints();
-            if ( ckForce ){
-                // check for special force escape characters.
-                forceEscapeMatcher = FORCE_ESCAPE_PAT.matcher(strValue);
-                if ( ! forceEscapeMatcher.find() ){
-                    // not in string -- no need to look for them again in the loop.
-                    ckForce = false;
-                    forceEscapeMatcher = null;
-                }
             }
 
             json.write('"');
             CodePointData cp = new CodePointData(strValue, cfg, useSingleLetterEscapes);
             while ( cp.next() ){
                 if ( cp.esc != null ){
-                    json.append(cp.esc);                // valid escape.
+                    json.write(cp.esc);                     // valid escape.
                 }else{
-                    // check if it needs to be escaped.
-                    boolean doEscape = (escapeNonAscii && cp.codePoint > 127)
-                            || (escapeSurrogates && cp.charCount > 1)
-                            || cp.codePoint < 0x20                  // JSON standard.
-                            || ! Character.isDefined(cp.codePoint)
-                            || (ckForce && gotMatch(forceEscapeMatcher, cp.i, cp.i+cp.charCount));
-
-                    if ( doEscape ){
-                        json.write(cp.getEscapeString());           // escape it.
-                    }else{
-                        json.write(cp.chars, 0, cp.charCount);      // Pass it through -- usual case.
-                    }
+                    json.write(cp.chars, 0, cp.charCount);  // Pass it through -- usual case.
                 }
             }
             json.write('"');
@@ -1255,24 +1229,26 @@ public class JSONUtil
     }
 
     /**
-     * Code point data for
-     * {@link JSONUtil#writeString(String,Writer,JSONConfig)} and
-     * {@link JSONUtil#escapeBadIdentifierCodePoints(String,JSONConfig)}. Tracks,
-     * updates and escapes the current code point as needed.
+     * Code point data as code processes a string.  Optionally
+     * handles escaping and some unescaping.
      */
     static class CodePointData
     {
         private String strValue;
         private EscapeHandler handler;
         private int len;
-        private boolean haveEscape;
+        private boolean processEscapes;
+        private boolean haveSlash;
         private boolean useECMA6;
         private boolean useSingleLetterEscapes;
+        private boolean notFullIdent;
+        private boolean escapeNonAscii;
+        private boolean escapeSurrogates;
 
         /**
          * If this is not null after a run of {@link #next()} then it means
-         * that a valid pass through escape has been detected or a single
-         * character escape has been created.
+         * that a valid pass through escape has been detected or an escape
+         * has been created.
          */
         private String esc;
 
@@ -1309,9 +1285,13 @@ public class JSONUtil
             this(strValue, cfg);
 
             // enable escaping as needed.
+            processEscapes = true;
             this.useSingleLetterEscapes = useSingleLetterEscapes;
+            notFullIdent = ! cfg.isFullJSONIdentifierCodePoints();
+            escapeNonAscii = cfg.isEscapeNonAscii();
+            escapeSurrogates = cfg.isEscapeSurrogates();
             handler = new EscapeHandler(this, cfg);
-            if ( ! haveEscape ){
+            if ( ! haveSlash ){
                 handler = null;
             }
         }
@@ -1333,8 +1313,7 @@ public class JSONUtil
             useECMA6 = cfg.isUseECMA6();
 
             // no escaping with this one.
-            useSingleLetterEscapes = false;
-            haveEscape = false;
+            processEscapes = false;
         }
 
         /**
@@ -1361,18 +1340,34 @@ public class JSONUtil
                     chars[1] = strValue.charAt(i+1);
                 }
 
-                // handle escapes as appropriate.
-                esc = null;
-                if ( haveEscape && codePoint == '\\' ){
-                    // check for escapes.
-                    handler.doMatches();
-                }
-                if ( useSingleLetterEscapes && esc == null && codePoint <= '\\' ){
-                    esc = getEscape(chars[0]);     // single letter escapes for JSON.
+                if ( processEscapes ){
+                    doEscapes();
                 }
                 return true;
             }else{
                 return false;
+            }
+        }
+
+        /**
+         * Handle escapes as appropriate.
+         */
+        private void doEscapes()
+        {
+            esc = null;
+            if ( haveSlash && codePoint == '\\' ){
+                handler.doMatches();            // check for escapes.
+            }
+            if ( useSingleLetterEscapes && esc == null && codePoint <= '\\' ){
+                esc = getEscape(chars[0]);      // single letter escapes for JSON.
+            }
+            // any other escapes requested or required.
+            if ( esc == null && ((escapeNonAscii && codePoint > 127)
+                              || (escapeSurrogates && charCount > 1)
+                              || codePoint < 0x20
+                              || ! Character.isDefined(codePoint)
+                              || (notFullIdent && OTHER_ESC_SET.contains(chars[0]))) ){
+                esc = getEscapeString();
             }
         }
 
@@ -1436,7 +1431,7 @@ public class JSONUtil
             {
                 if ( cp.strValue.indexOf('\\') >= 0 ){
                     this.cp = cp;
-                    cp.haveEscape = true;
+                    cp.haveSlash = true;
                     lastBackSlash = cp.strValue.lastIndexOf('\\');
 
                     // set up the pass through matcher.
@@ -1454,7 +1449,7 @@ public class JSONUtil
                         codePointMatcher = CODE_POINT_PAT.matcher(cp.strValue);
                     }
                 }else{
-                    cp.haveEscape = false;
+                    cp.haveSlash = false;
                 }
             }
 
@@ -1488,7 +1483,7 @@ public class JSONUtil
                 }
                 if ( cp.i >= lastBackSlash ){
                     // this handler is no longer needed.
-                    cp.haveEscape = false;
+                    cp.haveSlash = false;
                     cp.handler = null;
                 }
             }
