@@ -1113,10 +1113,7 @@ public class TestJSONUtil
         jsonObj.put("e", objs);
 
         JSONConfig cfg = new JSONConfig();
-        IndentPadding pad = new IndentPadding();
-        pad.setIndent(1);
-        pad.setSpace('\t');
-        cfg.setIndentPadding(pad);
+        cfg.setIndentPadding(new IndentPadding("\t", String.format("%n")));
         //String json =
                 JSONUtil.toJSON(jsonObj, cfg);
         //validateJSON(json);

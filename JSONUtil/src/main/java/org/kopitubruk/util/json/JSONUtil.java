@@ -348,7 +348,7 @@ public class JSONUtil
                           "true", "false", NULL, "undefined", "Infinity", "NaN"));
 
     /**
-     * Map Javascript character escapes to their code points.
+     * Map Javascript character escapes to their characters.
      */
     private static final Map<String,Character> JAVASCRIPT_ESC_MAP;
 
@@ -1300,14 +1300,37 @@ public class JSONUtil
     {
         private String strValue;
         private EscapeHandler handler;
-        private String esc;
-        private char[] chars;
         private int len;
         private boolean haveEscape;
         private boolean useECMA6;
         private boolean useSingleLetterEscapes;
+
+        /**
+         * If this is not null after a run of {@link #next()} then it means
+         * that a valid pass through escape has been detected or a single
+         * character escape has been created.
+         */
+        private String esc;
+
+        /**
+         * This holds the char value(s) for the current code point.  Methods
+         * passing the code point through will use this for write/append.
+         */
+        private char[] chars;
+
+        /**
+         * The index in the string of the current code point.
+         */
         int i;
+
+        /**
+         * The current code point.
+         */
         int codePoint;
+
+        /**
+         * The number of chars used by the current code point in the string.
+         */
         int charCount;
 
         /**
@@ -1351,7 +1374,13 @@ public class JSONUtil
         }
 
         /**
-         * Set up the next codepoint and handle escapes as appropriate.
+         * Set up the next codepoint.
+         * <p>
+         * This initializes the next code point and its char data.
+         * <p>
+         * If escape handling is enabled then it will check for pass through
+         * escapes and unescape illegal escapes and possibly get single
+         * character escapes as appropriate.
          *
          * @return true if there's another code point.
          */
@@ -1396,7 +1425,7 @@ public class JSONUtil
         }
 
         /**
-         * Get the escaped version of the current code point.
+         * Get the Unicode escaped version of the current code point.
          *
          * @return the escaped version of the current code point.
          */
