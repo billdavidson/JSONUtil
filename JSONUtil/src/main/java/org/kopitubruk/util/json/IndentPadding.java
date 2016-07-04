@@ -30,8 +30,8 @@ import java.io.Writer;
  * This class is NOT thread safe. Do not reuse this object in different threads.
  * If you reuse JSONConfig objects in the same thread, then you should probably
  * call {@link #reset()} before calling JSONUtil's toJSON() methods just to be
- * safe (but not inside {@link JSONAble}s that have a JSONConfig object sent
- * to them).
+ * safe (but not inside {@link JSONAble}s that have a JSONConfig object sent to
+ * them).
  *
  * @author Bill Davidson
  * @since 1.7
@@ -39,8 +39,7 @@ import java.io.Writer;
 public class IndentPadding implements Cloneable
 {
     // config data
-    private int indent;
-    private char space;
+    private String indent;
     private String newLine;
 
     // operating data.
@@ -49,13 +48,24 @@ public class IndentPadding implements Cloneable
     private int level;
 
     /**
-     * Create an indent padding object.
+     * Create an indent padding object using four spaces and a standard newline.
      */
     public IndentPadding()
     {
-        indent = 4;
-        space = ' ';
-        newLine = "\n";
+        this("    ", "\n");
+    }
+
+    /**
+     * Create an indent padding object with the given indent and newLine
+     * strings.
+     *
+     * @param indent The indent string to use for one level.
+     * @param newLine The new line string.
+     */
+    public IndentPadding( String indent, String newLine )
+    {
+        this.indent = indent;
+        this.newLine = newLine;
 
         reset();
     }
@@ -67,14 +77,7 @@ public class IndentPadding implements Cloneable
      */
     public IndentPadding clone()
     {
-        IndentPadding result = new IndentPadding();
-
-        // copy the config data only.
-        result.indent = indent;
-        result.space = space;
-        result.newLine = newLine;
-
-        return result;
+        return new IndentPadding(indent, newLine);
     }
 
     /**
@@ -88,54 +91,32 @@ public class IndentPadding implements Cloneable
     }
 
     /**
-     * Get the number of space characters to use for each indent level.
+     * Get the spacing for one indent level.
      *
-     * @return The number of space characters to use for each indent level.
+     * @return the spacing for one indent level.
      */
-    public int getIndent()
+    public String getIndent()
     {
         return indent;
     }
 
     /**
-     * Set the number of space characters to use for each indent level (default
-     * 4).
+     * Set the spacing for one indent level (default is 4 spaces).
      *
-     * @param indent The number of space characters to use for each indent
-     *            level.
+     * @param indent The spacing for one indent level.
      */
-    public void setIndent( int indent )
+    public void setIndent( String indent )
     {
-        this.indent = Math.max(indent, 0);
-    }
-
-    /**
-     * Get the space character for indenting.
-     *
-     * @return the space character for indenting.
-     */
-    public char getSpace()
-    {
-        return space;
-    }
-
-    /**
-     * Set the space character for indenting (default is space).
-     *
-     * @param space The space character for indenting.
-     */
-    public void setSpace( char space )
-    {
-        if ( this.space != space ){
-            this.space = space;
+        if ( !this.indent.equals(indent) ){
+            this.indent = indent;
             paddingBuf.setLength(0);
             padding = null;
         }
     }
 
     /**
-     * Increment the level of indent.  The level is the number
-     * of indents currently being used.
+     * Increment the level of indent. The level is the number of indents
+     * currently being used.
      */
     public void incrementLevel()
     {
@@ -163,7 +144,18 @@ public class IndentPadding implements Cloneable
     }
 
     /**
-     * Set the string to use for a new line (default \n).
+     * <p>
+     * Set the string to use for a new line (default \n). A string is used so
+     * that you can use \r\n or other new line sequences if you like.
+     * <p>
+     * For example, if you wanted a platform specific newLine, you could do
+     * this:
+     * <p>
+     * <code>
+     * <pre>
+     *    setNewLine(String.format("%n"));
+     * </pre>
+     * </code>
      *
      * @param newLine The string to use for a new line (default \n)
      */
@@ -179,7 +171,7 @@ public class IndentPadding implements Cloneable
      */
     public String getPadding()
     {
-        int needLen = level * indent;
+        int needLen = level * indent.length();
         if ( needLen == 0 ){
             paddingBuf.setLength(0);
             if ( padding == null ){
@@ -189,7 +181,7 @@ public class IndentPadding implements Cloneable
             }
             padding = null;
         }
-        ++needLen;
+        needLen += newLine.length();
         if ( padding == null || padding.length() != needLen ){
             if ( paddingBuf.length() == 0 ){
                 paddingBuf.append(newLine);
@@ -198,7 +190,7 @@ public class IndentPadding implements Cloneable
                 paddingBuf.setLength(needLen);
             }
             while ( paddingBuf.length() < needLen ){
-                paddingBuf.append(space);
+                paddingBuf.append(indent);
             }
             padding = paddingBuf.toString();
         }
