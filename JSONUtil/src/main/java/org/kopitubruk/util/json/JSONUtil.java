@@ -1241,7 +1241,7 @@ public class JSONUtil
         private boolean haveSlash;
         private boolean useECMA6;
         private boolean useSingleLetterEscapes;
-        private boolean notFullIdent;
+        private boolean ecmaScriptIdentifiers;
         private boolean escapeNonAscii;
         private boolean escapeSurrogates;
 
@@ -1287,7 +1287,7 @@ public class JSONUtil
             // enable escaping as needed.
             processEscapes = true;
             this.useSingleLetterEscapes = useSingleLetterEscapes;
-            notFullIdent = ! cfg.isFullJSONIdentifierCodePoints();
+            ecmaScriptIdentifiers = ! cfg.isFullJSONIdentifierCodePoints();
             escapeNonAscii = cfg.isEscapeNonAscii();
             escapeSurrogates = cfg.isEscapeSurrogates();
             handler = new EscapeHandler(this, cfg);
@@ -1362,11 +1362,11 @@ public class JSONUtil
                 esc = getEscape(chars[0]);      // single letter escapes for JSON.
             }
             // any other escapes requested or required.
-            if ( esc == null && ((escapeNonAscii && codePoint > 127)
-                              || (escapeSurrogates && charCount > 1)
-                              || codePoint < 0x20
-                              || ! Character.isDefined(codePoint)
-                              || (notFullIdent && OTHER_ESC_SET.contains(chars[0]))) ){
+            if ( esc == null && ((escapeNonAscii && codePoint > 127) ||
+                                 (escapeSurrogates && charCount > 1) ||
+                                 codePoint < 0x20 ||
+                                 ! Character.isDefined(codePoint) ||
+                                 (ecmaScriptIdentifiers && OTHER_ESC_SET.contains(chars[0]))) ){
                 esc = getEscapeString();
             }
         }
