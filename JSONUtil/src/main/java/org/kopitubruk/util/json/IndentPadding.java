@@ -150,12 +150,9 @@ public class IndentPadding implements Cloneable
      * <p>
      * For example, if you wanted a platform specific newLine, you could do
      * this:
-     * <p>
-     * <code>
-     * <pre>
+     * <pre><code>
      *    setNewLine(String.format("%n"));
-     * </pre>
-     * </code>
+     * </code></pre>
      *
      * @param newLine The string to use for a new line (default \n)
      */
