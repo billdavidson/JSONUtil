@@ -1515,8 +1515,7 @@ public class JSONUtil
                     cp.codePoint = Integer.parseInt(codePointMatcher.group(2),16);
                     if ( cp.codePoint > 0xFFFF ){
                         cp.charCount = 2;
-                        int[] cps = new int[1];
-                        cps[0] = cp.codePoint;
+                        int[] cps = { cp.codePoint };
                         String str = new String(cps,0,1);
                         cp.chars[0] = str.charAt(0);
                         cp.chars[1] = str.charAt(1);
