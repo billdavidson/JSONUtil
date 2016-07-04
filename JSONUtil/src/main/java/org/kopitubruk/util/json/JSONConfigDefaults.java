@@ -175,6 +175,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static volatile Map<Class<? extends Number>,NumberFormat> numberFormatMap;
     private static volatile DateFormat dateGenFormat;
     private static volatile List<DateFormat> dateParseFormats;
+    private static IndentPadding indentPadding = null;
+
 
     // stored for deregistration on unload.
     private static ObjectName mBeanName = null;
@@ -356,6 +358,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             numberFormatMap = null;
             dateGenFormat = null;
             dateParseFormats = null;
+            indentPadding = null;
         }
     }
 
@@ -437,6 +440,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         cfg.setUseECMA6(useECMA6);
         cfg.setAllowReservedWordsInIdentifiers(allowReservedWordsInIdentifiers);
         cfg.setEncodeDatesAsObjects(encodeDatesAsObjects);
+
+        // indent padding, if any.
+        if ( indentPadding == null ){
+            cfg.setIndentPadding(indentPadding);
+        }else{
+            cfg.setIndentPadding(indentPadding.clone());
+        }
     }
 
     /**
@@ -844,6 +854,28 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         synchronized ( this.getClass() ){
             dateParseFormats = null;
         }
+    }
+
+    /**
+     * Get the default indent padding object.
+     *
+     * @return the padding object.
+     * @since 1.7
+     */
+    public static synchronized IndentPadding getIndentPadding()
+    {
+        return indentPadding;
+    }
+
+    /**
+     * Set the padding object.
+     *
+     * @param indentPadding the default indent padding object.
+     * @since 1.7
+     */
+    public static synchronized void setIndentPadding( IndentPadding indentPadding )
+    {
+        JSONConfigDefaults.indentPadding = indentPadding;
     }
 
     /**

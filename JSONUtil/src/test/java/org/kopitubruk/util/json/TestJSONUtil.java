@@ -63,6 +63,7 @@ import org.junit.Test;
 //import org.junit.rules.TestRule;
 //import org.junit.rules.TestWatcher;
 //import org.junit.runner.Description;
+
 /**
  * Tests for JSONUtil. Most of the produced JSON is put through Java's script
  * engine so that it will be tested that it parses without error. In most cases,
@@ -1311,7 +1312,7 @@ public class TestJSONUtil
         IndentPadding pad = new IndentPadding();
         pad.setIndent(1);
         pad.setSpace('\t');
-        cfg.setPad(pad);
+        cfg.setIndentPadding(pad);
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
         //System.out.println(json);

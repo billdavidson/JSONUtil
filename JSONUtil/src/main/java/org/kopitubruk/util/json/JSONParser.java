@@ -15,8 +15,9 @@
  */
 package org.kopitubruk.util.json;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
@@ -65,11 +66,10 @@ import java.util.regex.Pattern;
  * {@link Date}s.
  * <p>
  * JSON input can be fed to this class either as a {@link String} or as a
- * {@link Reader}, which may be useful and save memory when reading from files
- * or other input sources. If you wish to use an {@link InputStream} instead
- * then you should wrap it in an {@link InputStreamReader} which is a
- * {@link Reader} that will convert the bytes from the {@link InputStream} from
- * bytes to chars using the appropriate character set.
+ * and object that extends {@link Reader}, which may be useful and save memory
+ * when reading from files or other input sources.  Common objects that extend
+ * {@link Reader} include {@link InputStreamReader}, {@link FileReader} and
+ * {@link BufferedReader}.
  *
  * @author Bill Davidson
  * @since 1.2
@@ -79,36 +79,37 @@ public class JSONParser
     /**
      * Recognize literals
      */
-    private static final Pattern LITERAL_PAT = Pattern.compile("(null|true|false)\\b");
+    private static final Pattern LITERAL_PAT = Pattern.compile("^(null|true|false)$");
 
     /**
      * Recognize octal
      */
-    private static final Pattern OCTAL_PAT = Pattern.compile("0[0-7]*\\b");
+    private static final Pattern OCTAL_PAT = Pattern.compile("^0[0-7]*$");
 
     /**
-     * Recognize unquoted id's
+     * Recognize unquoted id's.  They must conform to the ECMAScript 6 standard.
+     * Id's which do not conform must be quoted.
      */
     private static final Pattern UNQUOTED_ID_PAT =
-            Pattern.compile("((?:[_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})" +
-                             "(?:[_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*)\\b");
+            Pattern.compile("^((?:[_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})" +
+                              "(?:[_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*)$");
 
     /**
      * Recognize Javascript floating point.
      */
     private static final Pattern JAVASCRIPT_FLOATING_POINT_PAT =
-            Pattern.compile("((?:[-+]?(?:(?:\\d+\\.\\d+|\\.\\d+)(?:[eE][-+]?\\d+)?|Infinity))|NaN)([,\\s}\\]]|$)");
+            Pattern.compile("^((?:[-+]?(?:(?:\\d+\\.\\d+|\\.\\d+)(?:[eE][-+]?\\d+)?|Infinity))|NaN)$");
 
     /**
      * Recognize Javascript integers.
      */
     private static final Pattern JAVASCRIPT_INTEGER_PAT =
-            Pattern.compile("([-+]?(?:\\d+|0x[\\da-fA-F]+))\\b");
+            Pattern.compile("^([-+]?(?:\\d+|0x[\\da-fA-F]+))$");
 
     /**
      * Recognize an embedded new Date().
      */
-    private static final Pattern NEW_DATE_PAT = Pattern.compile("(new\\s+Date\\s*\\(\\s*('[^']+'|\"[^\"]+\")\\s*\\))");
+    private static final Pattern NEW_DATE_PAT = Pattern.compile("^(new\\s+Date\\s*\\(\\s*('[^']+'|\"[^\"]+\")\\s*\\))$");
 
     /**
      * Used to convert time zones because Java 6 doesn't support ISO 8601 time zones.
@@ -529,27 +530,27 @@ public class JSONParser
 
                     // check for new Date(), numbers, literals and unquoted ids.
                     Matcher matcher = NEW_DATE_PAT.matcher(str);
-                    if ( matcher.find() && matcher.start() == 0 ){
+                    if ( matcher.matches() ){
                         String qs = matcher.group(2);
                         return new Token(TokenType.DATE, qs.substring(1, qs.length()-1));
                     }
                     matcher = JAVASCRIPT_FLOATING_POINT_PAT.matcher(str);
-                    if ( matcher.find() && matcher.start() == 0 ){
+                    if ( matcher.matches() ){
                         String number = matcher.group(1);
                         return new Token(TokenType.FLOATING_POINT_NUMBER, number);
                     }
                     matcher = JAVASCRIPT_INTEGER_PAT.matcher(str);
-                    if ( matcher.find() && matcher.start() == 0 ){
+                    if ( matcher.matches() ){
                         String number = matcher.group(1);
                         return new Token(TokenType.INTEGER_NUMBER, number);
                     }
                     matcher = LITERAL_PAT.matcher(str);
-                    if ( matcher.find() && matcher.start() == 0 ){
+                    if ( matcher.matches() ){
                         String literal = matcher.group(1);
                         return new Token(TokenType.LITERAL, literal);
                     }
                     matcher = UNQUOTED_ID_PAT.matcher(str);
-                    if ( matcher.find() && matcher.start() == 0 ){
+                    if ( matcher.matches() ){
                         String id = matcher.group(1);
                         return new Token(TokenType.UNQUOTED_ID, id);
                     }
