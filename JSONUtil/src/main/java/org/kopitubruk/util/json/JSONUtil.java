@@ -347,13 +347,13 @@ public class JSONUtil
 
     /**
      * These will break strings in eval() and so they need to be
-     * escaped unless full JSON identifier code points is defined
+     * escaped unless full JSON identifier code points is enabled
      * in which case the JSON should not be used with eval().
      */
     private static final Set<Character> EVAL_ESC_SET;
 
     /**
-     * Initialize JSON_ESC_MAP && JAVASCRIPT_ESC_MAP.
+     * Initialize JSON_ESC_MAP, JAVASCRIPT_ESC_MAP and EVAL_ESC_SET.
      */
     static {
         Map<Character,String> jsonEscMap = new HashMap<>();
@@ -454,10 +454,7 @@ public class JSONUtil
         }catch ( Exception e ){
             // in case the original calling code catches the exception and reuses the JSONConfig.
             jcfg.clearObjStack();
-            IndentPadding pad = jcfg.getIndentPadding();
-            if ( pad != null ){
-                pad.reset();
-            }
+            IndentPadding.reset(jcfg);
             throw e;
         }
     }
@@ -839,12 +836,10 @@ public class JSONUtil
                     String esc = passThroughMatcher.group(1);
                     cp.i += esc.length() - cp.charCount;
                 }else{
-                    // bad escape.
-                    return true;
+                    return true;                    // bad escape.
                 }
                 if ( cp.i >= lastBackSlash ){
-                    // don't need this anymore.
-                    passThroughMatcher = null;
+                    passThroughMatcher = null;      // don't need this anymore.
                 }
             }else if ( cp.i > 0 && isValidIdentifierPart(cp.codePoint, cfg) ){
                 // OK
@@ -1023,7 +1018,7 @@ public class JSONUtil
                     buf.appendCodePoint(Integer.parseInt(codePointMatcher.group(2),16));
                     cp.i += codePointMatcher.group(1).length() - cp.charCount;
                 }else{
-                    // have '\' but nothing looks like a valid escape, just pass it through.
+                    // have '\' but nothing looks like a valid escape; just pass it through.
                     buf.append(cp.chars, 0, cp.charCount);
                 }
                 if ( cp.i >= lastBackSlash ){
@@ -1033,8 +1028,7 @@ public class JSONUtil
                     codePointMatcher = null;
                 }
             }else{
-                // not an escape.
-                buf.append(cp.chars, 0, cp.charCount);
+                buf.append(cp.chars, 0, cp.charCount);          // not an escape.
             }
         }
         return buf.toString();
@@ -1118,9 +1112,7 @@ public class JSONUtil
     static boolean isValidIdentifierStart( int codePoint, JSONConfig cfg )
     {
         if ( cfg.isFullJSONIdentifierCodePoints() ){
-            return codePoint >= ' '
-                   && Character.isDefined(codePoint)
-                   && ! (codePoint <= '\\' && JSON_ESC_MAP.containsKey((char)codePoint));
+            return isValidIdentifierPart(codePoint, cfg);
         }else{
             return codePoint == '_' || codePoint == '$' ||
                     (cfg.isUseECMA6() ? Character.isUnicodeIdentifierStart(codePoint)
@@ -1140,9 +1132,9 @@ public class JSONUtil
     static boolean isValidIdentifierPart( int codePoint, JSONConfig cfg )
     {
         if ( cfg.isFullJSONIdentifierCodePoints() ){
-            return codePoint >= ' '
-                   && Character.isDefined(codePoint)
-                   && ! (codePoint <= '\\' && JSON_ESC_MAP.containsKey((char)codePoint));
+            return codePoint >= ' ' &&
+                    Character.isDefined(codePoint) &&
+                    ! (codePoint <= '\\' && JSON_ESC_MAP.containsKey((char)codePoint));
         }else{
             return cfg.isUseECMA6() ? Character.isUnicodeIdentifierPart(codePoint)
                                     : (isValidIdentifierStart(codePoint, cfg) ||
@@ -1372,18 +1364,6 @@ public class JSONUtil
         }
 
         /**
-         * Get the region end point for the given region length at
-         * the current position.
-         *
-         * @param regionLength the length of the desired region.
-         * @return The end point.
-         */
-        int end( int regionLength )
-        {
-            return Math.min(i+regionLength, len);
-        }
-
-        /**
          * Get the Unicode escaped version of the current code point.
          *
          * @return the escaped version of the current code point.
@@ -1403,6 +1383,18 @@ public class JSONUtil
                     return String.format("\\u%04X", (int)chars[0]);
                 }
             }
+        }
+
+        /**
+         * Get the region end point for the given region length at
+         * the current position.
+         *
+         * @param regionLength the length of the desired region.
+         * @return The end point.
+         */
+        int end( int regionLength )
+        {
+            return Math.min(i+regionLength, len);
         }
 
         /**
@@ -1469,8 +1461,11 @@ public class JSONUtil
                     cp.codePoint = cp.chars[0] = getEscapeChar(jsEsc);
                     cp.i += jsEsc.length() - cp.charCount;
                 }else if ( useECMA5 && gotMatch(codePointMatcher, cp.i, cp.end(MAX_CODE_POINT_ESC_LENGTH)) ){
-                    // only get here if it wasn't passed through => useECMA6 is false
-                    // convert it to an inline codepoint or other escape as needed.
+                    /*
+                     * Only get here if it wasn't passed through => useECMA6 is
+                     * false.  Convert it to an inline codepoint.  Maybe something
+                     * later will escape it legally.
+                     */
                     cp.codePoint = Integer.parseInt(codePointMatcher.group(2),16);
                     if ( cp.codePoint > 0xFFFF ){
                         cp.charCount = 2;
