@@ -31,5 +31,3 @@ use.
 [Comments (Disqus)](http://kopitubruk.org/JSONUtil/#comments)
 
 [Report Issues](https://github.com/billdavidson/JSONUtil/issues)
-
-[What's in store for 1.7](https://github.com/billdavidson/JSONUtil/wiki/What's-in-store-for-1.7)
