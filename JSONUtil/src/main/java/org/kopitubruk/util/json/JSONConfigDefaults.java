@@ -66,10 +66,12 @@ import static org.kopitubruk.util.json.JNDIUtil.getBoolean;
  * <p>
  * Example for Tomcat, assuming your app is named "MyApp", and your host
  * is named "host", put this into your
- * <code>$CATALINA_BASE/conf/Catalina/<i>host</i>/MyApp.xml</code> file in order to
- * disable property name validation:
+ * <code>$CATALINA_BASE/conf/Catalina/<i>host</i>/MyApp.xml</code> file in
+ * order to disable property name validation and enable using full JSON
+ * identifier code points by default:
  * <pre>{@code <Context path="/MyApp">
  *   <Environment name="org/kopitubruk/util/json/validatePropertyNames" type="java.lang.Boolean" value="false" override="false" />
+ *   <Environment name="org/kopitubruk/util/json/fullJSONIdentifierCodePoints" type="java.lang.Boolean" value="true" override="false" />
  * </Context>}</pre>
  * <p>
  * These are the names and their normal defaults if you don't change them.
@@ -995,7 +997,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void setFullJSONIdentifierCodePoints( boolean dflt )
     {
-        fullJSONIdentifierCodePoints = dflt;
+        synchronized ( this.getClass() ){
+            fullJSONIdentifierCodePoints = dflt;
+            if ( fullJSONIdentifierCodePoints ){
+                quoteIdentifier = true;
+            }
+        }
     }
 
     /**
@@ -1181,7 +1188,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public void setQuoteIdentifier( boolean dflt )
     {
         synchronized ( this.getClass() ){
-            quoteIdentifier = dflt;
+            quoteIdentifier = fullJSONIdentifierCodePoints || dflt;
         }
     }
 

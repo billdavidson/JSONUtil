@@ -160,6 +160,8 @@ public class IndentPadding implements Cloneable
     public void setNewLine( String newLine )
     {
         this.newLine = newLine;
+        paddingBuf.setLength(0);
+        padding = null;
     }
 
     /**
@@ -257,6 +259,19 @@ public class IndentPadding implements Cloneable
         IndentPadding pad = cfg.getIndentPadding();
         if ( pad != null ){
             pad.decrementLevel();
+        }
+    }
+
+    /**
+     * If the given config object has a padding object, then reset it.
+     *
+     * @param cfg The config object.
+     */
+    static void reset( JSONConfig cfg )
+    {
+        IndentPadding pad = cfg.getIndentPadding();
+        if ( pad != null ){
+            pad.reset();
         }
     }
 }
