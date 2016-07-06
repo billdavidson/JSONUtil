@@ -11,6 +11,7 @@ by setting system properties on the java command line.
 * Recursive traversal of Maps, Iterables, Enumerations, arrays and ResourceBundles
 * Data structure loop detection
 * Property name validation (can use ECMAScript or JSON rules)
+* Output to String or java.io.Writer
 * JSON parsing to Java objects from Strings or java.io.Reader
 * Options to fix certain types of bad data.
 * Several different escaping options.
