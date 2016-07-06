@@ -29,6 +29,7 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -587,14 +588,9 @@ public class JSONUtil
                     json.write(':');
                     Object value = isMap ? map.get(key) : bundle.getObject((String)key);
                     boolean extraIndent = havePadding && isRecursible(value);
-                    if ( extraIndent ){
-                        IndentPadding.incPadding(cfg, json);
-                    }
-                    // recurse on the value.
-                    appendPropertyValue(value, json, cfg);
-                    if ( extraIndent ){
-                        IndentPadding.decPadding(cfg);
-                    }
+                    IndentPadding.incPadding(cfg, json, extraIndent);
+                    appendPropertyValue(value, json, cfg);                    // recurse on the value.
+                    IndentPadding.incPadding(cfg, json, extraIndent);
                 }
                 IndentPadding.decPadding(cfg, json);
                 json.write('}');
@@ -602,43 +598,16 @@ public class JSONUtil
                 // make an array.
                 json.write('[');
                 IndentPadding.incPadding(cfg);
+                ArrayData ad = new ArrayData(propertyValue);
                 boolean didStart = false;
-                if ( propertyValue instanceof Iterable ){
-                    Iterable<?> iterable = (Iterable<?>)propertyValue;
-                    for ( Object value : iterable ){
-                        if ( didStart ){
-                            json.write(',');
-                        }else{
-                            didStart = true;
-                        }
-                        IndentPadding.writePadding(cfg, json);
-                        // recurse on the value.
-                        appendPropertyValue(value, json, cfg);
+                while ( ad.hasNext() ){
+                    if ( didStart ){
+                        json.write(',');
+                    }else{
+                        didStart = true;
                     }
-                }else if ( propertyValue instanceof Enumeration ){
-                    Enumeration<?> enumeration = (Enumeration<?>)propertyValue;
-                    while ( enumeration.hasMoreElements() ){
-                        if ( didStart ){
-                            json.write(',');
-                        }else{
-                            didStart = true;
-                        }
-                        IndentPadding.writePadding(cfg, json);
-                        // recurse on the value.
-                        appendPropertyValue(enumeration.nextElement(), json, cfg);
-                    }
-                }else{
-                    // propertyValue.getClass().isArray() == true
-                    Object array = propertyValue;
-                    // Don't know the type of the array so can't cast it.  Use reflection.
-                    for ( int i = 0, len = Array.getLength(array); i < len; i++ ){
-                        if ( i > 0 ){
-                            json.write(',');
-                        }
-                        IndentPadding.writePadding(cfg, json);
-                        // recurse on the value.
-                        appendPropertyValue(Array.get(array, i), json, cfg);
-                    }
+                    IndentPadding.writePadding(cfg, json);
+                    appendPropertyValue(ad.next(), json, cfg);
                 }
                 IndentPadding.decPadding(cfg, json);
                 json.write(']');
@@ -1222,6 +1191,88 @@ public class JSONUtil
      */
     private JSONUtil()
     {
+    }
+
+    /**
+     * Private class to iterate over the different types that can produce a
+     * Javascript array. Created because the array code was too redundant.
+     */
+    private static class ArrayData
+    {
+        private ArrayType arrayType;
+        private Iterator<?> iterator;
+        private Enumeration<?> enumeration;
+        private Object array;
+        private int i, len;
+
+        /**
+         * FLag the type.
+         */
+        private enum ArrayType
+        {
+            ITERABLE,
+            ENUMERATION,
+            ARRAY
+        }
+
+        /**
+         * Create an ArrayData.  Input must be an Iterable, Enumeration
+         * or array.
+         *
+         * @param obj The source object for the array to be created.
+         */
+        private ArrayData( Object obj )
+        {
+            if ( obj instanceof Iterable ){
+                iterator = ((Iterable<?>)obj).iterator();
+                arrayType = ArrayType.ITERABLE;
+            }else if ( obj instanceof Enumeration ){
+                enumeration = (Enumeration<?>)obj;
+                arrayType = ArrayType.ENUMERATION;
+            }else{
+                // Don't know type of array, so can't
+                // cast it or use Arrays.asList().
+                // Use reflection.
+                array = obj;
+                i = 0;
+                len = Array.getLength(array);
+                arrayType = ArrayType.ARRAY;
+            }
+        }
+
+        /**
+         * Return true if this object has more elements.
+         *
+         * @return true if this object has more elements.
+         */
+        private boolean hasNext()
+        {
+            switch ( arrayType ){
+                case ITERABLE:
+                    return iterator.hasNext();
+                case ENUMERATION:
+                    return enumeration.hasMoreElements();
+                default:
+                    return i < len;
+            }
+        }
+
+        /**
+         * Return the next element from this object.
+         *
+         * @return the next element from this object.
+         */
+        private Object next()
+        {
+            switch ( arrayType ){
+                case ITERABLE:
+                    return iterator.next();
+                case ENUMERATION:
+                    return enumeration.nextElement();
+                default:
+                    return Array.get(array, i++);
+            }
+        }
     }
 
     /**
