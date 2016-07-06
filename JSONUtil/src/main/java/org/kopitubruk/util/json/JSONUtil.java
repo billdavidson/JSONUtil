@@ -757,9 +757,13 @@ public class JSONUtil
          */
 
         // handle escaping options.
-        propertyName = escapeNonAscii(propertyName, cfg);
-        propertyName = escapeSurrogates(propertyName, cfg);
-        propertyName = escapeBadIdentifierCodePoints(propertyName, cfg);
+        if ( cfg.isEscapeBadIdentifierCodePoints() ){
+            propertyName = escapeBadIdentifierCodePoints(propertyName, cfg);
+        }else if ( cfg.isEscapeNonAscii() ){
+            propertyName = escapeNonAscii(propertyName, cfg);
+        }else if ( cfg.isEscapeSurrogates() ){
+            propertyName = escapeSurrogates(propertyName, cfg);
+        }
 
         // handle validation.
         if ( cfg.isValidatePropertyNames() ){
@@ -784,7 +788,7 @@ public class JSONUtil
      */
     private static String escapeBadIdentifierCodePoints( String propertyName, JSONConfig cfg )
     {
-        if ( ! cfg.isEscapeBadIdentifierCodePoints() || ! hasBadIdentifierCodePoints(propertyName, cfg) ){
+        if ( ! hasBadIdentifierCodePoints(propertyName, cfg) ){
             return propertyName;
         }
 
@@ -908,7 +912,7 @@ public class JSONUtil
      */
     private static String escapeSurrogates( String str, JSONConfig cfg )
     {
-        if ( ! cfg.isEscapeSurrogates() || ! hasSurrogates(str) ){
+        if ( ! hasSurrogates(str) ){
             return str;
         }
 
@@ -949,7 +953,7 @@ public class JSONUtil
      */
     private static String escapeNonAscii( String str, JSONConfig cfg )
     {
-        if ( ! cfg.isEscapeNonAscii() || ! hasNonAscii(str) ){
+        if ( ! hasNonAscii(str) ){
             return str;
         }
 
