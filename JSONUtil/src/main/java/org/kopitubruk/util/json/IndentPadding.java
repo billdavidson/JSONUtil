@@ -198,26 +198,35 @@ public class IndentPadding implements Cloneable
     }
 
     /**
-     * Increment the padding and return it if applicable.
+     * Write the padding,
      *
      * @param cfg The config object.
-     * @return The padding.
+     * @param json The writer.
+     * @throws IOException if there's an I/O error.
      */
-    static String incPadding( JSONConfig cfg )
+    static void writePadding( JSONConfig cfg, Writer json ) throws IOException
     {
         IndentPadding pad = cfg.getIndentPadding();
-        String padding;
         if ( pad != null ){
-            pad.incrementLevel();
-            padding = pad.getPadding();
-        }else{
-            padding = "";
+            json.write(pad.getPadding());
         }
-        return padding;
     }
 
     /**
-     * Increment the padding, write it out and return it if applicable.
+     * Increment the padding.
+     *
+     * @param cfg The config object.
+     */
+    static void incPadding( JSONConfig cfg )
+    {
+        IndentPadding pad = cfg.getIndentPadding();
+        if ( pad != null ){
+            pad.incrementLevel();
+        }
+    }
+
+    /**
+     * Increment the padding and write it out.
      *
      * @param cfg The config object.
      * @param json The writer.
