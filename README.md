@@ -13,8 +13,9 @@ by setting system properties on the java command line.
 * Property name validation (can use ECMAScript or JSON rules)
 * Output to String or java.io.Writer
 * JSON parsing to Java objects from Strings or java.io.Reader
-* Options to fix certain types of bad data.
-* Several different escaping options.
+* Options to fix certain types of bad data
+* Several different escaping options
+* Option to format dates on output and handle different formats when parsing
 * Automatic unescaping and possible reescaping of Javascript escapes which are illegal for JSON
 * ECMAScript 6 code point escapes are supported for reading and optionally for writing
 * The default values for most configuration options can be changed.
