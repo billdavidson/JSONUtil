@@ -15,10 +15,10 @@
  */
 package org.kopitubruk.util.json;
 
+import static org.kopitubruk.util.json.CodePointData.getEscapePassThroughPattern;
+import static org.kopitubruk.util.json.CodePointData.getEscapePassThroughRegionLength;
+import static org.kopitubruk.util.json.CodePointData.gotMatch;
 import static org.kopitubruk.util.json.JSONUtil.getBundle;
-import static org.kopitubruk.util.json.JSONUtil.getEscapePassThroughPattern;
-import static org.kopitubruk.util.json.JSONUtil.getEscapePassThroughRegionLength;
-import static org.kopitubruk.util.json.JSONUtil.gotMatch;
 import static org.kopitubruk.util.json.JSONUtil.isValidIdentifierPart;
 import static org.kopitubruk.util.json.JSONUtil.isValidIdentifierStart;
 
@@ -28,8 +28,6 @@ import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.kopitubruk.util.json.JSONUtil.CodePointData;
 
 /**
  * Exception for handling bad Javascript property identifiers for
@@ -92,33 +90,33 @@ public final class BadPropertyNameException extends JSONException
         StringBuilder codePointList = new StringBuilder();
         CodePointData cp = new CodePointData(propertyName, cfg);
         while ( cp.next() ){
-            if ( cp.codePoint == '\\' ){
+            if ( cp.getCodePoint() == '\\' ){
                 // check for valid escapes.
-                if ( gotMatch(passThroughMatcher, cp.i, cp.end(passThroughRegionLength)) ){
+                if ( gotMatch(passThroughMatcher, cp.getIndex(), cp.end(passThroughRegionLength)) ){
                     // Skip the escape.
-                    cp.i += passThroughMatcher.group(1).length() - cp.charCount;
+                    cp.setIndex(passThroughMatcher.group(1).length() - cp.getCharCount());
                 }else{
                     // bad backslash.
-                    badCodePoints.add(cp.codePoint);
-                    if ( cp.i == 0 ){
+                    badCodePoints.add(cp.getCodePoint());
+                    if ( cp.getIndex() == 0 ){
                         badStart = true;
                     }
                 }
-            }else if ( cp.i == 0 && isValidIdentifierStart(cp.codePoint, cfg) ){
+            }else if ( cp.getIndex() == 0 && isValidIdentifierStart(cp.getCodePoint(), cfg) ){
                 // OK for start character.
-            }else if ( cp.i > 0 && isValidIdentifierPart(cp.codePoint, cfg) ){
+            }else if ( cp.getIndex() > 0 && isValidIdentifierPart(cp.getCodePoint(), cfg) ){
                 // OK.
             }else{
                 // bad character.
-                badCodePoints.add(cp.codePoint);
-                if ( cp.i == 0 ){
+                badCodePoints.add(cp.getCodePoint());
+                if ( cp.getIndex() == 0 ){
                     badStart = true;
                 }
             }
-            if ( cp.i > 0 ){
+            if ( cp.getIndex() > 0 ){
                 codePointList.append(' ');
             }
-            codePointList.append(String.format("%04X", cp.codePoint));
+            codePointList.append(String.format("%04X", cp.getCodePoint()));
         }
 
         StringBuilder message = new StringBuilder();
