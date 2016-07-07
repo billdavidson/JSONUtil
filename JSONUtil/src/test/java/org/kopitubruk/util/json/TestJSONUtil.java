@@ -591,7 +591,7 @@ public class TestJSONUtil
             jsonObj.clear();
             jsonObj.put("x", String.format("a\\%o", i));
             jsonObj.put("y", String.format("a\\x%02X", i));
-            String result = JSONUtil.getEscape((char)i);
+            String result = CodePointData.getEscape((char)i);
             if ( result == null ){
                 result = i < 0x20 ? String.format("\\u%04X", i) : String.format("%c", (char)i);
             }
@@ -788,7 +788,7 @@ public class TestJSONUtil
             json = JSONUtil.toJSON(jsonObj, cfg);
             validateJSON(json);
 
-            String r = JSONUtil.getEscape((char)i);
+            String r = CodePointData.getEscape((char)i);
             if ( r == null ){
                 r = JSONUtil.isValidIdentifierPart(i, cfg) ? String.format("%c", (char)i) : String.format("\\u%04X", i);
             }

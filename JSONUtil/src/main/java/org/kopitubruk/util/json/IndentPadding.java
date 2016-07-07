@@ -70,6 +70,9 @@ public class IndentPadding implements Cloneable
         reset();
     }
 
+    // http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.kopitubruk.util%22%20AND%20a%3A%22JSONUtil%22
+    // http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22org.kopitubruk.util%22%20AND%20a%3A%22JSONUtil%22
+
     /*
      * (non-Javadoc)
      *
