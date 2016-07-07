@@ -70,6 +70,9 @@ public class IndentPadding implements Cloneable
         reset();
     }
 
+    // http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.kopitubruk.util%22%20AND%20a%3A%22JSONUtil%22
+    // http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22org.kopitubruk.util%22%20AND%20a%3A%22JSONUtil%22
+
     /*
      * (non-Javadoc)
      *
@@ -198,26 +201,35 @@ public class IndentPadding implements Cloneable
     }
 
     /**
-     * Increment the padding and return it if applicable.
+     * Write the padding,
      *
      * @param cfg The config object.
-     * @return The padding.
+     * @param json The writer.
+     * @throws IOException if there's an I/O error.
      */
-    static String incPadding( JSONConfig cfg )
+    static void writePadding( JSONConfig cfg, Writer json ) throws IOException
     {
         IndentPadding pad = cfg.getIndentPadding();
-        String padding;
         if ( pad != null ){
-            pad.incrementLevel();
-            padding = pad.getPadding();
-        }else{
-            padding = "";
+            json.write(pad.getPadding());
         }
-        return padding;
     }
 
     /**
-     * Increment the padding, write it out and return it if applicable.
+     * Increment the padding.
+     *
+     * @param cfg The config object.
+     */
+    static void incPadding( JSONConfig cfg )
+    {
+        IndentPadding pad = cfg.getIndentPadding();
+        if ( pad != null ){
+            pad.incrementLevel();
+        }
+    }
+
+    /**
+     * Increment the padding and write it out.
      *
      * @param cfg The config object.
      * @param json The writer.
@@ -229,6 +241,21 @@ public class IndentPadding implements Cloneable
         if ( pad != null ){
             pad.incrementLevel();
             json.write(pad.getPadding());
+        }
+    }
+
+    /**
+     * Increment padding and write padding if option is true.
+     *
+     * @param cfg The config object.
+     * @param json The writer.
+     * @param option flag that controls whether to do the operation or not.
+     * @throws IOException if there's an I/O error.
+     */
+    static void incPadding( JSONConfig cfg, Writer json, boolean option ) throws IOException
+    {
+        if ( option ){
+            incPadding(cfg, json);
         }
     }
 
