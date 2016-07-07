@@ -221,7 +221,8 @@ class CodePointData
     }
 
     /**
-     * Get the chars that represent the current code point.
+     * Get the index within the string for the current code point.
+     *
      * @return The index of the current code point.
      */
     int getIndex()
@@ -229,6 +230,11 @@ class CodePointData
         return index;
     }
 
+    /**
+     * Set the current index within the string for this CodePointData.
+     *
+     * @param i The desired index.
+     */
     void setIndex( int i )
     {
         index = i;
