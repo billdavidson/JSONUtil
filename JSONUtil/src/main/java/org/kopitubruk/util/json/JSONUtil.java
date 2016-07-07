@@ -18,7 +18,6 @@ package org.kopitubruk.util.json;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
-import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.FieldPosition;
@@ -27,16 +26,13 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -181,45 +177,6 @@ public class JSONUtil
     private static final Pattern OCTAL_NUMBER_PAT = Pattern.compile("^-?0[0-7]+$");
 
     /**
-     * Javascript escapes, including those not permitted in JSON.
-     */
-    private static final Pattern JAVASCRIPT_ESC_PAT =
-            Pattern.compile("(\\\\([bfnrtv\\\\/'\"]|(x\\p{XDigit}{2})|([0-3]?[0-7]{1,2})))");
-
-    /**
-     * Parse a Unicode code unit escape.
-     */
-    private static final Pattern CODE_UNIT_PAT = Pattern.compile("(\\\\u(\\p{XDigit}{4}))");
-
-    /**
-     * Parse an ECMAScript 6 Unicode code point escaoe.
-     */
-    private static final Pattern CODE_POINT_PAT = Pattern.compile("(\\\\u\\{(\\p{XDigit}+)\\})");
-
-    /**
-     * Escapes to pass through for ECMA5 when escaping bad identifier code points.
-     */
-    private static final Pattern JSON5_ESCAPE_PASS_THROUGH_PAT =
-            Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\[bfnrt\\\\/\"])");
-
-    /**
-     * Escapes to pass through for ECMA6 when escaping bad identifier code points.
-     */
-    private static final Pattern JSON6_ESCAPE_PASS_THROUGH_PAT =
-            Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\}|\\\\[bfnrt\\\\/\"])");
-
-    /**
-     * Escapes to pass through for ECMA5 when escaping bad identifier code points.
-     */
-    private static final Pattern ECMA5_ESCAPE_PASS_THROUGH_PAT = CODE_UNIT_PAT;
-
-    /**
-     * Escapes to pass through for ECMA6 when escaping bad identifier code points.
-     */
-    private static final Pattern ECMA6_ESCAPE_PASS_THROUGH_PAT =
-            Pattern.compile("(\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})");
-
-    /**
      * <p>
      *   Regular expression which should cover all valid Javascript property
      *   names. Notice the \p{x} notation, which uses
@@ -297,21 +254,6 @@ public class JSONUtil
             Pattern.compile("^([^\u0000-\u001F\\p{Cn}\"/\\\\]|\\\\[bfnrt\\\\/\"]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})+$");
 
     /**
-     * Maximum length of a ECMAScript 6 code point escape.
-     */
-    private static final int MAX_CODE_POINT_ESC_LENGTH = 10;
-
-    /**
-     * Exact length of a code unit escape.
-     */
-    private static final int CODE_UNIT_ESC_LENGTH = 6;
-
-    /**
-     * Maximum length of other Javascript escapes (octal or hex).
-     */
-    private static final int MAX_JS_ESC_LENGTH = 4;
-
-    /**
      * This is the set of reserved words from ECMAScript 6. It's a bad practice
      * to use these as property names and not permitted by the JSON standard.
      * They will work as property names with Javascript eval() but not with a
@@ -334,53 +276,6 @@ public class JSONUtil
                           "await",
                                     /* literals */
                           "true", "false", NULL, "undefined", "Infinity", "NaN"));
-
-    /**
-     * Map Javascript character escapes to their characters.
-     */
-    private static final Map<String,Character> JAVASCRIPT_ESC_MAP;
-
-    /**
-     * Map characters to JSON character escapes.
-     */
-    private static final Map<Character,String> JSON_ESC_MAP;
-
-    /**
-     * These will break strings in eval() and so they need to be
-     * escaped unless full JSON identifier code points is enabled
-     * in which case the JSON should not be used with eval().
-     */
-    private static final Set<Character> EVAL_ESC_SET;
-
-    /**
-     * Initialize JSON_ESC_MAP, JAVASCRIPT_ESC_MAP and EVAL_ESC_SET.
-     */
-    static {
-        Map<Character,String> jsonEscMap = new HashMap<>();
-        jsonEscMap.put('"', "\\\"");
-        jsonEscMap.put('/', "\\/");
-        jsonEscMap.put('\b', "\\b");
-        jsonEscMap.put('\f', "\\f");
-        jsonEscMap.put('\n', "\\n");
-        jsonEscMap.put('\r', "\\r");
-        jsonEscMap.put('\t', "\\t");
-        jsonEscMap.put('\\', "\\\\");
-        JSON_ESC_MAP = new HashMap<>(jsonEscMap);
-
-        Map<String,Character> javascriptEscMap = new HashMap<>();
-        for ( Entry<Character,String> entry : JSON_ESC_MAP.entrySet() ){
-            javascriptEscMap.put(entry.getValue(), entry.getKey());
-        }
-        // these two are valid in Javascript but not JSON.
-        javascriptEscMap.put("\\'", '\'');
-        javascriptEscMap.put("\\v", (char)0xB);
-        JAVASCRIPT_ESC_MAP = new HashMap<>(javascriptEscMap);
-
-        Set<Character> evalEscSet = new HashSet<>();
-        evalEscSet.add((char)0x2028);              // line separator
-        evalEscSet.add((char)0x2029);              // paragraph separator
-        EVAL_ESC_SET = new HashSet<>(evalEscSet);
-    }
 
     /**
      * Convert an object to JSON and return it as a {@link String}. All options
@@ -561,7 +456,7 @@ public class JSONUtil
                 // make a Javascript object with the keys as the property names.
                 json.write('{');
                 boolean havePadding = cfg.getIndentPadding() != null;
-                String padding = IndentPadding.incPadding(cfg);
+                IndentPadding.incPadding(cfg);
 
                 boolean didStart = false;
                 for ( Object key : keys ){
@@ -570,7 +465,7 @@ public class JSONUtil
                     }else{
                         didStart = true;
                     }
-                    json.write(padding);
+                    IndentPadding.writePadding(cfg, json);
 
                     // apply any escapes and do validation as per the config flags.
                     String propertyName = getPropertyName(key, cfg, propertyNames);
@@ -587,58 +482,26 @@ public class JSONUtil
                     json.write(':');
                     Object value = isMap ? map.get(key) : bundle.getObject((String)key);
                     boolean extraIndent = havePadding && isRecursible(value);
-                    if ( extraIndent ){
-                        IndentPadding.incPadding(cfg, json);
-                    }
-                    // recurse on the value.
-                    appendPropertyValue(value, json, cfg);
-                    if ( extraIndent ){
-                        IndentPadding.decPadding(cfg);
-                    }
+                    IndentPadding.incPadding(cfg, json, extraIndent);
+                    appendPropertyValue(value, json, cfg);                    // recurse on the value.
+                    IndentPadding.incPadding(cfg, json, extraIndent);
                 }
                 IndentPadding.decPadding(cfg, json);
                 json.write('}');
             }else{
                 // make an array.
                 json.write('[');
-                String padding = IndentPadding.incPadding(cfg);
+                IndentPadding.incPadding(cfg);
+                ArrayData ad = new ArrayData(propertyValue);
                 boolean didStart = false;
-                if ( propertyValue instanceof Iterable ){
-                    Iterable<?> iterable = (Iterable<?>)propertyValue;
-                    for ( Object value : iterable ){
-                        if ( didStart ){
-                            json.write(',');
-                        }else{
-                            didStart = true;
-                        }
-                        json.write(padding);
-                        // recurse on the value.
-                        appendPropertyValue(value, json, cfg);
+                while ( ad.hasNext() ){
+                    if ( didStart ){
+                        json.write(',');
+                    }else{
+                        didStart = true;
                     }
-                }else if ( propertyValue instanceof Enumeration ){
-                    Enumeration<?> enumeration = (Enumeration<?>)propertyValue;
-                    while ( enumeration.hasMoreElements() ){
-                        if ( didStart ){
-                            json.write(',');
-                        }else{
-                            didStart = true;
-                        }
-                        json.write(padding);
-                        // recurse on the value.
-                        appendPropertyValue(enumeration.nextElement(), json, cfg);
-                    }
-                }else{
-                    // propertyValue.getClass().isArray() == true
-                    Object array = propertyValue;
-                    // Don't know the type of the array so can't cast it.  Use reflection.
-                    for ( int i = 0, len = Array.getLength(array); i < len; i++ ){
-                        if ( i > 0 ){
-                            json.write(',');
-                        }
-                        json.write(padding);
-                        // recurse on the value.
-                        appendPropertyValue(Array.get(array, i), json, cfg);
-                    }
+                    IndentPadding.writePadding(cfg, json);
+                    appendPropertyValue(ad.next(), json, cfg);              // recurse on the value.
                 }
                 IndentPadding.decPadding(cfg, json);
                 json.write(']');
@@ -717,16 +580,16 @@ public class JSONUtil
         }else{
             boolean useSingleLetterEscapes = true;
             if ( cfg.isUnEscapeWherePossible() ){
-                strValue = unEscape(strValue, cfg);
+                strValue = CodePointData.unEscape(strValue, cfg);
             }
 
             json.write('"');
             CodePointData cp = new CodePointData(strValue, cfg, useSingleLetterEscapes);
             while ( cp.next() ){
-                if ( cp.esc != null ){
-                    json.write(cp.esc);                     // valid escape.
+                if ( cp.getEsc() != null ){
+                    json.write(cp.getEsc());                     // valid escape.
                 }else{
-                    json.write(cp.chars, 0, cp.charCount);  // Pass it through -- usual case.
+                    json.write(cp.getChars(), 0, cp.getCharCount());  // Pass it through -- usual case.
                 }
             }
             json.write('"');
@@ -757,9 +620,13 @@ public class JSONUtil
          */
 
         // handle escaping options.
-        propertyName = escapeNonAscii(propertyName, cfg);
-        propertyName = escapeSurrogates(propertyName, cfg);
-        propertyName = escapeBadIdentifierCodePoints(propertyName, cfg);
+        if ( cfg.isEscapeBadIdentifierCodePoints() ){
+            propertyName = escapeBadIdentifierCodePoints(propertyName, cfg);
+        }else if ( cfg.isEscapeNonAscii() ){
+            propertyName = escapeNonAscii(propertyName, cfg);
+        }else if ( cfg.isEscapeSurrogates() ){
+            propertyName = escapeSurrogates(propertyName, cfg);
+        }
 
         // handle validation.
         if ( cfg.isValidatePropertyNames() ){
@@ -784,21 +651,17 @@ public class JSONUtil
      */
     private static String escapeBadIdentifierCodePoints( String propertyName, JSONConfig cfg )
     {
-        if ( ! cfg.isEscapeBadIdentifierCodePoints() || ! hasBadIdentifierCodePoints(propertyName, cfg) ){
-            return propertyName;
-        }
-
-        StringBuilder buf = new StringBuilder();
+        StringBuilder buf = new StringBuilder(propertyName.length());
         boolean useSingleLetterEscapes = cfg.isFullJSONIdentifierCodePoints();
 
         CodePointData cp = new CodePointData(propertyName, cfg, useSingleLetterEscapes);
         while ( cp.next() ){
-            if ( cp.esc != null ){
-                buf.append(cp.esc);                     // have valid escape
-            }else if ( cp.i > 0 && isValidIdentifierPart(cp.codePoint, cfg) ){
-                buf.append(cp.chars, 0, cp.charCount);
-            }else if ( cp.i == 0 && isValidIdentifierStart(cp.codePoint, cfg) ){
-                buf.append(cp.chars, 0, cp.charCount);
+            if ( cp.getEsc() != null ){
+                buf.append(cp.getEsc());                     // have valid escape
+            }else if ( cp.getIndex() > 0 && isValidIdentifierPart(cp.getCodePoint(), cfg) ){
+                buf.append(cp.getChars(), 0, cp.getCharCount());
+            }else if ( cp.getIndex() == 0 && isValidIdentifierStart(cp.getCodePoint(), cfg) ){
+                buf.append(cp.getChars(), 0, cp.getCharCount());
             }else{
                 buf.append(cp.getEscapeString());       // Bad code point for an identifier.
             }
@@ -808,95 +671,24 @@ public class JSONUtil
     }
 
     /**
-     * Return true of if the given input contains bad identifier code points.
+     * Escape non-ascii if the config object requires it.
      *
-     * @param propertyName the input string.
-     * @return true if the input string contains bad identifier code points. Otherwise false.
+     * @param str The input string.
+     * @param cfg The config object for flags.
+     * @return The escaped string.
      */
-    private static boolean hasBadIdentifierCodePoints( String propertyName, JSONConfig cfg )
+    private static String escapeNonAscii( String str, JSONConfig cfg )
     {
-        Matcher passThroughMatcher = null;
-        int lastBackSlash = -1;
-        int passThroughRegionLength = 0;
-        if ( propertyName.indexOf('\\') >= 0 ){
-            // only create matcher if there are escapes.
-            boolean useSingleLetterEscapes = cfg.isFullJSONIdentifierCodePoints();
-            Pattern escapePassThroughPat = getEscapePassThroughPattern(cfg, useSingleLetterEscapes);
-            passThroughMatcher = escapePassThroughPat.matcher(propertyName);
-            lastBackSlash = propertyName.lastIndexOf('\\');
-            passThroughRegionLength = getEscapePassThroughRegionLength(cfg);
-        }
-
-        CodePointData cp = new CodePointData(propertyName, cfg);
+        StringBuilder buf = new StringBuilder(str.length());
+        CodePointData cp = new CodePointData(str, cfg);
         while ( cp.next() ){
-            if ( cp.codePoint == '\\' ){
-                // check for escapes to pass through.
-                if ( gotMatch(passThroughMatcher, cp.i, cp.end(passThroughRegionLength)) ){
-                    // It's a valid escape.  Pass it through.
-                    String esc = passThroughMatcher.group(1);
-                    cp.i += esc.length() - cp.charCount;
-                }else{
-                    return true;                    // bad escape.
-                }
-                if ( cp.i >= lastBackSlash ){
-                    passThroughMatcher = null;      // don't need this anymore.
-                }
-            }else if ( cp.i > 0 && isValidIdentifierPart(cp.codePoint, cfg) ){
-                // OK
-            }else if ( cp.i == 0 && isValidIdentifierStart(cp.codePoint, cfg) ){
-                // OK
+            if ( cp.getCodePoint() > 127 ){
+                buf.append(cp.getEscapeString());
             }else{
-                // Bad code point for an identifier.
-                return true;
+                buf.append(cp.getChars()[0]);
             }
         }
-        return false;
-    }
-
-    /**
-     * Get the escape pass through pattern for identifiers or strings.
-     *
-     * @param cfg A configuration object to determine which pattern to use.
-     * @param useSingleLetterEscapes If true, then use a pattern that allows JSON single letter escapes.
-     * @return The escape pass through pattern.
-     */
-    static Pattern getEscapePassThroughPattern( JSONConfig cfg, boolean useSingleLetterEscapes )
-    {
-        Pattern escapePassThroughPat;
-
-        if ( useSingleLetterEscapes || cfg.isFullJSONIdentifierCodePoints() ){
-            // JSON standard allows most string escapes in identifiers.
-            escapePassThroughPat = cfg.isUseECMA6() ? JSON6_ESCAPE_PASS_THROUGH_PAT
-                                                    : JSON5_ESCAPE_PASS_THROUGH_PAT;
-        }else{
-            // ECMAScript only allows Unicode escapes in identifiers.
-            escapePassThroughPat = cfg.isUseECMA6() ? ECMA6_ESCAPE_PASS_THROUGH_PAT
-                                                    : ECMA5_ESCAPE_PASS_THROUGH_PAT;
-        }
-
-        return escapePassThroughPat;
-    }
-
-    /**
-     * Get the maximum region length of an escape pass through.
-     *
-     * @param cfg the config object.
-     * @return the maximum region length.
-     */
-    static int getEscapePassThroughRegionLength( JSONConfig cfg )
-    {
-        return cfg.isUseECMA6() ? MAX_CODE_POINT_ESC_LENGTH : CODE_UNIT_ESC_LENGTH;
-    }
-
-    /**
-     * Return true if the input looks like a valid JSON number.
-     *
-     * @param numericString the string.
-     * @return true if the string can be treated as a number in JSON.
-     */
-    private static boolean isValidJSONNumber( String numericString )
-    {
-        return JSON_NUMBER_PAT.matcher(numericString).matches() && ! OCTAL_NUMBER_PAT.matcher(numericString).matches();
+        return buf.toString();
     }
 
     /**
@@ -908,17 +700,13 @@ public class JSONUtil
      */
     private static String escapeSurrogates( String str, JSONConfig cfg )
     {
-        if ( ! cfg.isEscapeSurrogates() || ! hasSurrogates(str) ){
-            return str;
-        }
-
-        StringBuilder buf = new StringBuilder();
+        StringBuilder buf = new StringBuilder(str.length());
         CodePointData cp = new CodePointData(str, cfg);
         while ( cp.next() ){
-            if ( cp.charCount > 1 ){
+            if ( cp.getCharCount() > 1 ){
                 buf.append(cp.getEscapeString());
             }else{
-                buf.append(cp.chars[0]);
+                buf.append(cp.getChars()[0]);
             }
         }
         return buf.toString();
@@ -941,130 +729,14 @@ public class JSONUtil
     }
 
     /**
-     * Escape non-ascii if the config object requires it.
+     * Return true if the input looks like a valid JSON number.
      *
-     * @param str The input string.
-     * @param cfg The config object for flags.
-     * @return The escaped string.
+     * @param numericString the string.
+     * @return true if the string can be treated as a number in JSON.
      */
-    private static String escapeNonAscii( String str, JSONConfig cfg )
+    private static boolean isValidJSONNumber( String numericString )
     {
-        if ( ! cfg.isEscapeNonAscii() || ! hasNonAscii(str) ){
-            return str;
-        }
-
-        StringBuilder buf = new StringBuilder();
-        CodePointData cp = new CodePointData(str, cfg);
-        while ( cp.next() ){
-            if ( cp.codePoint > 127 ){
-                buf.append(cp.getEscapeString());
-            }else{
-                buf.append(cp.chars[0]);
-            }
-        }
-        return buf.toString();
-    }
-
-    /**
-     * Return true of if the given input contains non-ASCII characters.
-     *
-     * @param str the input string.
-     * @return true if the input string contains non-ASCII characters. Otherwise false.
-     */
-    private static boolean hasNonAscii( String str )
-    {
-        for ( int i = 0, len = str.length(); i < len; i++ ){
-            if ( str.charAt(i) > 127 ){
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Undo escapes in input strings before formatting a string. This will get
-     * rid of octal escapes and hex escapes and any unnecessary escapes. If the
-     * characters still need to be escaped, then they will be re-escaped by the
-     * caller.
-     *
-     * @param strValue Input string.
-     * @param cfg The config object for flags.
-     * @return Unescaped string.
-     */
-    static String unEscape( String strValue, JSONConfig cfg )
-    {
-        if ( strValue.indexOf('\\') < 0 ){
-            // nothing to do.
-            return strValue;
-        }
-
-        Matcher jsEscMatcher = JAVASCRIPT_ESC_PAT.matcher(strValue);
-        Matcher codeUnitMatcher = CODE_UNIT_PAT.matcher(strValue);
-        Matcher codePointMatcher = CODE_POINT_PAT.matcher(strValue);
-
-        int lastBackSlash = strValue.lastIndexOf('\\');
-        StringBuilder buf = new StringBuilder();
-        CodePointData cp = new CodePointData(strValue, cfg);
-        while ( cp.next() ){
-            if ( cp.codePoint == '\\' ){
-                if ( gotMatch(jsEscMatcher, cp.i, cp.end(MAX_JS_ESC_LENGTH)) ){
-                    String esc = jsEscMatcher.group(1);
-                    buf.append(getEscapeChar(esc));
-                    cp.i += esc.length() - cp.charCount;
-                }else if ( gotMatch(codeUnitMatcher, cp.i, cp.end(CODE_UNIT_ESC_LENGTH)) ){
-                    buf.append((char)Integer.parseInt(codeUnitMatcher.group(2),16));
-                    cp.i += codeUnitMatcher.group(1).length() - cp.charCount;
-                }else if ( gotMatch(codePointMatcher, cp.i, cp.end(MAX_CODE_POINT_ESC_LENGTH)) ){
-                    buf.appendCodePoint(Integer.parseInt(codePointMatcher.group(2),16));
-                    cp.i += codePointMatcher.group(1).length() - cp.charCount;
-                }else{
-                    // have '\' but nothing looks like a valid escape; just pass it through.
-                    buf.append(cp.chars, 0, cp.charCount);
-                }
-                if ( cp.i >= lastBackSlash ){
-                    // don't need these anymore.
-                    jsEscMatcher = null;
-                    codeUnitMatcher = null;
-                    codePointMatcher = null;
-                }
-            }else{
-                buf.append(cp.chars, 0, cp.charCount);          // not an escape.
-            }
-        }
-        return buf.toString();
-    }
-
-    /**
-     * Take a string containing a Javascript character escape and return its
-     * char value.
-     *
-     * @param esc A string containing a Javascript hex, octal or single character escape.
-     * @return The char represented by the given escape.
-     */
-    private static char getEscapeChar( String esc )
-    {
-        char result;
-
-        char c = esc.charAt(1);
-        if ( c == 'x' ){
-            result = (char)Integer.parseInt(esc.substring(2), 16); // hex escape
-        }else if ( Character.isDigit(c) ){
-            result = (char)Integer.parseInt(esc.substring(1), 8);  // octal escape
-        }else{
-            result = JAVASCRIPT_ESC_MAP.get(esc);                  // other character escape
-        }
-        return result;
-    }
-
-    /**
-     * Return the JSON character escape for the given char or null if there isn't one.
-     *
-     * @param c The char to be escaped.
-     * @return The escape if there is one.
-     */
-    static String getEscape( char c )
-    {
-        return JSON_ESC_MAP.get(c);
+        return JSON_NUMBER_PAT.matcher(numericString).matches() && ! OCTAL_NUMBER_PAT.matcher(numericString).matches();
     }
 
     /**
@@ -1134,7 +806,7 @@ public class JSONUtil
         if ( cfg.isFullJSONIdentifierCodePoints() ){
             return codePoint >= ' ' &&
                     Character.isDefined(codePoint) &&
-                    ! (codePoint <= '\\' && JSON_ESC_MAP.containsKey((char)codePoint));
+                    ! (codePoint <= '\\' && CodePointData.haveJsonEsc((char)codePoint));
         }else{
             return cfg.isUseECMA6() ? Character.isUnicodeIdentifierPart(codePoint)
                                     : (isValidIdentifierStart(codePoint, cfg) ||
@@ -1197,291 +869,9 @@ public class JSONUtil
     }
 
     /**
-     * Shorthand to apply a region to a matcher and find out if the desired
-     * pattern is in that spot. Using limited regions limits the overhead of
-     * using {@link Matcher#find()} which could otherwise be considerable for
-     * long strings.
-     *
-     * @param matcher The matcher.
-     * @param start The start of the region.
-     * @param end The end of the region.
-     * @return true if there is a match at the start of the region.
-     */
-    static boolean gotMatch( Matcher matcher, int start, int end )
-    {
-        matcher.region(start, end);
-        return matcher.find() && matcher.start() == start;
-    }
-
-    /**
      * Constructor is private because this class should never be instantiated.
      */
     private JSONUtil()
     {
     }
-
-    /**
-     * Code point data as code processes a string.  Optionally
-     * handles escaping and some unescaping.
-     */
-    static class CodePointData
-    {
-        private String strValue;
-        private EscapeHandler handler;
-        private int len;
-        private boolean processEscapes;
-        private boolean haveSlash;
-        private boolean useECMA6;
-        private boolean useSingleLetterEscapes;
-        private boolean supportEval;
-        private boolean escapeNonAscii;
-        private boolean escapeSurrogates;
-
-        /**
-         * If this is not null after a run of {@link #next()} then it means
-         * that a valid pass through escape has been detected or an escape
-         * has been created.
-         */
-        private String esc;
-
-        /**
-         * This holds the char value(s) for the current code point.  Methods
-         * passing the code point through will use this for write/append.
-         */
-        private char[] chars;
-
-        /**
-         * The index in the string of the current code point.
-         */
-        int i;
-
-        /**
-         * The current code point.
-         */
-        int codePoint;
-
-        /**
-         * The number of chars used by the current code point in the string.
-         */
-        int charCount;
-
-        /**
-         * Make a CodePointData that handles embedded escapes appropriately.
-         *
-         * @param strValue The string that will be analyzed.
-         * @param cfg the config object.
-         * @param useSingleLetterEscapes Use single letter escapes permitted by JSON.
-         */
-        private CodePointData( String strValue, JSONConfig cfg, boolean useSingleLetterEscapes )
-        {
-            this(strValue, cfg);
-
-            // enable escaping as needed.
-            processEscapes = true;
-            this.useSingleLetterEscapes = useSingleLetterEscapes;
-            supportEval = ! cfg.isFullJSONIdentifierCodePoints();
-            escapeNonAscii = cfg.isEscapeNonAscii();
-            escapeSurrogates = cfg.isEscapeSurrogates();
-            handler = new EscapeHandler(this, cfg);
-            if ( ! haveSlash ){
-                handler = null;
-            }
-        }
-
-        /**
-         * Make a CodePointData that doesn't do any escaping.
-         *
-         * @param strValue The string that will be analyzed.
-         * @param cfg the config object.
-         */
-        CodePointData( String strValue, JSONConfig cfg )
-        {
-            // stuff that's common to both.
-            this.strValue = strValue;
-            chars = new char[2];
-            len = strValue.length();
-            i = 0;
-            charCount = 0;
-            useECMA6 = cfg.isUseECMA6();
-
-            // no escaping with this one.
-            processEscapes = false;
-        }
-
-        /**
-         * Set up the next codepoint.
-         * <p>
-         * This initializes the next code point and its char data.
-         * <p>
-         * If escape handling is enabled then it will check for pass through
-         * escapes and unescape illegal escapes and possibly get single
-         * character escapes as appropriate.
-         *
-         * @return true if there's another code point.
-         */
-        boolean next()
-        {
-            if ( (i+charCount) < len ){
-                i += charCount;
-
-                // set up code point and char data.
-                codePoint = strValue.codePointAt(i);
-                charCount = Character.charCount(codePoint);
-                chars[0] = strValue.charAt(i);
-                if ( charCount > 1 ){
-                    chars[1] = strValue.charAt(i+1);
-                }
-
-                if ( processEscapes ){
-                    doEscapes();
-                }
-                return true;
-            }else{
-                return false;
-            }
-        }
-
-        /**
-         * Handle escapes as appropriate.
-         */
-        private void doEscapes()
-        {
-            esc = null;
-            if ( haveSlash && codePoint == '\\' ){
-                handler.doMatches();            // check for escapes.
-            }
-            if ( useSingleLetterEscapes && esc == null && codePoint <= '\\' ){
-                esc = getEscape(chars[0]);      // single letter escapes for JSON.
-            }
-            // any other escapes requested or required.
-            if ( esc == null && ((escapeNonAscii && codePoint > 127) ||
-                                 (escapeSurrogates && charCount > 1) ||
-                                 codePoint < 0x20 ||
-                                 ! Character.isDefined(codePoint) ||
-                                 (supportEval && EVAL_ESC_SET.contains(chars[0]))) ){
-                esc = getEscapeString();
-            }
-        }
-
-        /**
-         * Get the Unicode escaped version of the current code point.
-         *
-         * @return the escaped version of the current code point.
-         */
-        private String getEscapeString()
-        {
-            // Bad code point for an identifier.
-            if ( useECMA6 && (codePoint < 0x10 || codePoint > 0xFFFF) ){
-                // Use ECMAScript 6 code point escape.
-                // only very low or very high code points see an advantage.
-                return String.format("\\u{%X}", codePoint);
-            }else{
-                // Use normal escape.
-                if ( charCount > 1 ){
-                    return String.format("\\u%04X\\u%04X", (int)chars[0], (int)chars[1]);
-                }else{
-                    return String.format("\\u%04X", (int)chars[0]);
-                }
-            }
-        }
-
-        /**
-         * Get the region end point for the given region length at
-         * the current position.
-         *
-         * @param regionLength the length of the desired region.
-         * @return The end point.
-         */
-        int end( int regionLength )
-        {
-            return Math.min(i+regionLength, len);
-        }
-
-        /**
-         * Class to encapsulate redundant code for the escape handling for
-         * {@link JSONUtil#writeString(String,Writer,JSONConfig)} and
-         * {@link JSONUtil#escapeBadIdentiferCodePoints(String,JSONConfig)}
-         */
-        private static class EscapeHandler
-        {
-            // various matching variables.
-            private Matcher passThroughMatcher;
-            private Matcher jsEscMatcher;
-            private Matcher codePointMatcher;
-            private CodePointData cp;
-            private int passThroughRegionLength;
-            private int lastBackSlash;
-            private boolean useECMA5;
-
-            /**
-             * Make an EscapeHandler.
-             *
-             * @param cp reference to the CodePointData
-             * @param cfg the config object.
-             */
-            private EscapeHandler( CodePointData cp, JSONConfig cfg )
-            {
-                if ( cp.strValue.indexOf('\\') >= 0 ){
-                    this.cp = cp;
-                    cp.haveSlash = true;
-                    lastBackSlash = cp.strValue.lastIndexOf('\\');
-
-                    // set up the pass through matcher.
-                    Pattern escapePassThroughPat = getEscapePassThroughPattern(cfg, cp.useSingleLetterEscapes);
-                    passThroughMatcher = escapePassThroughPat.matcher(cp.strValue);
-                    passThroughRegionLength = getEscapePassThroughRegionLength(cfg);
-
-                    // set up the javascript character escape matcher.
-                    jsEscMatcher = JAVASCRIPT_ESC_PAT.matcher(cp.strValue);
-
-                    useECMA5 = ! cfg.isUseECMA6();
-                    if ( useECMA5 ){
-                        // set up the ECMAScript 6 code point matcher,
-                        // because those will not be matched by the pass through.
-                        codePointMatcher = CODE_POINT_PAT.matcher(cp.strValue);
-                    }
-                }else{
-                    cp.haveSlash = false;
-                }
-            }
-
-            /**
-             * Do the matching for escapes.
-             */
-            private void doMatches()
-            {
-                // check for escapes.
-                if ( gotMatch(passThroughMatcher, cp.i, cp.end(passThroughRegionLength)) ){
-                    // pass it through unchanged.
-                    cp.esc = passThroughMatcher.group(1);
-                    cp.i += cp.esc.length() - cp.charCount;
-                }else if ( gotMatch(jsEscMatcher, cp.i, cp.end(MAX_JS_ESC_LENGTH)) ){
-                    // Any Javascript escapes that didn't make it through the pass through are not allowed.
-                    String jsEsc = jsEscMatcher.group(1);
-                    cp.codePoint = cp.chars[0] = getEscapeChar(jsEsc);
-                    cp.i += jsEsc.length() - cp.charCount;
-                }else if ( useECMA5 && gotMatch(codePointMatcher, cp.i, cp.end(MAX_CODE_POINT_ESC_LENGTH)) ){
-                    /*
-                     * Only get here if it wasn't passed through => useECMA6 is
-                     * false.  Convert it to an inline codepoint.  Maybe something
-                     * later will escape it legally.
-                     */
-                    cp.codePoint = Integer.parseInt(codePointMatcher.group(2),16);
-                    if ( cp.codePoint > 0xFFFF ){
-                        cp.charCount = 2;
-                        cp.chars[0] = Character.highSurrogate(cp.codePoint);
-                        cp.chars[1] = Character.lowSurrogate(cp.codePoint);
-                    }else{
-                        cp.chars[0] = (char)cp.codePoint;
-                    }
-                    cp.i += codePointMatcher.group(1).length() - cp.charCount;
-                }
-                if ( cp.i >= lastBackSlash ){
-                    // this handler is no longer needed.
-                    cp.haveSlash = false;
-                    cp.handler = null;
-                }
-            }
-        } // class EscapeHandler
-    } // class CodePointData
 }
