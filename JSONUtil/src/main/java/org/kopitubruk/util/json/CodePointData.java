@@ -483,7 +483,7 @@ class CodePointData
                     // have '\' but nothing looks like a valid escape; just pass it through.
                     buf.append(cp.chars, 0, cp.charCount);
                 }
-                if ( cp.getIndex() >= lastBackSlash ){
+                if ( cp.index >= lastBackSlash ){
                     // don't need these anymore.
                     jsEscMatcher = null;
                     codeUnitMatcher = null;
