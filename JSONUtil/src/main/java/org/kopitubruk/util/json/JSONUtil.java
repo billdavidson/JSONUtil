@@ -489,19 +489,18 @@ public class JSONUtil
                 IndentPadding.decPadding(cfg, json);
                 json.write('}');
             }else{
-                // make an array.
+                // make a JSON array from an Iterable, Enumeration or array.
                 json.write('[');
                 IndentPadding.incPadding(cfg);
-                ArrayData ad = new ArrayData(propertyValue);
                 boolean didStart = false;
-                while ( ad.hasNext() ){
+                for ( Object value : new JSONArrayData(propertyValue) ){
                     if ( didStart ){
                         json.write(',');
                     }else{
                         didStart = true;
                     }
                     IndentPadding.writePadding(cfg, json);
-                    appendPropertyValue(ad.next(), json, cfg);              // recurse on the value.
+                    appendPropertyValue(value, json, cfg);              // recurse on the value.
                 }
                 IndentPadding.decPadding(cfg, json);
                 json.write(']');
