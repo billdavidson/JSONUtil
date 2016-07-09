@@ -51,24 +51,39 @@ class JSONArrayData implements Iterable<Object>
             @SuppressWarnings("unchecked")
             Iterable<Object> iterable = (Iterable<Object>)obj;
             return iterable.iterator();
-        }else{
+        }else if ( obj instanceof Enumeration ){
             return new Iterator<Object>() {
-                private boolean isEnumeration = obj instanceof Enumeration;
-                private Enumeration<?> enumeration = isEnumeration ? (Enumeration<?>)obj : null;
-                private Object array = isEnumeration ? null : obj;
-                private int i = 0;
-                private int len = isEnumeration ? 0 : Array.getLength(array);
+                @SuppressWarnings("unchecked")
+                private Enumeration<Object> enumeration = (Enumeration<Object>)obj;
 
                 @Override
                 public boolean hasNext()
                 {
-                    return isEnumeration ? enumeration.hasMoreElements() : i < len;
+                    return enumeration.hasMoreElements();
                 }
 
                 @Override
                 public Object next()
                 {
-                    return isEnumeration ? enumeration.nextElement() : Array.get(array, i++);
+                    return enumeration.nextElement();
+                }
+            };
+        }else{          // obj.getClass().isArray() == true
+            return new Iterator<Object>() {
+                private Object array = obj;
+                private int i = 0;
+                private int len = Array.getLength(array);
+
+                @Override
+                public boolean hasNext()
+                {
+                    return i < len;
+                }
+
+                @Override
+                public Object next()
+                {
+                    return Array.get(array, i++);
                 }
             };
         }
