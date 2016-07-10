@@ -207,7 +207,7 @@ public class IndentPadding implements Cloneable
      * @param json The writer.
      * @throws IOException if there's an I/O error.
      */
-    static void writePadding( JSONConfig cfg, Writer json ) throws IOException
+    static void appendPadding( JSONConfig cfg, Writer json ) throws IOException
     {
         IndentPadding pad = cfg.getIndentPadding();
         if ( pad != null ){
@@ -235,7 +235,7 @@ public class IndentPadding implements Cloneable
      * @param json The writer.
      * @throws IOException if there's an I/O error.
      */
-    static void incPadding( JSONConfig cfg, Writer json ) throws IOException
+    static void incAppendPadding( JSONConfig cfg, Writer json ) throws IOException
     {
         IndentPadding pad = cfg.getIndentPadding();
         if ( pad != null ){
@@ -252,10 +252,10 @@ public class IndentPadding implements Cloneable
      * @param option flag that controls whether to do the operation or not.
      * @throws IOException if there's an I/O error.
      */
-    static void incPadding( JSONConfig cfg, Writer json, boolean option ) throws IOException
+    static void incAppendPadding( JSONConfig cfg, Writer json, boolean option ) throws IOException
     {
         if ( option ){
-            incPadding(cfg, json);
+            incAppendPadding(cfg, json);
         }
     }
 
@@ -267,10 +267,10 @@ public class IndentPadding implements Cloneable
      * @param option flag that controls whether to do the operation or not.
      * @throws IOException if there's an I/O error.
      */
-    static void decPadding( JSONConfig cfg, Writer json, boolean option ) throws IOException
+    static void decAppendPadding( JSONConfig cfg, Writer json, boolean option ) throws IOException
     {
         if ( option ){
-            decPadding(cfg, json);
+            decAppendPadding(cfg, json);
         }
     }
 
@@ -281,7 +281,7 @@ public class IndentPadding implements Cloneable
      * @param json The writer.
      * @throws IOException if there's an I/O error.
      */
-    static void decPadding( JSONConfig cfg, Writer json ) throws IOException
+    static void decAppendPadding( JSONConfig cfg, Writer json ) throws IOException
     {
         IndentPadding pad = cfg.getIndentPadding();
         if ( pad != null ){

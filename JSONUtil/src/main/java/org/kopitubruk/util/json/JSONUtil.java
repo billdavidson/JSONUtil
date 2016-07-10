@@ -28,9 +28,9 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.TreeSet;
@@ -413,100 +413,105 @@ public class JSONUtil
     private static void appendRecursiblePropertyValue( Object propertyValue, Writer json, JSONConfig cfg ) throws IOException
     {
         // check for loops.
-        int stackIndex = 0;
-        List<Object> objStack = null;
-        boolean detectDataStructureLoops = cfg.isDetectDataStructureLoops();
-        if ( detectDataStructureLoops ){
-            objStack = cfg.getObjStack();
-            for ( Object o : objStack ){
-                // reference comparison.
-                if ( o == propertyValue ){
-                    throw new DataStructureLoopException(propertyValue, cfg);
-                }
-            }
-            stackIndex = objStack.size();
-            objStack.add(propertyValue);
-        }
+        DataStructureLoopDetector loopDetector = new DataStructureLoopDetector(cfg, propertyValue);
 
         if ( propertyValue instanceof JSONAble ){
             JSONAble jsonAble = (JSONAble)propertyValue;
             jsonAble.toJSON(cfg, json);
+        }else if ( propertyValue instanceof Map || propertyValue instanceof ResourceBundle ){
+            Map<?,?> map = getJSONObjectMap(propertyValue);
+            Set<String> propertyNames = cfg.isValidatePropertyNames() ? new HashSet<>(map.size()) : null;
+            boolean didStart = false;
+            boolean quoteIdentifier = cfg.isQuoteIdentifier();
+            boolean havePadding = cfg.getIndentPadding() != null;
+
+            // make a Javascript object with the keys used to generate the property names.
+            json.write('{');
+            IndentPadding.incPadding(cfg);
+            for ( Entry<?,?> property : map.entrySet() ){
+                String propertyName = getPropertyName(property.getKey(), cfg, propertyNames);
+                Object value = property.getValue();
+                boolean extraIndent = havePadding && isRecursible(value);
+
+                if ( didStart ){
+                    json.write(',');
+                }else{
+                    didStart = true;
+                }
+                IndentPadding.appendPadding(cfg, json);
+                appendPropertyName(propertyName, json, quoteIdentifier);
+                IndentPadding.incAppendPadding(cfg, json, extraIndent);
+                appendPropertyValue(value, json, cfg);      // recurse on the value.
+                IndentPadding.decAppendPadding(cfg, json, extraIndent);
+            }
+            IndentPadding.decAppendPadding(cfg, json);
+            json.write('}');
         }else{
-            if ( propertyValue instanceof Map || propertyValue instanceof ResourceBundle ){
-                Map<?,?> map = getJSONObjectMap(propertyValue);
-                Set<String> propertyNames = null;
-
-                boolean quoteIdentifier = cfg.isQuoteIdentifier();
-                if ( cfg.isValidatePropertyNames() ){
-                    propertyNames = new HashSet<>();
+            // make a JSON array from an Iterable, Enumeration or array.
+            boolean didStart = false;
+            json.write('[');
+            IndentPadding.incPadding(cfg);
+            for ( Object value : new JSONArrayData(propertyValue) ){
+                if ( didStart ){
+                    json.write(',');
+                }else{
+                    didStart = true;
                 }
-
-                // make a Javascript object with the keys as the property names.
-                json.write('{');
-                boolean havePadding = cfg.getIndentPadding() != null;
-                IndentPadding.incPadding(cfg);
-
-                boolean didStart = false;
-                // doing key lookup because some map key sets are ordered
-                for ( Object key : map.keySet() ){
-                    Object value = map.get(key);
-                    boolean extraIndent = havePadding && isRecursible(value);
-
-                    if ( didStart ){
-                        json.write(',');
-                    }else{
-                        didStart = true;
-                    }
-                    IndentPadding.writePadding(cfg, json);
-
-                    // apply any escapes and do validation as per the config flags.
-                    String propertyName = getPropertyName(key, cfg, propertyNames);
-                    boolean doQuote = quoteIdentifier ||
-                                        isReservedWord(propertyName) ||
-                                        hasSurrogates(propertyName);
-                    if ( doQuote ){
-                        json.write('"');
-                    }
-                    json.write(propertyName);
-                    if ( doQuote ){
-                        json.write('"');
-                    }
-                    json.write(':');
-                    IndentPadding.incPadding(cfg, json, extraIndent);
-                    appendPropertyValue(value, json, cfg);                    // recurse on the value.
-                    IndentPadding.decPadding(cfg, json, extraIndent);
-                }
-                IndentPadding.decPadding(cfg, json);
-                json.write('}');
-            }else{
-                // make a JSON array from an Iterable, Enumeration or array.
-                json.write('[');
-                IndentPadding.incPadding(cfg);
-                boolean didStart = false;
-                for ( Object value : new JSONArrayData(propertyValue) ){
-                    if ( didStart ){
-                        json.write(',');
-                    }else{
-                        didStart = true;
-                    }
-                    IndentPadding.writePadding(cfg, json);
-                    appendPropertyValue(value, json, cfg);              // recurse on the value.
-                }
-                IndentPadding.decPadding(cfg, json);
-                json.write(']');
+                IndentPadding.appendPadding(cfg, json);
+                appendPropertyValue(value, json, cfg);      // recurse on the value.
             }
+            IndentPadding.decAppendPadding(cfg, json);
+            json.write(']');
         }
 
-        if ( detectDataStructureLoops ){
-            // remove this value from the stack.
-            if ( objStack.size() == (stackIndex+1) && objStack.get(stackIndex) == propertyValue ){
-                // current propertyValue is the last value in the list.
-                objStack.remove(stackIndex);
-            }else{
-                // this should never happen.
-                throw new LoopDetectionFailureException(stackIndex, cfg);
+        loopDetector.popDataStructureStack();
+    }
+
+    /**
+     * Get the data for a JSON object as a Map, even if it's a ResourceBundle.
+     *
+     * @param mapData A Map or ResourceBundle.
+     * @return The map.
+     */
+    private static Map<?,?> getJSONObjectMap( Object mapData )
+    {
+        if ( mapData instanceof Map ){
+            return (Map<?,?>)mapData;
+        }else{
+            // make it a map so that code can use an EntrySet.
+            ResourceBundle bundle = (ResourceBundle)mapData;
+            Map<Object,Object> result = new LinkedHashMap<>();
+            for ( String key : bundle.keySet() ){
+                result.put(key, bundle.getObject(key));
             }
+            return new LinkedHashMap<>(result);
         }
+    }
+
+    /**
+     * Write a property name to the output.
+     *
+     * @param propertyName the property name.
+     * @param json the writer.
+     * @param quoteIdentifier if true, then force quotes
+     * @throws IOException if there's an I/O error.
+     */
+    private static void appendPropertyName( String propertyName, Writer json, boolean quoteIdentifier ) throws IOException
+    {
+        boolean doQuote = quoteIdentifier ||
+                                isReservedWord(propertyName) ||
+                                hasSurrogates(propertyName);
+
+        if ( doQuote ){
+            json.write('"');
+        }
+
+        json.write(propertyName);
+
+        if ( doQuote ){
+            json.write('"');
+        }
+        json.write(':');
     }
 
     /**
@@ -855,27 +860,6 @@ public class JSONUtil
         }
 
         return validationPat;
-    }
-
-    /**
-     * Get the data for a JSON object as a Map, even if it's a ResourceBundle.
-     *
-     * @param mapData A Map or ResourceBundle.
-     * @return The map.
-     */
-    private static Map<?,?> getJSONObjectMap( Object mapData )
-    {
-        if ( mapData instanceof Map ){
-            return (Map<?,?>)mapData;
-        }else{
-            // make it a map.
-            ResourceBundle bundle = (ResourceBundle)mapData;
-            Map<Object,Object> result = new LinkedHashMap<>();
-            for ( String key : bundle.keySet() ){
-                result.put(key, bundle.getObject(key));
-            }
-            return new LinkedHashMap<>(result);
-        }
     }
 
     /**
