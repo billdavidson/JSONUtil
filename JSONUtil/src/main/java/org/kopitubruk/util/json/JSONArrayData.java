@@ -85,6 +85,7 @@ class JSONArrayData implements Iterable<Object>
                 @Override
                 public Object next()
                 {
+                    // With array of primitives, this will box the primitive.
                     return Array.get(array, i++);
                 }
             };

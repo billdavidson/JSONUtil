@@ -431,26 +431,13 @@ public class JSONUtil
             JSONAble jsonAble = (JSONAble)propertyValue;
             jsonAble.toJSON(cfg, json);
         }else{
-            boolean isMap = propertyValue instanceof Map;
-
-            if ( isMap || propertyValue instanceof ResourceBundle ){
-                // Maps and ResourceBundles use almost the same logic.
-                Map<?,?> map = null;
-                ResourceBundle bundle = null;
-                Set<?> keys;
+            if ( propertyValue instanceof Map || propertyValue instanceof ResourceBundle ){
+                Map<?,?> map = new JSONObjectData<Object,Object>(propertyValue);
                 Set<String> propertyNames = null;
-
-                if ( isMap ){
-                    map = (Map<?,?>)propertyValue;
-                    keys = map.keySet();
-                }else{
-                    bundle = (ResourceBundle)propertyValue;
-                    keys = bundle.keySet();
-                }
 
                 boolean quoteIdentifier = cfg.isQuoteIdentifier();
                 if ( cfg.isValidatePropertyNames() ){
-                    propertyNames = new HashSet<>(keys.size());
+                    propertyNames = new HashSet<>();
                 }
 
                 // make a Javascript object with the keys as the property names.
@@ -459,7 +446,7 @@ public class JSONUtil
                 IndentPadding.incPadding(cfg);
 
                 boolean didStart = false;
-                for ( Object key : keys ){
+                for ( Object key : map.keySet() ){
                     if ( didStart ){
                         json.write(',');
                     }else{
@@ -480,11 +467,11 @@ public class JSONUtil
                         json.write('"');
                     }
                     json.write(':');
-                    Object value = isMap ? map.get(key) : bundle.getObject((String)key);
+                    Object value = map.get(key);
                     boolean extraIndent = havePadding && isRecursible(value);
                     IndentPadding.incPadding(cfg, json, extraIndent);
                     appendPropertyValue(value, json, cfg);                    // recurse on the value.
-                    IndentPadding.incPadding(cfg, json, extraIndent);
+                    IndentPadding.decPadding(cfg, json, extraIndent);
                 }
                 IndentPadding.decPadding(cfg, json);
                 json.write('}');

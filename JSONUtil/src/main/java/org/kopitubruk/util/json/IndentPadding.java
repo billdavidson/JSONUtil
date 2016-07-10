@@ -260,6 +260,21 @@ public class IndentPadding implements Cloneable
     }
 
     /**
+     * Decrement padding and write padding if option is true.
+     *
+     * @param cfg The config object.
+     * @param json The writer.
+     * @param option flag that controls whether to do the operation or not.
+     * @throws IOException if there's an I/O error.
+     */
+    static void decPadding( JSONConfig cfg, Writer json, boolean option ) throws IOException
+    {
+        if ( option ){
+            decPadding(cfg, json);
+        }
+    }
+
+    /**
      * Decrement the padding, and write it out if applicable.
      *
      * @param cfg The config object.
