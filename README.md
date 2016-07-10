@@ -8,7 +8,7 @@ may be generated, but it is harmless.  Those log messages can be suppressed
 by setting system properties on the java command line.
 
 #### Features
-* Recursive traversal of Maps, Iterables, Enumerations, arrays and ResourceBundles
+* Recursive traversal of Maps, Iterables (including Collection, List, Set etc.), Enumerations, arrays and ResourceBundles
 * Data structure loop detection
 * Property name validation (can use ECMAScript or JSON rules)
 * Output to String or java.io.Writer
