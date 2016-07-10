@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -432,7 +433,7 @@ public class JSONUtil
             jsonAble.toJSON(cfg, json);
         }else{
             if ( propertyValue instanceof Map || propertyValue instanceof ResourceBundle ){
-                Map<?,?> map = new JSONObjectData<Object,Object>(propertyValue);
+                Map<?,?> map = getJSONObjectMap(propertyValue);
                 Set<String> propertyNames = null;
 
                 boolean quoteIdentifier = cfg.isQuoteIdentifier();
@@ -446,7 +447,11 @@ public class JSONUtil
                 IndentPadding.incPadding(cfg);
 
                 boolean didStart = false;
+                // doing key lookup because some map key sets are ordered
                 for ( Object key : map.keySet() ){
+                    Object value = map.get(key);
+                    boolean extraIndent = havePadding && isRecursible(value);
+
                     if ( didStart ){
                         json.write(',');
                     }else{
@@ -467,8 +472,6 @@ public class JSONUtil
                         json.write('"');
                     }
                     json.write(':');
-                    Object value = map.get(key);
-                    boolean extraIndent = havePadding && isRecursible(value);
                     IndentPadding.incPadding(cfg, json, extraIndent);
                     appendPropertyValue(value, json, cfg);                    // recurse on the value.
                     IndentPadding.decPadding(cfg, json, extraIndent);
@@ -852,6 +855,27 @@ public class JSONUtil
         }
 
         return validationPat;
+    }
+
+    /**
+     * Get the data for a JSON object as a Map, even if it's a ResourceBundle.
+     *
+     * @param mapData A Map or ResourceBundle.
+     * @return The map.
+     */
+    private static Map<?,?> getJSONObjectMap( Object mapData )
+    {
+        if ( mapData instanceof Map ){
+            return (Map<?,?>)mapData;
+        }else{
+            // make it a map.
+            ResourceBundle bundle = (ResourceBundle)mapData;
+            Map<Object,Object> result = new LinkedHashMap<>();
+            for ( String key : bundle.keySet() ){
+                result.put(key, bundle.getObject(key));
+            }
+            return new LinkedHashMap<>(result);
+        }
     }
 
     /**
