@@ -14,6 +14,7 @@ by setting system properties on the java command line.
 * Output to String or java.io.Writer
 * JSON parsing to Java objects from Strings or java.io.Reader
 * Options to fix certain types of bad data
+* Automatic escaping of characters required to be escaped by the JSON standard.
 * Several different escaping options
 * Option to format dates on output and handle different formats when parsing
 * Automatic unescaping and possible reescaping of Javascript escapes which are illegal for JSON
