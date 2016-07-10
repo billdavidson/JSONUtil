@@ -20,7 +20,8 @@ import java.util.Enumeration;
 import java.util.Iterator;
 
 /**
- * Private class to iterate over the different types that can produce a
+/**
+ * Package private class to iterate over the different types that can produce a
  * Javascript array. Created because the array code was too redundant.
  *
  * @author Bill Davidson
@@ -31,10 +32,11 @@ class JSONArrayData implements Iterable<Object>
     private Object obj;
 
     /**
-     * Create an ArrayData.  Input must be an Iterable, Enumeration
-     * or array.
+     * Create a JSONArrayData. Input must be an {@link Iterable},
+     * {@link Enumeration} or array.
      *
-     * @param obj The source object for the array to be created.
+     * @param obj The source object for the array to be created. This must be an
+     *            {@link Iterable}, {@link Enumeration} or an array.
      */
     JSONArrayData( Object obj )
     {
