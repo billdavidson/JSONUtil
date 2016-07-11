@@ -232,7 +232,7 @@ public class JSONUtil
      *   <li>\\u\{\p{XDigit}+\} - Unicode code point escape.</li>
      * </ul>
      */
-    private static final Pattern VALID_ECMA6_PROPERTY_NAME_PAT =
+    static final Pattern VALID_ECMA6_PROPERTY_NAME_PAT =
             Pattern.compile("^(?:[_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})" +
                              "(?:[_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*$");
 
