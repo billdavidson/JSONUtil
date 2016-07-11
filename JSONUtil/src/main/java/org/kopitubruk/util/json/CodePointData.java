@@ -268,8 +268,8 @@ class CodePointData
     }
 
     /**
-     * Get the automatically generated escape for this code point or null if
-     * there isn't one.
+     * Get the pass through or automatically generated escape for this code
+     * point or null if there isn't one.
      *
      * @return The current escape or null if there isn't one.
      */
