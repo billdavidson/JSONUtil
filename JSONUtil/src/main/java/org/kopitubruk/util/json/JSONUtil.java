@@ -423,51 +423,79 @@ public class JSONUtil
             JSONAble jsonAble = (JSONAble)propertyValue;
             jsonAble.toJSON(cfg, json);
         }else if ( propertyValue instanceof Map || propertyValue instanceof ResourceBundle ){
-            Map<?,?> map = getJSONObjectMap(propertyValue);
-            Set<String> propertyNames = cfg.isValidatePropertyNames() ? new HashSet<String>(map.size()) : null;
-            boolean didStart = false;
-            boolean quoteIdentifier = cfg.isQuoteIdentifier();
-            boolean havePadding = cfg.getIndentPadding() != null;
-
-            // make a Javascript object with the keys used to generate the property names.
-            json.write('{');
-            IndentPadding.incPadding(cfg);
-            for ( Entry<?,?> property : map.entrySet() ){
-                String propertyName = getPropertyName(property.getKey(), cfg, propertyNames);
-                Object value = property.getValue();
-                boolean extraIndent = havePadding && isRecursible(value);
-
-                if ( didStart ){
-                    json.write(',');
-                }else{
-                    didStart = true;
-                }
-                IndentPadding.appendPadding(cfg, json);
-                appendPropertyName(propertyName, json, quoteIdentifier);
-                IndentPadding.incAppendPadding(cfg, json, extraIndent);
-                appendPropertyValue(value, json, cfg);      // recurse on the value.
-                IndentPadding.decAppendPadding(cfg, json, extraIndent);
-            }
-            IndentPadding.decAppendPadding(cfg, json);
-            json.write('}');
+            appendObjectPropertyValue(propertyValue, json, cfg);
         }else{
-            // make a JSON array from an Iterable, Enumeration or array.
-            boolean didStart = false;
-            json.write('[');
-            IndentPadding.incPadding(cfg);
-            for ( Object value : new JSONArrayData(propertyValue) ){
-                if ( didStart ){
-                    json.write(',');
-                }else{
-                    didStart = true;
-                }
-                IndentPadding.appendPadding(cfg, json);
-                appendPropertyValue(value, json, cfg);      // recurse on the value.
-            }
-            IndentPadding.decAppendPadding(cfg, json);
-            json.write(']');
+            appendArrayPropertyValue(propertyValue, json, cfg);
         }
         loopDetector.popDataStructureStack();
+    }
+
+    /**
+     * Append a value that will be a JSON object. That is, a {@link Map} or
+     * {@link ResourceBundle}
+     *
+     * @param propertyValue A {@link Map} or {@link ResourceBundle}.
+     * @param json Something to write the JSON data to.
+     * @param cfg A configuration object to use to set various options.
+     * @throws IOException If there is an error on output.
+     */
+    private static void appendObjectPropertyValue( Object propertyValue, Writer json, JSONConfig cfg ) throws IOException
+    {
+        Map<?,?> map = getJSONObjectMap(propertyValue);
+        Set<String> propertyNames = cfg.isValidatePropertyNames() ? new HashSet<String>(map.size()) : null;
+        boolean didStart = false;
+        boolean quoteIdentifier = cfg.isQuoteIdentifier();
+        boolean havePadding = cfg.getIndentPadding() != null;
+
+        // make a Javascript object with the keys used to generate the property names.
+        json.write('{');
+        IndentPadding.incPadding(cfg);
+        for ( Entry<?,?> property : map.entrySet() ){
+            String propertyName = getPropertyName(property.getKey(), cfg, propertyNames);
+            Object value = property.getValue();
+            boolean extraIndent = havePadding && isRecursible(value);
+
+            if ( didStart ){
+                json.write(',');
+            }else{
+                didStart = true;
+            }
+            IndentPadding.appendPadding(cfg, json);
+            appendPropertyName(propertyName, json, quoteIdentifier);
+            IndentPadding.incAppendPadding(cfg, json, extraIndent);
+            appendPropertyValue(value, json, cfg);      // recurse on the value.
+            IndentPadding.decAppendPadding(cfg, json, extraIndent);
+        }
+        IndentPadding.decAppendPadding(cfg, json);
+        json.write('}');
+    }
+
+    /**
+     * Append a value that will be a JSON array. That is, a {@link Iterable},
+     * {@link Enumeration} or array.
+     *
+     * @param propertyValue an {@link Iterable}, {@link Enumeration} or array to append.
+     * @param json Something to write the JSON data to.
+     * @param cfg A configuration object to use to set various options.
+     * @throws IOException If there is an error on output.
+     */
+    private static void appendArrayPropertyValue( Object propertyValue, Writer json, JSONConfig cfg ) throws IOException
+    {
+        boolean didStart = false;
+
+        json.write('[');
+        IndentPadding.incPadding(cfg);
+        for ( Object value : new JSONArrayData(propertyValue) ){
+            if ( didStart ){
+                json.write(',');
+            }else{
+                didStart = true;
+            }
+            IndentPadding.appendPadding(cfg, json);
+            appendPropertyValue(value, json, cfg);      // recurse on the value.
+        }
+        IndentPadding.decAppendPadding(cfg, json);
+        json.write(']');
     }
 
     /**
@@ -494,7 +522,7 @@ public class JSONUtil
     }
 
     /**
-     * Write a property name to the output.
+     * Write a property name to the output.  Includes the colon afterwards.
      *
      * @param propertyName the property name.
      * @param json the writer.
