@@ -1280,10 +1280,14 @@ public class TestJSONUtil
                       {
                           JSONConfig cfg = jsonConfig == null ? new JSONConfig() : jsonConfig;
                           Map<String,Object> jsonObj = new LinkedHashMap<String,Object>();
+                          Map<String,Object> more = new LinkedHashMap<String,Object>();
                           jsonObj.put("a", 0);
                           jsonObj.put("b", 2);
                           int[] ar = {1, 2, 3};
                           jsonObj.put("x", ar);
+                          more.put("z", 4);
+                          more.put("y", 2);
+                          jsonObj.put("w", more);
 
                           JSONUtil.toJSON(jsonObj, cfg, json);
                       }
