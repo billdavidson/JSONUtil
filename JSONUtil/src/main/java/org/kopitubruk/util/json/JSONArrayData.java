@@ -25,7 +25,7 @@ import java.util.Iterator;
  * Javascript array. Created because the array code was too redundant.
  *
  * @author Bill Davidson
- * @since 1.8
+ * @since 1.7.1
  */
 class JSONArrayData implements Iterable<Object>
 {

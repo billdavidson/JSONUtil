@@ -21,7 +21,7 @@ import java.util.List;
  * Encapsulates the data structure loop detection from appendRecursiblePropertyValue()
  *
  * @author Bill Davidson
- * @since 1.8
+ * @since 1.7.1
  */
 class DataStructureLoopDetector
 {
