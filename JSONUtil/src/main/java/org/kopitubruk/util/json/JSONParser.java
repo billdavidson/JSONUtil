@@ -91,9 +91,7 @@ public class JSONParser
      * Recognize unquoted id's.  They must conform to the ECMAScript 6 standard.
      * Id's which do not conform must be quoted.
      */
-    private static final Pattern UNQUOTED_ID_PAT =
-            Pattern.compile("^((?:[_\\$\\p{L}\\p{Nl}]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})" +
-                              "(?:[_\\$\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}\\u200C\\u200D]|\\\\u\\p{XDigit}{4}|\\\\u\\{\\p{XDigit}+\\})*)$");
+    private static final Pattern UNQUOTED_ID_PAT = JSONUtil.VALID_ECMA6_PROPERTY_NAME_PAT;
 
     /**
      * Recognize Javascript floating point.
@@ -600,8 +598,7 @@ public class JSONParser
             }
             matcher = UNQUOTED_ID_PAT.matcher(str);
             if ( matcher.matches() ){
-                String id = matcher.group(1);
-                return new Token(TokenType.UNQUOTED_ID, id);
+                return new Token(TokenType.UNQUOTED_ID, str);
             }
             throw new JSONParserException(str, charCount, cfg);
         }
