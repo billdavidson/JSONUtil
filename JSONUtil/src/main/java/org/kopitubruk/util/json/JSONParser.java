@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -241,58 +242,86 @@ public class JSONParser
         }
         switch ( token.tokenType ){
             case START_OBJECT:
-                Map<String,Object> map = new LinkedHashMap<String,Object>();
-                token = tokens.nextToken();
-                while ( token != null ){
-                    // need an identifier
-                    if ( token.tokenType == TokenType.STRING || token.tokenType == TokenType.UNQUOTED_ID ){
-                        // got an identifier.
-                        String key = CodePointData.unEscape(token.value, tokens.cfg);
-                        // need a colon
-                        token = tokens.nextToken();
-                        if ( token.tokenType == TokenType.COLON ){
-                            // got a colon.  get the value.
-                            token = tokens.nextToken();
-                            map.put(key, getValue(token, tokens));
-                        }else{
-                            throw new JSONParserException(TokenType.COLON, token.tokenType, tokens.cfg);
-                        }
-                    }else if ( token.tokenType == TokenType.END_OBJECT ){
-                        break;                                  // empty object; break out of loop.
-                    }else{
-                        throw new JSONParserException(TokenType.END_OBJECT, token.tokenType, tokens.cfg);
-                    }
-                    token = tokens.nextToken();
-                    if ( token.tokenType == TokenType.END_OBJECT ){
-                        break;                                  // end of object; break out of loop.
-                    }else if ( token.tokenType == TokenType.COMMA ){
-                        token = tokens.nextToken();             // next field.
-                    }else{
-                        throw new JSONParserException(TokenType.END_OBJECT, token.tokenType, tokens.cfg);
-                    }
-                }
-                // minimize memory usage.
-                return new LinkedHashMap<String,Object>(map);
+                return parseObject(tokens);
             case START_ARRAY:
-                ArrayList<Object> list = new ArrayList<Object>();
-                token = tokens.nextToken();
-                while ( token != null && token.tokenType != TokenType.END_ARRAY ){
-                    list.add(getValue(token, tokens));
-                    token = tokens.nextToken();
-                    if ( token.tokenType == TokenType.END_ARRAY ){
-                        break;                                  // end of array.
-                    }else if ( token.tokenType == TokenType.COMMA ){
-                        token = tokens.nextToken();             // next item.
-                    }else{
-                        throw new JSONParserException(TokenType.END_ARRAY, token.tokenType, tokens.cfg);
-                    }
-                }
-                // minimize memory usage.
-                list.trimToSize();
-                return list;
+                return parseArray(tokens);
             default:
                 return getValue(token, tokens);
         }
+    }
+
+    /**
+     * Parse the tokens from the input stream for an object.  This method is recursive
+     * via the {@link #getValue(Token, TokenReader)} method.
+     *
+     * @param tokens The token reader.
+     * @return the object that results from parsing.
+     * @throws IOException If there's a problem with I/O.
+     * @throws ParseException If there's a problem parsing dates.
+     */
+    private static Map<?,?> parseObject( TokenReader tokens ) throws IOException, ParseException
+    {
+        Map<String,Object> map = new LinkedHashMap<String,Object>();
+        Token token = tokens.nextToken();
+        while ( token != null ){
+            // need an identifier
+            if ( token.tokenType == TokenType.STRING || token.tokenType == TokenType.UNQUOTED_ID ){
+                // got an identifier.
+                String key = CodePointData.unEscape(token.value, tokens.cfg);
+                // need a colon
+                token = tokens.nextToken();
+                if ( token.tokenType == TokenType.COLON ){
+                    // got a colon.  get the value.
+                    token = tokens.nextToken();
+                    map.put(key, getValue(token, tokens));
+                }else{
+                    throw new JSONParserException(TokenType.COLON, token.tokenType, tokens.cfg);
+                }
+            }else if ( token.tokenType == TokenType.END_OBJECT ){
+                break;                                  // empty object; break out of loop.
+            }else{
+                throw new JSONParserException(TokenType.END_OBJECT, token.tokenType, tokens.cfg);
+            }
+            token = tokens.nextToken();
+            if ( token.tokenType == TokenType.END_OBJECT ){
+                break;                                  // end of object; break out of loop.
+            }else if ( token.tokenType == TokenType.COMMA ){
+                token = tokens.nextToken();             // next field.
+            }else{
+                throw new JSONParserException(TokenType.END_OBJECT, token.tokenType, tokens.cfg);
+            }
+        }
+        // minimize memory usage.
+        return new LinkedHashMap<String,Object>(map);
+    }
+
+    /**
+     * Parse the tokens from the input stream for an array.  This method is recursive
+     * via the {@link #getValue(Token, TokenReader)} method.
+     *
+     * @param tokens The token reader.
+     * @return the object that results from parsing.
+     * @throws IOException If there's a problem with I/O.
+     * @throws ParseException If there's a problem parsing dates.
+     */
+    private static List<?> parseArray( TokenReader tokens ) throws IOException, ParseException
+    {
+        ArrayList<Object> list = new ArrayList<Object>();
+        Token token = tokens.nextToken();
+        while ( token != null && token.tokenType != TokenType.END_ARRAY ){
+            list.add(getValue(token, tokens));
+            token = tokens.nextToken();
+            if ( token.tokenType == TokenType.END_ARRAY ){
+                break;                                  // end of array.
+            }else if ( token.tokenType == TokenType.COMMA ){
+                token = tokens.nextToken();             // next item.
+            }else{
+                throw new JSONParserException(TokenType.END_ARRAY, token.tokenType, tokens.cfg);
+            }
+        }
+        // minimize memory usage.
+        list.trimToSize();
+        return list;
     }
 
     /**
@@ -310,7 +339,7 @@ public class JSONParser
             case STRING:
                 JSONConfig cfg = tokens.cfg;
                 String unesc = CodePointData.unEscape(token.value, cfg);
-                if ( cfg.isEncodeDatesAsObjects() || cfg.isEncodeDatesAsStrings() ){
+                if ( cfg.isFormatDates() ){
                     try{
                         return parseDate(unesc, cfg);
                     }catch ( ParseException e ){
@@ -498,64 +527,83 @@ public class JSONParser
                 default:
                     // something else.  need to go to the next token or end of input
                     // to get this token.
-                    String str;
-                    {
-                        StringBuilder buf = new StringBuilder();
-                        int escapeCount = 0;
-                        do{
-                            ch = codePoint <= 0xFFFF ? (char)codePoint : 0;
-                            if ( ch == '\\' ){
-                                ++escapeCount;          // track escapes.
-                                buf.append(ch);
-                            }else if ( (ch == '\'' || ch == '"') && escapeCount % 2 == 0 ){
-                                buf.append(ch)
-                                   .append(getQuotedString(ch))
-                                   .append(ch);
-                                escapeCount = 0;
-                            }else{
-                                extraToken = SIMPLE_TOKENS.get(ch);
-                                if ( extraToken != null ){
-                                    break;              // ran into next token.  stop.
-                                }else{
-                                    buf.appendCodePoint(codePoint);
-                                    escapeCount = 0;
-                                }
-                            }
-                            codePoint = nextCodePoint();
-                        }while ( codePoint >= 0 );
-
-                        // remove trailing whitespace.
-                        str = buf.toString().trim();
-                    }
-
-                    // check for new Date(), numbers, literals and unquoted ids.
-                    Matcher matcher = NEW_DATE_PAT.matcher(str);
-                    if ( matcher.matches() ){
-                        String qs = matcher.group(2);
-                        return new Token(TokenType.DATE, qs.substring(1, qs.length()-1));
-                    }
-                    matcher = JAVASCRIPT_FLOATING_POINT_PAT.matcher(str);
-                    if ( matcher.matches() ){
-                        String number = matcher.group(1);
-                        return new Token(TokenType.FLOATING_POINT_NUMBER, number);
-                    }
-                    matcher = JAVASCRIPT_INTEGER_PAT.matcher(str);
-                    if ( matcher.matches() ){
-                        String number = matcher.group(1);
-                        return new Token(TokenType.INTEGER_NUMBER, number);
-                    }
-                    matcher = LITERAL_PAT.matcher(str);
-                    if ( matcher.matches() ){
-                        String literal = matcher.group(1);
-                        return new Token(TokenType.LITERAL, literal);
-                    }
-                    matcher = UNQUOTED_ID_PAT.matcher(str);
-                    if ( matcher.matches() ){
-                        String id = matcher.group(1);
-                        return new Token(TokenType.UNQUOTED_ID, id);
-                    }
-                    throw new JSONParserException(str, charCount, cfg);
+                    return matchOthers(getOtherTokenString(codePoint));
             }
+        }
+
+        /**
+         * Get a string for any type of token other than string or simple tokens.
+         *
+         * @param ch The current char
+         * @param codePoint The current codepoint
+         * @return The token
+         * @throws IOException If there's an I/O error.
+         */
+        private String getOtherTokenString( int codePoint ) throws IOException
+        {
+            StringBuilder buf = new StringBuilder();
+            int escapeCount = 0;
+            do{
+                char ch  = codePoint <= 0xFFFF ? (char)codePoint : 0;
+                if ( ch == '\\' ){
+                    ++escapeCount;          // track escapes.
+                    buf.append(ch);
+                }else if ( (ch == '\'' || ch == '"') && escapeCount % 2 == 0 ){
+                    buf.append(ch)
+                       .append(getQuotedString(ch))
+                       .append(ch);
+                    escapeCount = 0;
+                }else{
+                    extraToken = SIMPLE_TOKENS.get(ch);
+                    if ( extraToken != null ){
+                        break;              // ran into next token.  stop.
+                    }else{
+                        buf.appendCodePoint(codePoint);
+                        escapeCount = 0;
+                    }
+                }
+                codePoint = nextCodePoint();
+            }while ( codePoint >= 0 );
+
+            // remove trailing whitespace.
+            return buf.toString().trim();
+        }
+
+        /**
+         * Match other possible tokens that could occur in the stream.
+         *
+         * @param str the string to match.
+         * @return the token.
+         */
+        private Token matchOthers( String str )
+        {
+            // check for new Date(), numbers, literals and unquoted ids.
+            Matcher matcher = NEW_DATE_PAT.matcher(str);
+            if ( matcher.matches() ){
+                String qs = matcher.group(2);
+                return new Token(TokenType.DATE, qs.substring(1, qs.length()-1));
+            }
+            matcher = JAVASCRIPT_FLOATING_POINT_PAT.matcher(str);
+            if ( matcher.matches() ){
+                String number = matcher.group(1);
+                return new Token(TokenType.FLOATING_POINT_NUMBER, number);
+            }
+            matcher = JAVASCRIPT_INTEGER_PAT.matcher(str);
+            if ( matcher.matches() ){
+                String number = matcher.group(1);
+                return new Token(TokenType.INTEGER_NUMBER, number);
+            }
+            matcher = LITERAL_PAT.matcher(str);
+            if ( matcher.matches() ){
+                String literal = matcher.group(1);
+                return new Token(TokenType.LITERAL, literal);
+            }
+            matcher = UNQUOTED_ID_PAT.matcher(str);
+            if ( matcher.matches() ){
+                String id = matcher.group(1);
+                return new Token(TokenType.UNQUOTED_ID, id);
+            }
+            throw new JSONParserException(str, charCount, cfg);
         }
 
         /**
