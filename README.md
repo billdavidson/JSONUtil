@@ -16,7 +16,7 @@ and controlling the way that the JSON is generated.
 * Automatic unescaping and possible reescaping of Javascript escapes which are illegal for JSON
 * ECMAScript 6 code point escapes are supported for reading and optionally for writing
 * The default values for most configuration options can be changed.
-* Most defaults can be set via JNDI
+* Most defaults can be set via JNDI (See the JSONConfigDefaults class)
 * Most defaults can be read or modified via a JMX MBean client
 * Option to format output for debugging.
 
