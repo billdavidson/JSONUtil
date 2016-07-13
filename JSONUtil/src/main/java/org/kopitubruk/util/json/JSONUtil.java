@@ -609,9 +609,9 @@ public class JSONUtil
             CodePointData cp = new CodePointData(strValue, cfg, useSingleLetterEscapes);
             while ( cp.next() ){
                 if ( cp.getEsc() != null ){
-                    json.write(cp.getEsc());                     // valid escape.
+                    json.write(cp.getEsc());    // valid escape.
                 }else{
-                    json.write(cp.getChars(), 0, cp.getCharCount());  // Pass it through -- usual case.
+                    cp.writeChars(json);        // Pass it through -- usual case.
                 }
             }
             json.write('"');
@@ -681,9 +681,9 @@ public class JSONUtil
             if ( cp.getEsc() != null ){
                 buf.append(cp.getEsc());                     // have valid escape
             }else if ( cp.getIndex() > 0 && isValidIdentifierPart(cp.getCodePoint(), cfg) ){
-                buf.append(cp.getChars(), 0, cp.getCharCount());
+                cp.appendChars(buf);
             }else if ( cp.getIndex() == 0 && isValidIdentifierStart(cp.getCodePoint(), cfg) ){
-                buf.append(cp.getChars(), 0, cp.getCharCount());
+                cp.appendChars(buf);
             }else{
                 buf.append(cp.getEscapeString());       // Bad code point for an identifier.
             }
@@ -707,7 +707,7 @@ public class JSONUtil
             if ( cp.getCodePoint() > 127 ){
                 buf.append(cp.getEscapeString());
             }else{
-                buf.append(cp.getChars()[0]);
+                cp.appendChars(buf);
             }
         }
         return buf.toString();
@@ -728,7 +728,7 @@ public class JSONUtil
             if ( cp.getCharCount() > 1 ){
                 buf.append(cp.getEscapeString());
             }else{
-                buf.append(cp.getChars()[0]);
+                cp.appendChars(buf);
             }
         }
         return buf.toString();
