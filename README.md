@@ -1,11 +1,7 @@
 
 This is a JSON generation and parsing library for Java.  It is oriented
 towards being used in web servers and includes several options for validation
-and controlling the way that the JSON is generated.  Defaults for those options
-can be set programmatically or most by using JNDI or JMX/MBean access which is normally
-available with JEE web tier containers.  If you don't have those, a debug log message
-may be generated, but it is harmless.  Those log messages can be suppressed
-by setting system properties on the java command line.
+and controlling the way that the JSON is generated.
 
 #### Features
 * Recursive traversal of Maps, Iterables (Collection, List, Set etc.), Enumerations, arrays and ResourceBundles
@@ -20,7 +16,7 @@ by setting system properties on the java command line.
 * Automatic unescaping and possible reescaping of Javascript escapes which are illegal for JSON
 * ECMAScript 6 code point escapes are supported for reading and optionally for writing
 * The default values for most configuration options can be changed.
-* Most defaults can be set via JNDI
+* Most defaults can be set via JNDI (See the JSONConfigDefaults class)
 * Most defaults can be read or modified via a JMX MBean client
 * Option to format output for debugging.
 
