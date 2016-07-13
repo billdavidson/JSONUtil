@@ -532,7 +532,6 @@ public class JSONParser
         /**
          * Get a string for any type of token other than string or simple tokens.
          *
-         * @param ch The current char
          * @param codePoint The current codepoint
          * @return The token
          * @throws IOException If there's an I/O error.
@@ -598,7 +597,8 @@ public class JSONParser
             }
             matcher = UNQUOTED_ID_PAT.matcher(str);
             if ( matcher.matches() ){
-                return new Token(TokenType.UNQUOTED_ID, str);
+                String id = matcher.group(0);
+                return new Token(TokenType.UNQUOTED_ID, id);
             }
             throw new JSONParserException(str, charCount, cfg);
         }

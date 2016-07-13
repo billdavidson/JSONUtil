@@ -15,6 +15,7 @@
  */
 package org.kopitubruk.util.json;
 
+import java.io.IOException;
 import java.io.Writer;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -258,16 +259,6 @@ class CodePointData
     }
 
     /**
-     * Get the chars that represent the current code point.
-     *
-     * @return The chars that represent the current code point.
-     */
-    char[] getChars()
-    {
-        return chars;
-    }
-
-    /**
      * Get the pass through or automatically generated escape for this code
      * point or null if there isn't one.
      *
@@ -277,6 +268,28 @@ class CodePointData
     {
         return esc;
     }
+
+    /**
+     * Write the current code point out as chars to the given writer.
+     *
+     * @param json the writer.
+     * @throws IOException If there's an I/O problem.
+     */
+    void writeChars( Writer json ) throws IOException
+    {
+        json.write(chars, 0, charCount);
+    }
+
+    /**
+     * Append the current code point out as chars to the given string builder.
+     *
+     * @param buf the string builder.
+     */
+    void appendChars( StringBuilder buf )
+    {
+        buf.append(chars, 0, charCount);
+    }
+
 
     /**
      * Set up the next codepoint.

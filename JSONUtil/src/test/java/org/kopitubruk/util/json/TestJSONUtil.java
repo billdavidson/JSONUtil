@@ -594,7 +594,7 @@ public class TestJSONUtil
     @Test
     public void testParser() throws ParseException
     {
-        Object obj = JSONParser.parseJSON("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37e24,\"c\":Infinity,\"d\":NaN,\"e\":[1,2,3,{\"a\":4}]}");
+        Object obj = JSONParser.parseJSON("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37e24,c:Infinity,\"d\":NaN,\"e\":[1,2,3,{\"a\":4}]}");
         String json = JSONUtil.toJSON(obj);
         assertEquals("{\"foo\":\"b\\\"ar\",\"a\":5,\"b\":2.37E24,\"c\":\"Infinity\",\"d\":\"NaN\",\"e\":[1,2,3,{\"a\":4}]}", json);
 

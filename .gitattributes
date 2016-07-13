@@ -4,6 +4,7 @@
 *.java text
 *.xml text
 *.properties text
+*.md text
 LICENSE text
 NOTICE diff
 
