@@ -147,7 +147,7 @@ class CodePointData
     private boolean escapeSurrogates;
 
     /**
-     * If this is not null after a run of {@link #next()} then it means
+     * If this is not null after a run of {@link #nextReady()} then it means
      * that a valid pass through escape has been detected or an escape
      * has been created.
      */
@@ -302,7 +302,7 @@ class CodePointData
      *
      * @return true if there's another code point.
      */
-    boolean next()
+    boolean nextReady()
     {
         if ( (index+charCount) < len ){
             index += charCount;
@@ -503,7 +503,7 @@ class CodePointData
         int lastBackSlash = strValue.lastIndexOf('\\');
         StringBuilder buf = new StringBuilder();
         CodePointData cp = new CodePointData(strValue, cfg);
-        while ( cp.next() ){
+        while ( cp.nextReady() ){
             if ( cp.codePoint == '\\' ){
                 if ( gotMatch(jsEscMatcher, cp.index, cp.end(MAX_JS_ESC_LENGTH)) ){
                     String esc = jsEscMatcher.group(1);
