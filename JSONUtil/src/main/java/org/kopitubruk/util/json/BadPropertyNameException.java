@@ -89,7 +89,7 @@ public final class BadPropertyNameException extends JSONException
          */
         StringBuilder codePointList = new StringBuilder();
         CodePointData cp = new CodePointData(propertyName, cfg);
-        while ( cp.next() ){
+        while ( cp.nextReady() ){
             if ( cp.getCodePoint() == '\\' ){
                 // check for valid escapes.
                 if ( gotMatch(passThroughMatcher, cp.getIndex(), cp.end(passThroughRegionLength)) ){

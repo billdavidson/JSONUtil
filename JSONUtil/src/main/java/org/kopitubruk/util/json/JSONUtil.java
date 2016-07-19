@@ -612,7 +612,7 @@ public class JSONUtil
 
             json.write('"');
             CodePointData cp = new CodePointData(strValue, cfg, useSingleLetterEscapes);
-            while ( cp.next() ){
+            while ( cp.nextReady() ){
                 if ( cp.getEsc() != null ){
                     json.write(cp.getEsc());    // valid escape.
                 }else{
@@ -682,7 +682,7 @@ public class JSONUtil
         boolean useSingleLetterEscapes = cfg.isFullJSONIdentifierCodePoints();
 
         CodePointData cp = new CodePointData(propertyName, cfg, useSingleLetterEscapes);
-        while ( cp.next() ){
+        while ( cp.nextReady() ){
             if ( cp.getEsc() != null ){
                 buf.append(cp.getEsc());                     // have valid escape
             }else if ( cp.getIndex() > 0 && isValidIdentifierPart(cp.getCodePoint(), cfg) ){
@@ -708,7 +708,7 @@ public class JSONUtil
     {
         StringBuilder buf = new StringBuilder(str.length());
         CodePointData cp = new CodePointData(str, cfg);
-        while ( cp.next() ){
+        while ( cp.nextReady() ){
             if ( cp.getCodePoint() > 127 ){
                 buf.append(cp.getEscapeString());
             }else{
@@ -729,7 +729,7 @@ public class JSONUtil
     {
         StringBuilder buf = new StringBuilder(str.length());
         CodePointData cp = new CodePointData(str, cfg);
-        while ( cp.next() ){
+        while ( cp.nextReady() ){
             if ( cp.getCharCount() > 1 ){
                 buf.append(cp.getEscapeString());
             }else{
