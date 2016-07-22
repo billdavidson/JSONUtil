@@ -138,7 +138,7 @@ class CodePointData
     private String strValue;
     private EscapeHandler handler;
     private int len;
-    private boolean processEscapes;
+    private boolean handleEscaping;
     private boolean haveSlash;
     private boolean useECMA6;
     private boolean useSingleLetterEscapes;
@@ -180,24 +180,22 @@ class CodePointData
      * @param strValue The string that will be analyzed.
      * @param cfg The config object.
      * @param useSingleLetterEscapes Use single letter escapes permitted by JSON.
-     * @param handleEscapes If true, then process inline escapes.
+     * @param processInlineEscapes If true, then process inline escapes.
      */
-    CodePointData( String strValue, JSONConfig cfg, boolean useSingleLetterEscapes, boolean handleEscapes )
+    CodePointData( String strValue, JSONConfig cfg, boolean useSingleLetterEscapes, boolean processInlineEscapes )
     {
         this(strValue, cfg);
 
         // enable escaping as needed.
-        processEscapes = true;
+        handleEscaping = true;
         this.useSingleLetterEscapes = useSingleLetterEscapes;
         supportEval = ! cfg.isFullJSONIdentifierCodePoints();
         escapeNonAscii = cfg.isEscapeNonAscii();
         escapeSurrogates = cfg.isEscapeSurrogates();
 
-        if ( handleEscapes && strValue.indexOf('\\') >= 0 ){
-            haveSlash = true;
+        haveSlash = processInlineEscapes && strValue.indexOf('\\') >= 0;
+        if ( haveSlash ){
             handler = new EscapeHandler(this, cfg);
-        }else{
-            haveSlash = false;
         }
     }
 
@@ -218,7 +216,7 @@ class CodePointData
         useECMA6 = cfg.isUseECMA6();
 
         // no escaping with this one.
-        processEscapes = false;
+        handleEscaping = false;
     }
 
     /**
@@ -318,8 +316,8 @@ class CodePointData
                 chars[1] = strValue.charAt(index+1);
             }
 
-            if ( processEscapes ){
-                doEscapes();
+            if ( handleEscaping ){
+                handleEscaping();
             }
             return true;
         }else{
@@ -330,7 +328,7 @@ class CodePointData
     /**
      * Handle escapes as appropriate.
      */
-    private void doEscapes()
+    private void handleEscaping()
     {
         esc = null;
 
