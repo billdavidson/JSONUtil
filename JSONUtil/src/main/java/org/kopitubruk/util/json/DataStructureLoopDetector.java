@@ -33,6 +33,7 @@ class DataStructureLoopDetector
 
     /**
      * Make a DataStructureLoopDetector
+     *
      * @param cfg The config object.
      * @param propertyValue The property value being checked.
      */
