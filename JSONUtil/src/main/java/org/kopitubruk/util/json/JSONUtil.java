@@ -601,12 +601,13 @@ public class JSONUtil
             json.write(strValue);
         }else{
             boolean useSingleLetterEscapes = true;
+            boolean handleEscapes = cfg.isPassThroughEscapes();
             if ( cfg.isUnEscapeWherePossible() ){
                 strValue = CodePointData.unEscape(strValue, cfg);
             }
 
             json.write('"');
-            CodePointData cp = new CodePointData(strValue, cfg, useSingleLetterEscapes);
+            CodePointData cp = new CodePointData(strValue, cfg, useSingleLetterEscapes, handleEscapes);
             while ( cp.nextReady() ){
                 if ( cp.getEsc() != null ){
                     json.write(cp.getEsc());    // valid escape.
@@ -675,8 +676,9 @@ public class JSONUtil
     {
         StringBuilder buf = new StringBuilder(propertyName.length());
         boolean useSingleLetterEscapes = cfg.isFullJSONIdentifierCodePoints();
+        boolean handleEscapes = true;
 
-        CodePointData cp = new CodePointData(propertyName, cfg, useSingleLetterEscapes);
+        CodePointData cp = new CodePointData(propertyName, cfg, useSingleLetterEscapes, handleEscapes);
         while ( cp.nextReady() ){
             if ( cp.getEsc() != null ){
                 buf.append(cp.getEsc());                     // have valid escape

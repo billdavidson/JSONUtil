@@ -218,6 +218,25 @@ public interface JSONConfigDefaultsMBean
     public void setEscapeSurrogates( boolean dflt );
 
     /**
+     * Get the pass through escapes policy.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @return The pass through escapes policy.
+     */
+    public boolean isPassThroughEscapes();
+
+    /**
+     * If true, then escapes in strings will be passed through unchanged.
+     * If false, then the backslash that starts the escape will be escaped.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @param dflt If true, then pass escapes through.
+     */
+    public void setPassThroughEscapes( boolean dflt );
+
+    /**
      * Get the encode dates as strings policy.
      *
      * @return the encodeDatesAsStrings policy.

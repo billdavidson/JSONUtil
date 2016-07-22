@@ -17,6 +17,7 @@ package org.kopitubruk.util.json;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -128,10 +129,9 @@ class CodePointData
         javascriptEscMap.put("\\v", (char)0xB);
         JAVASCRIPT_ESC_MAP = new HashMap<>(javascriptEscMap);
 
-        Set<Character> evalEscSet = new HashSet<>();
-        evalEscSet.add((char)0x2028);              // line separator
-        evalEscSet.add((char)0x2029);              // paragraph separator
-        EVAL_ESC_SET = new HashSet<>(evalEscSet);
+        EVAL_ESC_SET = new HashSet<>(Arrays.asList(
+                                        (char)0x2028,       // line separator
+                                        (char)0x2029));     // paragraph separator
     }
 
     // private data and flags.
@@ -180,8 +180,9 @@ class CodePointData
      * @param strValue The string that will be analyzed.
      * @param cfg The config object.
      * @param useSingleLetterEscapes Use single letter escapes permitted by JSON.
+     * @param handleEscapes If true, then process inline escapes.
      */
-    CodePointData( String strValue, JSONConfig cfg, boolean useSingleLetterEscapes )
+    CodePointData( String strValue, JSONConfig cfg, boolean useSingleLetterEscapes, boolean handleEscapes )
     {
         this(strValue, cfg);
 
@@ -192,9 +193,11 @@ class CodePointData
         escapeNonAscii = cfg.isEscapeNonAscii();
         escapeSurrogates = cfg.isEscapeSurrogates();
 
-        handler = new EscapeHandler(this, cfg);
-        if ( ! haveSlash ){
-            handler = null;
+        if ( handleEscapes && strValue.indexOf('\\') >= 0 ){
+            haveSlash = true;
+            handler = new EscapeHandler(this, cfg);
+        }else{
+            haveSlash = false;
         }
     }
 
@@ -557,27 +560,22 @@ class CodePointData
          */
         private EscapeHandler( CodePointData cp, JSONConfig cfg )
         {
-            if ( cp.strValue.indexOf('\\') >= 0 ){
-                this.cp = cp;
-                cp.haveSlash = true;
-                lastBackSlash = cp.strValue.lastIndexOf('\\');
+            this.cp = cp;
+            lastBackSlash = cp.strValue.lastIndexOf('\\');
 
-                // set up the pass through matcher.
-                Pattern escapePassThroughPat = getEscapePassThroughPattern(cfg, cp.useSingleLetterEscapes);
-                passThroughMatcher = escapePassThroughPat.matcher(cp.strValue);
-                passThroughRegionLength = getEscapePassThroughRegionLength(cfg);
+            // set up the pass through matcher.
+            Pattern escapePassThroughPat = getEscapePassThroughPattern(cfg, cp.useSingleLetterEscapes);
+            passThroughMatcher = escapePassThroughPat.matcher(cp.strValue);
+            passThroughRegionLength = getEscapePassThroughRegionLength(cfg);
 
-                // set up the javascript character escape matcher.
-                jsEscMatcher = JAVASCRIPT_ESC_PAT.matcher(cp.strValue);
+            // set up the javascript character escape matcher.
+            jsEscMatcher = JAVASCRIPT_ESC_PAT.matcher(cp.strValue);
 
-                useECMA5 = ! cfg.isUseECMA6();
-                if ( useECMA5 ){
-                    // set up the ECMAScript 6 code point matcher,
-                    // because those will not be matched by the pass through.
-                    codePointMatcher = CODE_POINT_PAT.matcher(cp.strValue);
-                }
-            }else{
-                cp.haveSlash = false;
+            useECMA5 = ! cfg.isUseECMA6();
+            if ( useECMA5 ){
+                // set up the ECMAScript 6 code point matcher,
+                // because those will not be matched by the pass through.
+                codePointMatcher = CODE_POINT_PAT.matcher(cp.strValue);
             }
         }
 
