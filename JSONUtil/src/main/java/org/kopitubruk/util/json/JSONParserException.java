@@ -130,7 +130,7 @@ public class JSONParserException extends JSONException
             return e.getLocalizedMessage();
         }else{
             String str = badData == null ? "" : badData;
-            return String.format(bundle.getString("unrecognizedData"), str, index);
+            return String.format(bundle.getString("unrecognizedData"), index, str );
         }
     }
 
