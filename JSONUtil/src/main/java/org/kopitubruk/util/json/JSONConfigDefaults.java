@@ -955,7 +955,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt if true, then any bad code points in identifiers will be escaped.
      */
-    
+
     public void setEscapeBadIdentifierCodePoints( boolean dflt )
     {
         synchronized ( this.getClass() ){
@@ -1003,7 +1003,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return The default encode numeric strings as numbers policy.
      */
-    
+
     public boolean isEncodeNumericStringsAsNumbers()
     {
         return encodeNumericStringsAsNumbers;
@@ -1017,7 +1017,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @param dflt If true, then strings that look like valid JSON numbers
      * will be encoded as numbers.
      */
-    
+
     public void setEncodeNumericStringsAsNumbers( boolean dflt )
     {
         synchronized ( this.getClass() ){
@@ -1032,7 +1032,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return The default quote non-ASCII policy.
      */
-    
+
     public boolean isEscapeNonAscii()
     {
         return escapeNonAscii;
@@ -1048,7 +1048,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true, then all non-ASCII will be Unicode escaped.
      */
-    
+
     public void setEscapeNonAscii( boolean dflt )
     {
         synchronized ( this.getClass() ){
@@ -1066,7 +1066,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return the unEscape policy.
      */
-    
+
     public boolean isUnEscapeWherePossible()
     {
         return unEscapeWherePossible;
@@ -1079,7 +1079,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true then where possible, undo inline escapes in strings.
      */
-    
+
     public void setUnEscapeWherePossible( boolean dflt )
     {
         synchronized ( this.getClass() ){
@@ -1094,7 +1094,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return the escape surrogates policy.
      */
-    
+
     public boolean isEscapeSurrogates()
     {
         return escapeSurrogates;
@@ -1108,7 +1108,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @param dflt If true, then surrogates will be escaped in strings and identifiers
      * and escapeNonAscii will be forced to false.
      */
-    
+
     public void setEscapeSurrogates( boolean dflt )
     {
         synchronized ( this.getClass() ){
@@ -1126,7 +1126,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return The pass through escapes policy.
      */
-    @Override
     public boolean isPassThroughEscapes()
     {
         return passThroughEscapes;
@@ -1140,7 +1139,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true, then pass escapes through.
      */
-    @Override
     public void setPassThroughEscapes( boolean dflt )
     {
         synchronized ( this.getClass() ){
@@ -1187,7 +1185,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return The default quote identifier policy.
      */
-    
+
     public boolean isQuoteIdentifier()
     {
         return quoteIdentifier;
@@ -1202,7 +1200,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true, then all identifiers will be quoted.
      */
-    
+
     public void setQuoteIdentifier( boolean dflt )
     {
         synchronized ( this.getClass() ){
@@ -1248,7 +1246,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @return the reserverd words in identifiers policy.
      */
-    
+
     public boolean isAllowReservedWordsInIdentifiers()
     {
         return allowReservedWordsInIdentifiers;
@@ -1261,7 +1259,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true, then reserved words will be allowed in identifiers.
      */
-    
+
     public void setAllowReservedWordsInIdentifiers( boolean dflt )
     {
         synchronized ( this.getClass() ){
