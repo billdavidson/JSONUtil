@@ -52,6 +52,7 @@ import java.util.TimeZone;
  *   <li>escapeNonAscii = false</li>
  *   <li>unEscapeWherePossible = false</li>
  *   <li>escapeSurrogates = false</li>
+ *   <li>passThroughEscapes = false</li>
  *   <li>encodeDatesAsStrings = false</li>
  * </ul>
  * <h3>
@@ -139,6 +140,7 @@ public class JSONConfig implements Serializable, Cloneable
     private boolean escapeNonAscii;
     private boolean unEscapeWherePossible;
     private boolean escapeSurrogates;
+    private boolean passThroughEscapes;
     private boolean encodeDatesAsStrings;
 
     private boolean quoteIdentifier;
@@ -231,6 +233,7 @@ public class JSONConfig implements Serializable, Cloneable
         result.escapeNonAscii = escapeNonAscii;
         result.unEscapeWherePossible = unEscapeWherePossible;
         result.escapeSurrogates = escapeSurrogates;
+        result.passThroughEscapes = passThroughEscapes;
         result.encodeDatesAsStrings = encodeDatesAsStrings;
 
         // non-standard JSON.
@@ -798,6 +801,27 @@ public class JSONConfig implements Serializable, Cloneable
     public boolean isEscapeSurrogates()
     {
         return escapeSurrogates;
+    }
+
+    /**
+     * Get the pass through escapes policy.
+     *
+     * @return The pass through escapes policy.
+     */
+    public boolean isPassThroughEscapes()
+    {
+        return passThroughEscapes;
+    }
+
+    /**
+     * If true, then escapes in strings will be passed through unchanged.
+     * If false, then the backslash that starts the escape will be escaped.
+     *
+     * @param passThroughEscapes If true, then pass escapes through.
+     */
+    public void setPassThroughEscapes( boolean passThroughEscapes )
+    {
+        this.passThroughEscapes = passThroughEscapes;
     }
 
     /**

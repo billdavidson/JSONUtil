@@ -89,7 +89,8 @@ import static org.kopitubruk.util.json.JNDIUtil.getBoolean;
  *   <li>escapeNonAscii = false</li>
  *   <li>unEscapeWherePossible = false</li>
  *   <li>escapeSurrogates = false</li>
-     <li>encodeDatesAsStrings = false</li>
+ *   <li>passThroughEscapes = false</li>
+ *   <li>encodeDatesAsStrings = false</li>
  * </ul>
  * <h3>
  *   Allow generation of certain types of non-standard JSON.
@@ -165,6 +166,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static volatile boolean escapeNonAscii;
     private static volatile boolean unEscapeWherePossible;
     private static volatile boolean escapeSurrogates;
+    private static volatile boolean passThroughEscapes;
     private static volatile boolean encodeDatesAsStrings;
 
     private static volatile boolean quoteIdentifier;
@@ -283,6 +285,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 d.setEscapeNonAscii(getBoolean(ctx, "escapeNonAscii", escapeNonAscii));
                 d.setUnEscapeWherePossible(getBoolean(ctx, "unEscapeWherePossible", unEscapeWherePossible));
                 d.setEscapeSurrogates(getBoolean(ctx, "escapeSurrogates", escapeSurrogates));
+                d.setEscapeSurrogates(getBoolean(ctx, "passThroughEscapes", passThroughEscapes));
                 d.setEncodeDatesAsStrings(getBoolean(ctx, "encodeDatesAsStrings", encodeDatesAsStrings));
 
                 // non-standard encoding options.
@@ -349,6 +352,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             escapeNonAscii = false;
             unEscapeWherePossible = false;
             escapeSurrogates = false;
+            passThroughEscapes = false;
             encodeDatesAsStrings = false;
 
             quoteIdentifier = true;
@@ -435,6 +439,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         cfg.setEscapeNonAscii(escapeNonAscii);
         cfg.setUnEscapeWherePossible(unEscapeWherePossible);
         cfg.setEscapeSurrogates(escapeSurrogates);
+        cfg.setPassThroughEscapes(passThroughEscapes);
         cfg.setEncodeDatesAsStrings(encodeDatesAsStrings);
 
         // non-standard JSON options.
@@ -1120,6 +1125,35 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             if ( escapeSurrogates ){
                 escapeNonAscii = false;
             }
+        }
+    }
+
+    /**
+     * Get the pass through escapes policy.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @return The pass through escapes policy.
+     */
+    @Override
+    public boolean isPassThroughEscapes()
+    {
+        return passThroughEscapes;
+    }
+
+    /**
+     * If true, then escapes in strings will be passed through unchanged.
+     * If false, then the backslash that starts the escape will be escaped.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @param dflt If true, then pass escapes through.
+     */
+    @Override
+    public void setPassThroughEscapes( boolean dflt )
+    {
+        synchronized ( this.getClass() ){
+            passThroughEscapes = dflt;
         }
     }
 
