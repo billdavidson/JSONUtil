@@ -20,7 +20,6 @@ import java.util.Enumeration;
 import java.util.Iterator;
 
 /**
-/**
  * Package private class to iterate over the different types that can produce a
  * Javascript array. Created because the array code was too redundant.
  *

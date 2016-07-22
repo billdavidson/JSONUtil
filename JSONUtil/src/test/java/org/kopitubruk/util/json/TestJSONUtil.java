@@ -395,6 +395,7 @@ public class TestJSONUtil
         Map<String,Object> jsonObj = new HashMap<String,Object>();
         JSONConfig cfg = new JSONConfig();
         cfg.setUnEscapeWherePossible(false);
+        cfg.setPassThroughEscapes(true);
         cfg.setUseECMA6(true);
         // escapes that get passed through.
         String[] strs = { "\\u1234", "a\\u{41}", "\\\"", "\\/", "\\b", "\\f", "\\n", "\\r", "\\t", "\\\\" };
@@ -449,6 +450,7 @@ public class TestJSONUtil
 
         // test that these get fixed regardless.
         cfg.setUnEscapeWherePossible(false);
+        cfg.setPassThroughEscapes(true);
 
         // test octal/hex unescape.
         for ( int i = 0; i < 256; i++ ){
@@ -475,7 +477,7 @@ public class TestJSONUtil
     {
         Object obj = JSONParser.parseJSON("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37e24,c:Infinity,\"d\":NaN,\"e\":[1,2,3,{\"a\":4}]}");
         String json = JSONUtil.toJSON(obj);
-        assertEquals("{\"foo\":\"b\\\"ar\",\"a\":5,\"b\":2.37E24,\"c\":\"Infinity\",\"d\":\"NaN\",\"e\":[1,2,3,{\"a\":4}]}", json);
+        assertEquals("{\"foo\":\"b\\\\\\\"ar\",\"a\":5,\"b\":2.37E24,\"c\":\"Infinity\",\"d\":\"NaN\",\"e\":[1,2,3,{\"a\":4}]}", json);
 
         obj = JSONParser.parseJSON("'foo'");
         assertEquals("foo", obj);
