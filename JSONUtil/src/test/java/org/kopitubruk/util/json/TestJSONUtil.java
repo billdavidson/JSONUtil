@@ -1318,6 +1318,14 @@ public class TestJSONUtil
         cfg.setIndentPadding(new IndentPadding("\t", String.format("%n")));
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
+        @SuppressWarnings("unchecked")
+        Map<String,Object> obj = (Map<String,Object>)JSONParser.parseJSON(json);
+        assertThat((String)obj.get("b"), is("x"));
+        @SuppressWarnings("unchecked")
+        ArrayList<Object> innerObj = (ArrayList<Object>)obj.get("e");
+        @SuppressWarnings("unchecked")
+        Map<Object,Object> jsonAble = (Map<Object,Object>)innerObj.get(1);
+        assertThat((Long)jsonAble.get("b"), is((long)2));
         //System.out.println(json);
     }
 
