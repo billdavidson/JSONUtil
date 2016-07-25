@@ -1311,6 +1311,12 @@ public class TestJSONUtil
         cfg.setIndentPadding(new IndentPadding("\t", String.format("%n")));
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
+        @SuppressWarnings("unchecked")
+        Map<String,Object> obj = (Map<String,Object>)JSONParser.parseJSON(json);
+        assertThat(obj.get("b"), is("x"));
+        @SuppressWarnings("unchecked")
+        Map<String,Object> innerObj = (Map<String,Object>)obj.get("e");
+        assertThat(innerObj.get("b"), is(2));
         //System.out.println(json);
     }
 
