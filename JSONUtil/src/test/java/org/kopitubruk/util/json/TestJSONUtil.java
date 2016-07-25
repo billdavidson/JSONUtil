@@ -1358,10 +1358,12 @@ public class TestJSONUtil
         validateJSON(json);
         @SuppressWarnings("unchecked")
         Map<String,Object> obj = (Map<String,Object>)JSONParser.parseJSON(json);
-        assertThat(obj.get("b"), is("x"));
+        assertThat((String)obj.get("b"), is("x"));
         @SuppressWarnings("unchecked")
-        Map<String,Object> innerObj = (Map<String,Object>)obj.get("e");
-        assertThat(innerObj.get("b"), is(2));
+        ArrayList<Object> innerObj = (ArrayList<Object>)obj.get("e");
+        @SuppressWarnings("unchecked")
+        Map<Object,Object> jsonAble = (Map<Object,Object>)innerObj.get(1);
+        assertThat((Long)jsonAble.get("b"), is((long)2));
         //System.out.println(json);
     }
 
