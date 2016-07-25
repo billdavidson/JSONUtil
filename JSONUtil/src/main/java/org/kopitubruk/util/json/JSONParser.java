@@ -459,7 +459,7 @@ public class JSONParser
 
             // get to the first non space code point.
             int codePoint = nextCodePoint();
-            while ( codePoint >= 0 && Character.isSpaceChar(codePoint) ){
+            while ( codePoint >= 0 && Character.isWhitespace(codePoint) ){
                 codePoint = nextCodePoint();
             }
             if ( codePoint < 0 ){

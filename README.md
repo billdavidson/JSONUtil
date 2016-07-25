@@ -13,7 +13,6 @@ and controlling the way that the JSON is generated.
 * Automatic escaping of characters required to be escaped by the JSON standard.
 * Several different escaping options
 * Option to format dates on output and handle different formats when parsing
-* Automatic unescaping and possible reescaping of Javascript escapes which are illegal for JSON
 * ECMAScript 6 code point escapes are supported for reading and optionally for writing
 * The default values for most configuration options can be changed.
 * Most defaults can be set via JNDI (See the JSONConfigDefaults class)
