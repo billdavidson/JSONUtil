@@ -1318,7 +1318,7 @@ public class TestJSONUtil
         ArrayList<Object> innerObj = (ArrayList<Object>)obj.get("e");
         @SuppressWarnings("unchecked")
         Map<Object,Object> jsonAble = (Map<Object,Object>)innerObj.get(1);
-        assertThat((Long)jsonAble.get("b"), is((long)2));
+        assertThat((Long)jsonAble.get("b"), is(2L));
         //System.out.println(json);
     }
 
