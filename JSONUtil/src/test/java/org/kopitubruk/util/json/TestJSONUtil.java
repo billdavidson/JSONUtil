@@ -1041,6 +1041,7 @@ public class TestJSONUtil
                               jsonObj.put("b", 2);
                               int[] ar = {1, 2, 3};
                               jsonObj.put("x", ar);
+                              jsonObj.put("t", null);
 
                               JSONUtil.toJSON(jsonObj, cfg, json);
                           }
@@ -1065,7 +1066,7 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
         String json = JSONUtil.toJSON(jsonObj, cfg);
         // validateJSON(json);
-        assertThat(json, is("{\"a\":1,\"b\":\"x\",\"c\":[\"1\",\"2\",\"3\"],\"d\":[\"1\",\"2\",\"3\"],\"e\":[null,{\"a\":0,\"b\":2,\"x\":[1,2,3]},[\"1\",\"2\",\"3\"]]}"));
+        assertThat(json, is("{\"a\":1,\"b\":\"x\",\"c\":[\"1\",\"2\",\"3\"],\"d\":[\"1\",\"2\",\"3\"],\"e\":[null,{\"a\":0,\"b\":2,\"x\":[1,2,3],\"t\":null},[\"1\",\"2\",\"3\"]]}"));
     }
 
     /**
@@ -1096,6 +1097,7 @@ public class TestJSONUtil
                           jsonObj.put("x", ar);
                           more.put("z", 4);
                           more.put("y", 2);
+                          more.put("t", null);
                           jsonObj.put("w", more);
 
                           JSONUtil.toJSON(jsonObj, cfg, json);
@@ -1129,7 +1131,7 @@ public class TestJSONUtil
         ArrayList<Object> innerObj = (ArrayList<Object>)obj.get("e");
         @SuppressWarnings("unchecked")
         Map<Object,Object> jsonAble = (Map<Object,Object>)innerObj.get(1);
-        assertThat((Long)jsonAble.get("b"), is((long)2));
+        assertThat((Long)jsonAble.get("b"), is(2L));
         //System.out.println(json);
     }
 
