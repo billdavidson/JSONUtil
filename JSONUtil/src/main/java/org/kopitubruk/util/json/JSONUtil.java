@@ -450,7 +450,7 @@ public class JSONUtil
         for ( Entry<?,?> property : map.entrySet() ){
             String propertyName = getPropertyName(property.getKey(), cfg, propertyNames);
             Object value = property.getValue();
-            boolean extraIndent = havePadding && isRecursible(value);
+            boolean extraIndent = havePadding && value != null && isRecursible(value);
 
             if ( didStart ){
                 json.write(',');
