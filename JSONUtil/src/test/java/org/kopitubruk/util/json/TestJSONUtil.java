@@ -1259,6 +1259,7 @@ public class TestJSONUtil
                           stuff.put("b", 2);
                           int[] ar = {1, 2, 3};
                           stuff.put("x", ar);
+                          stuff.put("t", null);
 
                           JSONUtil.toJSON(stuff, cfg, json);
                      };
@@ -1268,7 +1269,7 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
-        assertThat(json, is("{\"a\":1,\"b\":\"x\",\"c\":[\"1\",\"2\",\"3\"],\"d\":[\"1\",\"2\",\"3\"],\"e\":[null,{\"a\":0,\"b\":2,\"x\":[1,2,3]},[\"1\",\"2\",\"3\"]]}"));
+        assertThat(json, is("{\"a\":1,\"b\":\"x\",\"c\":[\"1\",\"2\",\"3\"],\"d\":[\"1\",\"2\",\"3\"],\"e\":[null,{\"a\":0,\"b\":2,\"x\":[1,2,3],\"t\":null},[\"1\",\"2\",\"3\"]]}"));
     }
 
     /**
@@ -1300,6 +1301,7 @@ public class TestJSONUtil
                           stuff.put("x", ar);
                           more.put("z", 4);
                           more.put("y", 2);
+                          more.put("t", null);
                           stuff.put("w", more);
 
                           JSONUtil.toJSON(stuff, cfg, json);
