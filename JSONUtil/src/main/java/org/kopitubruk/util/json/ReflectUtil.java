@@ -108,7 +108,7 @@ public class ReflectUtil
                     }
                     Object value;
                     try{
-                        value = getter.invoke(obj);
+                        value = getter.invoke(propertyValue);
                     }catch ( IllegalAccessException|IllegalArgumentException|InvocationTargetException e ){
                         throw new JSONReflectionException(propertyValue, name, e, cfg);
                     }

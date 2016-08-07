@@ -1450,5 +1450,10 @@ public class TestJSONUtil
         public ReflectTestClass()
         {
         }
+
+        public String getB()
+        {
+            return b;
+        }
     }
 }
