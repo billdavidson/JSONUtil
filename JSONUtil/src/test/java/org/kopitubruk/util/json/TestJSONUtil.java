@@ -1421,4 +1421,34 @@ public class TestJSONUtil
             return TestJSONUtil.this;
         }
     }
+
+    /**
+     * Test reflection.
+     */
+    @Test
+    public void testReflect()
+    {
+        Map<Object,Object> jsonObj = new HashMap<>();
+        jsonObj.put("f", new ReflectTestClass());
+        JSONConfig cfg = new JSONConfig();
+        cfg.setReflectUnknownObjects(true);
+        String json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[],\"d\":null}}"));
+    }
+
+    /**
+     * Class used to test reflection.
+     */
+    @SuppressWarnings("unused")
+    private static class ReflectTestClass
+    {
+        private int a = 1;
+        private String b = "something";
+        private List<Long> c = new ArrayList<>();
+        private List<Short> d = null;
+
+        public ReflectTestClass()
+        {
+        }
+    }
 }

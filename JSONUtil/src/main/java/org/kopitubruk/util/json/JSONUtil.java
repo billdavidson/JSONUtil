@@ -378,10 +378,13 @@ public class JSONUtil
     {
         if ( propertyValue == null ){
             json.write(NULL);
-        }else if ( isRecursible(propertyValue) ){
-            appendRecursiblePropertyValue(propertyValue, json, cfg);
         }else{
-            appendSimplePropertyValue(propertyValue, json, cfg);
+            boolean isReflectClass = cfg.isReflectClass(propertyValue);
+            if ( isRecursible(propertyValue, isReflectClass) ){
+                appendRecursiblePropertyValue(propertyValue, json, cfg, isReflectClass);
+            }else{
+                appendSimplePropertyValue(propertyValue, json, cfg);
+            }
         }
     }
 
@@ -391,14 +394,15 @@ public class JSONUtil
      * @param propertyValue The value to check.
      * @return true if the object is recurisble.
      */
-    private static boolean isRecursible( Object propertyValue )
+    private static boolean isRecursible( Object propertyValue, boolean isReflectClass )
     {
         return propertyValue instanceof Iterable ||
                propertyValue instanceof Map ||
                propertyValue instanceof JSONAble ||
                propertyValue instanceof Enumeration ||
                propertyValue instanceof ResourceBundle ||       // typically not recursed but code same as Map.
-               propertyValue.getClass().isArray();
+               propertyValue.getClass().isArray() ||
+               isReflectClass;
     }
 
     /**
@@ -408,9 +412,10 @@ public class JSONUtil
      * @param propertyValue The value to append.
      * @param json Something to write the JSON data to.
      * @param cfg A configuration object to use to set various options.
+     * @param isReflectClass if true, then use reflection on the class to encode it.
      * @throws IOException If there is an error on output.
      */
-    private static void appendRecursiblePropertyValue( Object propertyValue, Writer json, JSONConfig cfg ) throws IOException
+    private static void appendRecursiblePropertyValue( Object propertyValue, Writer json, JSONConfig cfg, boolean isReflectClass ) throws IOException
     {
         // check for loops.
         DataStructureLoopDetector loopDetector = new DataStructureLoopDetector(cfg, propertyValue);
@@ -418,10 +423,17 @@ public class JSONUtil
         if ( propertyValue instanceof JSONAble ){
             JSONAble jsonAble = (JSONAble)propertyValue;
             jsonAble.toJSON(cfg, json);
-        }else if ( propertyValue instanceof Map || propertyValue instanceof ResourceBundle ){
-            appendObjectPropertyValue(propertyValue, json, cfg);
         }else{
-            appendArrayPropertyValue(propertyValue, json, cfg);
+            if ( propertyValue instanceof ResourceBundle ){
+                propertyValue = resourceBundleToMap((ResourceBundle)propertyValue);
+            }else if ( isReflectClass && ! (propertyValue instanceof Map) ){
+                propertyValue = ReflectUtil.getReflectedObject(propertyValue, cfg);
+            }
+            if ( propertyValue instanceof Map ){
+                appendObjectPropertyValue((Map<?,?>)propertyValue, json, cfg);
+            }else{
+                appendArrayPropertyValue(propertyValue, json, cfg);
+            }
         }
 
         loopDetector.popDataStructureStack();
@@ -429,16 +441,15 @@ public class JSONUtil
 
     /**
      * Append a value that will be a JSON object. That is, a {@link Map} or
-     * {@link ResourceBundle}
+     * {@link ResourceBundle}.
      *
      * @param propertyValue A {@link Map} or {@link ResourceBundle}.
      * @param json Something to write the JSON data to.
      * @param cfg A configuration object to use to set various options.
      * @throws IOException If there is an error on output.
      */
-    private static void appendObjectPropertyValue( Object propertyValue, Writer json, JSONConfig cfg ) throws IOException
+    private static void appendObjectPropertyValue( Map<?,?> map, Writer json, JSONConfig cfg ) throws IOException
     {
-        Map<?,?> map = getJSONObjectMap(propertyValue);
         Set<String> propertyNames = cfg.isValidatePropertyNames() ? new HashSet<>(map.size()) : null;
         boolean didStart = false;
         boolean quoteIdentifier = cfg.isQuoteIdentifier();
@@ -450,8 +461,7 @@ public class JSONUtil
         for ( Entry<?,?> property : map.entrySet() ){
             String propertyName = getPropertyName(property.getKey(), cfg, propertyNames);
             Object value = property.getValue();
-            boolean extraIndent = havePadding && value != null && isRecursible(value);
-
+            boolean extraIndent = havePadding && value != null && isRecursible(value, cfg.isReflectClass(value));
             if ( didStart ){
                 json.write(',');
             }else{
@@ -496,24 +506,19 @@ public class JSONUtil
     }
 
     /**
-     * Get the data for a JSON object as a Map, even if it's a ResourceBundle.
+     * Get the ResourceBundle for a JSON object as a Map.
      *
-     * @param mapData A Map or ResourceBundle.
+     * @param bundle A ResourceBundle.
      * @return The map.
      */
-    private static Map<?,?> getJSONObjectMap( Object mapData )
+    private static Map<?,?> resourceBundleToMap( ResourceBundle bundle )
     {
-        if ( mapData instanceof Map ){
-            return (Map<?,?>)mapData;
-        }else{
-            // make it a map so that code can use an EntrySet.
-            ResourceBundle bundle = (ResourceBundle)mapData;
-            Map<Object,Object> result = new LinkedHashMap<>();
-            for ( String key : bundle.keySet() ){
-                result.put(key, bundle.getObject(key));
-            }
-            return new LinkedHashMap<>(result);
+        // make it a map so that code can use an EntrySet.
+        Map<Object,Object> result = new LinkedHashMap<>();
+        for ( String key : bundle.keySet() ){
+            result.put(key, bundle.getObject(key));
         }
+        return new LinkedHashMap<>(result);
     }
 
     /**
@@ -580,9 +585,13 @@ public class JSONUtil
             if ( cfg.isEncodeDatesAsObjects() ){
                 json.write(')');
             }
-        }else{
+        }else if ( propertyValue instanceof CharSequence || ! cfg.isReflectUnknownObjects() ){
             // Use the toString() method for the value and write it out as a string.
             writeString(propertyValue.toString(), json, cfg);
+        }else{
+            // unknown object and reflection requested.
+            boolean isReflectClass = true;
+            appendRecursiblePropertyValue(propertyValue, json, cfg, isReflectClass);
         }
     }
 
@@ -632,7 +641,7 @@ public class JSONUtil
     {
         String propertyName = key == null ? null : key.toString();
 
-        if ( propertyName == null || propertyName.length() == 0 ){
+        if ( propertyName == null || propertyName.length() < 1 ){
             throw new BadPropertyNameException(propertyName, cfg);
         }
 

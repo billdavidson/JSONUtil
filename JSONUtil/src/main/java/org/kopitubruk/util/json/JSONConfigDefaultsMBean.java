@@ -20,6 +20,8 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+import javax.management.MBeanException;
+
 /**
  * MBean interface for JSONConfigDefaults to expose its methods to view and
  * modify the defaults at run time when this library is used with an MBean
@@ -94,6 +96,61 @@ public interface JSONConfigDefaultsMBean
      * @return The default validate property names policy.
      */
     public boolean isValidatePropertyNames();
+
+    /**
+     * Get the reflection privacy level.
+     *
+     * @return the reflection privacy level.
+     * @since 1.9
+     */
+    public int getReflectionPrivacy();
+
+    /**
+     * Set the privacy level for reflection.
+     *
+     * @param dflt the level to set
+     * @see ReflectUtil#PRIVATE
+     * @see ReflectUtil#PACKAGE
+     * @see ReflectUtil#PROTECTED
+     * @see ReflectUtil#PUBLIC
+     * @since 1.9
+     */
+    public void setReflectionPrivacy( int dflt );
+
+    /**
+     * Clear all reflection classes, disabling all default automatic reflection.
+     *
+     * @since 1.9
+     */
+    public void clearReflectClasses();
+
+    /**
+     * Add the given class to the set of classes to be reflected.
+     *
+     * @param className The name of the class suitable for
+     * (@link {@link ClassLoader#loadClass(String)}}.
+     * @throws MBeanException If there's a problem loading the class.
+     * @since 1.9
+     */
+    public void addReflectClassByName( String className ) throws MBeanException;
+
+    /**
+     * Remove the given class from the set of classes to be reflected.
+     *
+     * @param className The name of the class suitable for
+     * (@link {@link ClassLoader#loadClass(String)}}.
+     * @throws MBeanException If there's a problem loading the class.
+     * @since 1.9
+     */
+    public void removeReflectClassByName( String className ) throws MBeanException;
+
+    /**
+     * Get a string with newline separated list of classes that get reflected.
+     *
+     * @return A string with newline separated list of classes that get reflected.
+     * @since 1.9
+     */
+    public String listReflectedClasses();
 
     /**
      * Set the default flag for validation of property names.
@@ -254,6 +311,26 @@ public interface JSONConfigDefaultsMBean
      * {@link JSONConfigDefaults#setDateGenFormat(DateFormat)}.
      */
     public void setEncodeDatesAsStrings( boolean dflt );
+
+    /**
+     * Get the reflection of unknown objects policy.
+     *
+     * @return the reflectUnknownObjects policy.
+     * @since 1.9
+     */
+    public boolean isReflectUnknownObjects();
+
+    /**
+     * Set the reflection encoding policy.  If true, then any time that an
+     * unknown object is encountered, this package will attempt to use
+     * reflection to encode it.  Default is false.  When false, then unknown
+     * objects will have their toString() method called.
+     *
+     * @param dflt If true, then attempt to use reflection
+     * to encode objects which are otherwise unknown.
+     * @since 1.9
+     */
+    public void setReflectUnknownObjects( boolean dflt );
 
     /**
      * Get the default quote identifier policy.

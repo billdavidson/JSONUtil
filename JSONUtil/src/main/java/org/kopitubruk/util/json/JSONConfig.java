@@ -24,10 +24,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TimeZone;
 
 /**
@@ -126,9 +128,19 @@ public class JSONConfig implements Serializable, Cloneable
     private List<DateFormat> dateParseFormats = null;
 
     /**
+     * The set of classes that reflection should be used for.
+     */
+    private Set<Class<?>> reflectClasses = null;
+
+    /**
      * Indent padding object.
      */
     private IndentPadding indentPadding = null;
+
+    /**
+     * The privacy level for reflection.
+     */
+    private int reflectionPrivacy = ReflectUtil.PRIVATE;
 
     // various flags.  see their setters.
     private boolean validatePropertyNames;
@@ -142,6 +154,7 @@ public class JSONConfig implements Serializable, Cloneable
     private boolean escapeSurrogates;
     private boolean passThroughEscapes;
     private boolean encodeDatesAsStrings;
+    private boolean reflectUnknownObjects;
 
     private boolean quoteIdentifier;
     private boolean useECMA6;
@@ -217,10 +230,14 @@ public class JSONConfig implements Serializable, Cloneable
             result.customDateParseFormats = null;
         }
 
+        result.reflectClasses = reflectClasses == null ? null : new HashSet<>(reflectClasses);
+
         result.indentPadding = indentPadding == null ? null : indentPadding.clone();
 
         // this will just be regenerated on the next call if needed.
         result.dateParseFormats = null;
+
+        result.reflectionPrivacy = reflectionPrivacy;
 
         // validation options.
         result.validatePropertyNames = validatePropertyNames;
@@ -235,6 +252,7 @@ public class JSONConfig implements Serializable, Cloneable
         result.escapeSurrogates = escapeSurrogates;
         result.passThroughEscapes = passThroughEscapes;
         result.encodeDatesAsStrings = encodeDatesAsStrings;
+        result.reflectUnknownObjects = reflectUnknownObjects;
 
         // non-standard JSON.
         result.quoteIdentifier = quoteIdentifier;
@@ -602,6 +620,117 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
+     * Get the reflection privacy level.
+     *
+     * @return the reflection privacy level.
+     * @since 1.9
+     */
+    public int getReflectionPrivacy()
+    {
+        return reflectionPrivacy;
+    }
+
+    /**
+     * Set the privacy level for reflection.
+     *
+     * @param reflectionPrivacy the level to set
+     * @see ReflectUtil#PRIVATE
+     * @see ReflectUtil#PACKAGE
+     * @see ReflectUtil#PROTECTED
+     * @see ReflectUtil#PUBLIC
+     * @since 1.9
+     */
+    public void setReflectionPrivacy( int reflectionPrivacy )
+    {
+        this.reflectionPrivacy = ReflectUtil.confirmLevel(reflectionPrivacy, this);
+    }
+
+    /**
+     * Return true if the given class is in the set of classes being
+     * automatically reflected.
+     *
+     * @param clazz The class.
+     * @return true if the class is automatically reflected.
+     * @since 1.9
+     */
+    public boolean isReflectClass( Class<?> clazz )
+    {
+        return reflectClasses == null ? false : reflectClasses.contains(clazz);
+    }
+
+    /**
+     * Return true if objects with the same class given object are in the set of
+     * classes being automatically reflected.
+     *
+     * @param obj An object to check
+     * @return true if objects of the same type are reflected.
+     * @since 1.9
+     */
+    public boolean isReflectClass( Object obj )
+    {
+        return obj == null ? false : isReflectClass(JSONConfigDefaults.getClass(obj));
+    }
+
+    /**
+     * Add the class of the given object to the set of classes that
+     * automatically get reflected.
+     *
+     * @param obj The object whose class to add to the reflect list.
+     * @since 1.9
+     */
+    public void addReflectClass( Object obj )
+    {
+        reflectClasses = JSONConfigDefaults.addReflectClass(reflectClasses, obj);
+    }
+
+    /**
+     * Add the classes of all of the given objests to the list of classes
+     * that automatically get reflected.
+     *
+     * @param classes The objects to reflect.
+     * @since 1.9
+     */
+    public void addReflectClasses( Collection<?> classes )
+    {
+        reflectClasses = JSONConfigDefaults.addReflectClasses(reflectClasses, classes);
+    }
+
+    /**
+     * Remove the given class from the list of automatically reflected
+     * classes.
+     *
+     * @param obj An object of the type to be removed from the reflect list.
+     * @since 1.9
+     */
+    public void removeReflectClass( Object obj )
+    {
+        reflectClasses = JSONConfigDefaults.removeReflectClass(reflectClasses, obj);
+    }
+
+    /**
+     * Remove the given classes from the list of automatically reflected
+     * classes.
+     *
+     * @param classes A collection objects of the types to be removed from
+     * the reflect list.
+     * @since 1.9
+     */
+    public void removeReflectClasses( Collection<?> classes )
+    {
+        reflectClasses = JSONConfigDefaults.removeReflectClasses(reflectClasses, classes);
+    }
+
+    /**
+     * Clear all reflection classes, disabling all automatic reflection.
+     *
+     * @since 1.9
+     */
+    public void clearReflectClasses()
+    {
+        reflectClasses = null;
+    }
+
+    /**
      * Check if property names will be validated.
      *
      * @return true if property names are set to be validated.
@@ -865,9 +994,35 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
+     * Get the reflection of unknown objects policy.
+     *
+     * @return the reflectUnknownObjects policy.
+     */
+    public boolean isReflectUnknownObjects()
+    {
+        return reflectUnknownObjects;
+    }
+
+    /**
+     * Set the reflection encoding policy.  If true, then any time that an
+     * unknown object is encountered, this package will attempt to use
+     * reflection to encode it.  Default is false.  When false, then unknown
+     * objects will have their toString() method called.
+     *
+     * @param reflectUnknownObjects If true, then attempt to use reflection
+     * to encode objects which are otherwise unknown.
+     * @since 1.9
+     */
+    public void setReflectUnknownObjects( boolean reflectUnknownObjects )
+    {
+        this.reflectUnknownObjects = reflectUnknownObjects;
+    }
+
+    /**
      * Find out what the identifier quote policy is.
      *
      * @return If true, then all identifiers will be quoted.
+     * @since 1.9
      */
     public boolean isQuoteIdentifier()
     {
