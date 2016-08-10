@@ -17,6 +17,7 @@ package org.kopitubruk.util.json;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Locale;
 
@@ -106,16 +107,19 @@ public interface JSONConfigDefaultsMBean
     public int getReflectionPrivacy();
 
     /**
-     * Set the privacy level for reflection.
+     * Set the privacy level for reflection. Default is
+     * {@link ReflectUtil#PRIVATE} which includes all fields when reflection is
+     * enabled.
      *
      * @param dflt the level to set
+     * @throws MBeanException If the privacy level is not allowed.
      * @see ReflectUtil#PRIVATE
      * @see ReflectUtil#PACKAGE
      * @see ReflectUtil#PROTECTED
      * @see ReflectUtil#PUBLIC
      * @since 1.9
      */
-    public void setReflectionPrivacy( int dflt );
+    public void setReflectionPrivacy( int dflt ) throws MBeanException;
 
     /**
      * Clear all reflection classes, disabling all default automatic reflection.
@@ -331,6 +335,67 @@ public interface JSONConfigDefaultsMBean
      * @since 1.9
      */
     public void setReflectUnknownObjects( boolean dflt );
+
+    /**
+     * Get the preciseFloatingPoint policy.
+     *
+     * @return The preciseFloatingPoint policy.
+     */
+    public boolean isPreciseIntegers();
+
+    /**
+     * If true then integer numbers which are not exactly representable
+     * by a 64 bit double precision floating point number will be quoted in the
+     * output.  If false, then they will be unquoted, as numbers and precision
+     * will likely be lost in the interpreter.
+     *
+     * @param dflt If true then quote integer numbers
+     * that lose precision in 64-bit floating point.
+     */
+    public void setPreciseIntegers( boolean dflt );
+    /**
+     * Get the preciseFloatingPoint policy.
+     *
+     * @return The preciseFloatingPoint policy.
+     */
+    public boolean isPreciseFloatingPoint();
+
+    /**
+     * If true then floating point numbers which are not exactly representable
+     * by a 64 bit double precision floating point number will be quoted in the
+     * output.  If false, then they will be unquoted, as numbers and precision
+     * will likely be lost in the interpreter.
+     *
+     * @param dflt If true then quote floating point numbers
+     * that lose precision in 64-bit floating point.
+     */
+    public void setPreciseFloatingPoint( boolean dflt );
+
+    /**
+     * The primitive arrays policy.
+     *
+     * @return the usePrimitiveArrays policy.
+     */
+    public boolean isUsePrimitiveArrays();
+
+    /**
+     * If true, then when {@link JSONParser} encounters a JSON array of non-null
+     * wrappers of primitives and those primitives are all compatible with each
+     * other, then instead of an {@link ArrayList} of wrappers for those
+     * primitives it will create an array of those primitives in order to save
+     * memory.
+     * <p>
+     * This works for booleans and numbers. It will also convert an array of
+     * single character strings into an array of chars. Arrays of numbers will
+     * attempt to use the least complex type that does not lose information. You
+     * could easily end up with an array of bytes if all of your numbers are
+     * integers in the range -128 to 127. This option is meant to save as much
+     * memory as possible.
+     *
+     * @param dflt if true, then the parser will create arrays of primitives as
+     *            applicable.
+     */
+    public void setUsePrimitiveArrays( boolean dflt );
 
     /**
      * Get the default quote identifier policy.

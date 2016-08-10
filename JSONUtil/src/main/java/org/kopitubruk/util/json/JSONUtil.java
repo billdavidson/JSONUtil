@@ -140,12 +140,27 @@ import java.util.regex.Pattern;
  *     strict JSON parsers.  The date format can be changed to something else by
  *     {@link JSONConfig#setDateGenFormat(java.text.DateFormat)}.
  *   </dd>
+ *   <dt>CharSequence's</dt>
+ *   <dd>
+ *     CharSequence's such as {@link String} and {@StringBuilder} are encoded as Javascript
+ *     strings with escapes used as needed according to the ECMA JSON standard and escape
+ *     options from JSONConfig.
+ *   </dd>
  *   <dt>Any other object</dt>
  *   <dd>
- *     Any other object just gets its toString() method called and it's surrounded
- *     by quotes with escapes used as needed according to the ECMA JSON standard and
- *     escape options from JSONConfig. Usually this will just be for String objects,
- *     but anything that has a toString() that gives you what you want will work.
+ *     If reflection is disabled (which it is by default), then any other object just gets
+ *     its toString() method called and it's surrounded by quotes with escapes used as
+ *     needed according to the ECMA JSON standard and escape options from JSONConfig.
+ *     <p>
+ *     If reflection is enabled for the specific type or for all unknown types then
+ *     The package will attempt to figure out how to encode the fields of the given object
+ *     according to the privacy level set by {@link JSONConfig#setReflectionPrivacy(int)}
+ *     using Javabeans compliant getters if available or accessing fields directly if not.
+ *     See {@link JSONConfig#addReflectClass(Object)},
+ *     {@link JSONConfig#addReflectClasses(Collection)} and
+ *     {@link JSONConfig#setReflectUnknownObjects(boolean)} for ways to enable reflection.
+ *     These methods are also available in {@link JSONConfigDefaults} if you want to make
+ *     them the default behavior.
  *   </dd>
  *   <dt>null</dt>
  *   <dd>
@@ -171,6 +186,11 @@ public class JSONUtil
      * sign to start a number.
      */
     private static final Pattern JSON_NUMBER_PAT = Pattern.compile("^-?(?:(?:\\d+(?:\\.\\d+)?)|(?:\\.\\d+))(?:[eE][-+]?\\d+)?$");
+
+    /**
+     * Valid JSON integer pattern.
+     */
+    private static final Pattern JSON_INTEGER_PAT = Pattern.compile("^-?\\d+");
 
     /**
      * Check for octal numbers, which aren't allowed in JSON.
@@ -379,30 +399,13 @@ public class JSONUtil
         if ( propertyValue == null ){
             json.write(NULL);
         }else{
-            boolean isReflectClass = cfg.isReflectClass(propertyValue);
-            if ( isRecursible(propertyValue, isReflectClass) ){
-                appendRecursiblePropertyValue(propertyValue, json, cfg, isReflectClass);
+            JSONType jsonType = new JSONType(propertyValue, cfg);
+            if ( jsonType.isRecursible() ){
+                appendRecursiblePropertyValue(propertyValue, json, cfg, jsonType);
             }else{
-                appendSimplePropertyValue(propertyValue, json, cfg);
+                appendSimplePropertyValue(propertyValue, json, cfg, jsonType);
             }
         }
-    }
-
-    /**
-     * Return true if the object is recurisble.
-     *
-     * @param propertyValue The value to check.
-     * @return true if the object is recurisble.
-     */
-    private static boolean isRecursible( Object propertyValue, boolean isReflectClass )
-    {
-        return propertyValue instanceof Iterable ||
-               propertyValue instanceof Map ||
-               propertyValue instanceof JSONAble ||
-               propertyValue instanceof Enumeration ||
-               propertyValue instanceof ResourceBundle ||       // typically not recursed but code same as Map.
-               propertyValue.getClass().isArray() ||
-               isReflectClass;
     }
 
     /**
@@ -412,69 +415,82 @@ public class JSONUtil
      * @param propertyValue The value to append.
      * @param json Something to write the JSON data to.
      * @param cfg A configuration object to use to set various options.
-     * @param isReflectClass if true, then use reflection on the class to encode it.
+     * @param jsonType Information about the type of JSON to generate for this propertyValue
      * @throws IOException If there is an error on output.
      */
-    private static void appendRecursiblePropertyValue( Object propertyValue, Writer json, JSONConfig cfg, boolean isReflectClass ) throws IOException
+    private static void appendRecursiblePropertyValue( Object propertyValue, Writer json, JSONConfig cfg, JSONType jsonType ) throws IOException
     {
         // check for loops.
         DataStructureLoopDetector loopDetector = new DataStructureLoopDetector(cfg, propertyValue);
 
-        if ( propertyValue instanceof JSONAble ){
+        if ( jsonType.isJSONAble() ){
             JSONAble jsonAble = (JSONAble)propertyValue;
             jsonAble.toJSON(cfg, json);
+        }else if ( jsonType.isArrayType() ){
+            appendArrayPropertyValue(propertyValue, json, cfg);
         }else{
-            if ( propertyValue instanceof ResourceBundle ){
-                propertyValue = resourceBundleToMap((ResourceBundle)propertyValue);
-            }else if ( isReflectClass && ! (propertyValue instanceof Map) ){
-                propertyValue = ReflectUtil.getReflectedObject(propertyValue, cfg);
-            }
-            if ( propertyValue instanceof Map ){
-                appendObjectPropertyValue((Map<?,?>)propertyValue, json, cfg);
+            Map<?,?> map;
+            if ( jsonType.isResourceBundle() ){
+                ResourceBundle bundle = (ResourceBundle)propertyValue;
+                map = resourceBundleToMap(bundle);
+            }else if ( jsonType.isReflectType() ){
+                map = ReflectUtil.getReflectedObject(propertyValue, cfg);
             }else{
-                appendArrayPropertyValue(propertyValue, json, cfg);
+                map = (Map<?,?>)propertyValue;
             }
+            appendObjectPropertyValue(map, json, cfg);
         }
 
         loopDetector.popDataStructureStack();
     }
 
     /**
-     * Append a value that will be a JSON object. That is, a {@link Map} or
-     * {@link ResourceBundle}.
+     * Append a simple property value to the given JSON buffer. This method is
+     * used for numbers, strings and any other object that
+     * {@link #appendPropertyValue(Object, Writer, JSONConfig)} doesn't know
+     * about. There is some risk of infinite recursion if the object has a
+     * toString() method that references objects above this in the data
+     * structure, so be careful about that.
      *
-     * @param propertyValue A {@link Map} or {@link ResourceBundle}.
+     * @param propertyValue The value to append.
      * @param json Something to write the JSON data to.
      * @param cfg A configuration object to use to set various options.
+     * @param jsonType Information about the type of JSON to generate for this propertyValue
      * @throws IOException If there is an error on output.
      */
-    private static void appendObjectPropertyValue( Map<?,?> map, Writer json, JSONConfig cfg ) throws IOException
+    private static void appendSimplePropertyValue( Object propertyValue, Writer json, JSONConfig cfg, JSONType jsonType ) throws IOException
     {
-        Set<String> propertyNames = cfg.isValidatePropertyNames() ? new HashSet<>(map.size()) : null;
-        boolean didStart = false;
-        boolean quoteIdentifier = cfg.isQuoteIdentifier();
-        boolean havePadding = cfg.getIndentPadding() != null;
-
-        // make a Javascript object with the keys used to generate the property names.
-        json.write('{');
-        IndentPadding.incPadding(cfg);
-        for ( Entry<?,?> property : map.entrySet() ){
-            String propertyName = getPropertyName(property.getKey(), cfg, propertyNames);
-            Object value = property.getValue();
-            boolean extraIndent = havePadding && value != null && isRecursible(value, cfg.isReflectClass(value));
-            if ( didStart ){
-                json.write(',');
+        if ( propertyValue instanceof Number ){
+            Number num = (Number)propertyValue;
+            NumberFormat fmt = cfg.getNumberFormat(num);
+            String numericString = fmt == null ? num.toString()
+                                               : fmt.format(num, new StringBuffer(), new FieldPosition(0)).toString();
+            if ( isValidJSONNumber(numericString, cfg) ){
+                json.write(numericString);
             }else{
-                didStart = true;
+                // Something isn't a kosher number for JSON, which is more
+                // restrictive than ECMAScript for numbers.
+                writeString(numericString, json, cfg);
             }
-            IndentPadding.appendPadding(cfg, json);
-            appendPropertyName(propertyName, json, quoteIdentifier);
-            IndentPadding.incAppendPadding(cfg, json, extraIndent);
-            appendPropertyValue(value, json, cfg);      // recurse on the value.
-            IndentPadding.decAppendPadding(cfg, json, extraIndent);
+        }else if ( propertyValue instanceof Boolean ){
+            // boolean values go literal -- no quotes.
+            json.write(propertyValue.toString());
+        }else if ( propertyValue instanceof Date && cfg.isFormatDates() ){
+            if ( cfg.isEncodeDatesAsObjects() ){
+                json.write("new Date(");
+            }
+            writeString(cfg.getDateGenFormat().format((Date)propertyValue), json, cfg);
+            if ( cfg.isEncodeDatesAsObjects() ){
+                json.write(')');
+            }
+        }else if ( propertyValue instanceof CharSequence || propertyValue.getClass().isEnum() || ! cfg.isReflectUnknownObjects() ){
+            // Use the toString() method for the value and write it out as a string.
+            writeString(propertyValue.toString(), json, cfg);
+        }else{
+            // unknown object and reflection requested.
+            jsonType.forceReflectType();
+            appendRecursiblePropertyValue(propertyValue, json, cfg, jsonType);
         }
-        IndentPadding.decAppendPadding(cfg, json);
-        json.write('}');
     }
 
     /**
@@ -506,6 +522,44 @@ public class JSONUtil
     }
 
     /**
+     * Append a value that will be a JSON object. That is, a {@link Map} or
+     * {@link ResourceBundle}.
+     *
+     * @param propertyValue A {@link Map} or {@link ResourceBundle}.
+     * @param json Something to write the JSON data to.
+     * @param cfg A configuration object to use to set various options.
+     * @throws IOException If there is an error on output.
+     */
+    private static void appendObjectPropertyValue( Map<?,?> map, Writer json, JSONConfig cfg ) throws IOException
+    {
+        Set<String> propertyNames = cfg.isValidatePropertyNames() ? new HashSet<>(map.size()) : null;
+        boolean didStart = false;
+        boolean quoteIdentifier = cfg.isQuoteIdentifier();
+        boolean havePadding = cfg.getIndentPadding() != null;
+
+        // make a Javascript object with the keys used to generate the property names.
+        json.write('{');
+        IndentPadding.incPadding(cfg);
+        for ( Entry<?,?> property : map.entrySet() ){
+            String propertyName = getPropertyName(property.getKey(), cfg, propertyNames);
+            Object value = property.getValue();
+            boolean extraIndent = havePadding && value != null && new JSONType(value, cfg).isRecursible();
+            if ( didStart ){
+                json.write(',');
+            }else{
+                didStart = true;
+            }
+            IndentPadding.appendPadding(cfg, json);
+            appendPropertyName(propertyName, json, quoteIdentifier);
+            IndentPadding.incAppendPadding(cfg, json, extraIndent);
+            appendPropertyValue(value, json, cfg);      // recurse on the value.
+            IndentPadding.decAppendPadding(cfg, json, extraIndent);
+        }
+        IndentPadding.decAppendPadding(cfg, json);
+        json.write('}');
+    }
+
+    /**
      * Get the ResourceBundle for a JSON object as a Map.
      *
      * @param bundle A ResourceBundle.
@@ -519,113 +573,6 @@ public class JSONUtil
             result.put(key, bundle.getObject(key));
         }
         return new LinkedHashMap<>(result);
-    }
-
-    /**
-     * Write a property name to the output.  Includes the colon afterwards.
-     *
-     * @param propertyName the property name.
-     * @param json the writer.
-     * @param quoteIdentifier if true, then force quotes
-     * @throws IOException if there's an I/O error.
-     */
-    private static void appendPropertyName( String propertyName, Writer json, boolean quoteIdentifier ) throws IOException
-    {
-        boolean doQuote = quoteIdentifier ||
-                                isReservedWord(propertyName) ||
-                                hasSurrogates(propertyName);
-
-        if ( doQuote ){
-            json.write('"');
-        }
-
-        json.write(propertyName);
-
-        if ( doQuote ){
-            json.write('"');
-        }
-        json.write(':');
-    }
-
-    /**
-     * Append a simple property value to the given JSON buffer. This method is
-     * used for numbers, strings and any other object that
-     * {@link #appendPropertyValue(Object, Writer, JSONConfig)} doesn't know
-     * about. There is some risk of infinite recursion if the object has a
-     * toString() method that references objects above this in the data
-     * structure, so be careful about that.
-     *
-     * @param propertyValue The value to append.
-     * @param json Something to write the JSON data to.
-     * @param cfg A configuration object to use to set various options.
-     * @throws IOException If there is an error on output.
-     */
-    private static void appendSimplePropertyValue( Object propertyValue, Writer json, JSONConfig cfg ) throws IOException
-    {
-        if ( propertyValue instanceof Number ){
-            Number num = (Number)propertyValue;
-            NumberFormat fmt = cfg.getNumberFormat(num);
-            String numericString = fmt == null ? num.toString()
-                                               : fmt.format(num, new StringBuffer(), new FieldPosition(0)).toString();
-            if ( isValidJSONNumber(numericString) ){
-                json.write(numericString);
-            }else{
-                // Something isn't a kosher number for JSON, which is more
-                // restrictive than ECMAScript for numbers.
-                writeString(numericString, json, cfg);
-            }
-        }else if ( propertyValue instanceof Boolean ){
-            // boolean values go literal -- no quotes.
-            json.write(propertyValue.toString());
-        }else if ( propertyValue instanceof Date && cfg.isFormatDates() ){
-            if ( cfg.isEncodeDatesAsObjects() ){
-                json.write("new Date(");
-            }
-            writeString(cfg.getDateGenFormat().format((Date)propertyValue), json, cfg);
-            if ( cfg.isEncodeDatesAsObjects() ){
-                json.write(')');
-            }
-        }else if ( propertyValue instanceof CharSequence || ! cfg.isReflectUnknownObjects() ){
-            // Use the toString() method for the value and write it out as a string.
-            writeString(propertyValue.toString(), json, cfg);
-        }else{
-            // unknown object and reflection requested.
-            boolean isReflectClass = true;
-            appendRecursiblePropertyValue(propertyValue, json, cfg, isReflectClass);
-        }
-    }
-
-    /**
-     * Write a string to the output using escapes as needed.
-     *
-     * @param strValue The value to write.
-     * @param json Something to write the JSON data to.
-     * @param cfg A configuration object to use.
-     * @throws IOException If there is an error on output.
-     */
-    private static void writeString( String strValue, Writer json, JSONConfig cfg ) throws IOException
-    {
-        if ( cfg.isEncodeNumericStringsAsNumbers() && isValidJSONNumber(strValue) ){
-            // no quotes.
-            json.write(strValue);
-        }else{
-            boolean useSingleLetterEscapes = true;
-            boolean processInlineEscapes = cfg.isPassThroughEscapes();
-            if ( cfg.isUnEscapeWherePossible() ){
-                strValue = CodePointData.unEscape(strValue, cfg);
-            }
-
-            json.write('"');
-            CodePointData cp = new CodePointData(strValue, cfg, useSingleLetterEscapes, processInlineEscapes);
-            while ( cp.nextReady() ){
-                if ( cp.getEsc() != null ){
-                    json.write(cp.getEsc());    // valid escape.
-                }else{
-                    cp.writeChars(json);        // Pass it through -- usual case.
-                }
-            }
-            json.write('"');
-        }
     }
 
     /**
@@ -672,6 +619,32 @@ public class JSONUtil
         }
 
         return propertyName;
+    }
+
+    /**
+     * Write a property name to the output.  Includes the colon afterwards.
+     *
+     * @param propertyName the property name.
+     * @param json the writer.
+     * @param quoteIdentifier if true, then force quotes
+     * @throws IOException if there's an I/O error.
+     */
+    private static void appendPropertyName( String propertyName, Writer json, boolean quoteIdentifier ) throws IOException
+    {
+        boolean doQuote = quoteIdentifier ||
+                                isReservedWord(propertyName) ||
+                                hasSurrogates(propertyName);
+
+        if ( doQuote ){
+            json.write('"');
+        }
+
+        json.write(propertyName);
+
+        if ( doQuote ){
+            json.write('"');
+        }
+        json.write(':');
     }
 
     /**
@@ -762,14 +735,89 @@ public class JSONUtil
     }
 
     /**
-     * Return true if the input looks like a valid JSON number.
+     * Write a string to the output using escapes as needed.
+     *
+     * @param strValue The value to write.
+     * @param json Something to write the JSON data to.
+     * @param cfg A configuration object to use.
+     * @throws IOException If there is an error on output.
+     */
+    private static void writeString( String strValue, Writer json, JSONConfig cfg ) throws IOException
+    {
+        if ( cfg.isEncodeNumericStringsAsNumbers() && isValidJSONNumber(strValue, cfg) ){
+            // no quotes.
+            json.write(strValue);
+        }else{
+            boolean useSingleLetterEscapes = true;
+            boolean processInlineEscapes = cfg.isPassThroughEscapes();
+            if ( cfg.isUnEscapeWherePossible() ){
+                strValue = CodePointData.unEscape(strValue, cfg);
+            }
+
+            json.write('"');
+            CodePointData cp = new CodePointData(strValue, cfg, useSingleLetterEscapes, processInlineEscapes);
+            while ( cp.nextReady() ){
+                if ( cp.getEsc() != null ){
+                    json.write(cp.getEsc());    // valid escape.
+                }else{
+                    cp.writeChars(json);        // Pass it through -- usual case.
+                }
+            }
+            json.write('"');
+        }
+    }
+
+    /**
+     * Return true if the input looks like a valid JSON number and can be
+     * represented by a non-infinity double.
      *
      * @param numericString the string.
+     * @param cfg the config object.
      * @return true if the string can be treated as a number in JSON.
      */
-    private static boolean isValidJSONNumber( String numericString )
+    private static boolean isValidJSONNumber( String numericString, JSONConfig cfg )
     {
-        return JSON_NUMBER_PAT.matcher(numericString).matches() && ! OCTAL_NUMBER_PAT.matcher(numericString).matches();
+        return JSON_NUMBER_PAT.matcher(numericString).matches() &&
+               ! OCTAL_NUMBER_PAT.matcher(numericString).matches() &&
+               isSafeJavascriptNumber(numericString, cfg);
+    }
+
+    /**
+     * Check range and precision of a JSON number according to flags.
+     *
+     * @param numericString The numeric string to check.
+     * @param cfg the config object.
+     * @return true if the number is valid for 64-bit floating point and flags.
+     */
+    private static boolean isSafeJavascriptNumber( String numericString, JSONConfig cfg )
+    {
+        BigDecimal b = new BigDecimal(numericString);
+        Double d = b.doubleValue();
+
+        // All valid JSON numbers must be representable as finite 64-bit floating point.
+        boolean isSafeJavascriptNumber = Double.isFinite(d);
+
+        if ( isSafeJavascriptNumber && cfg.havePrecisionOpts() ){
+            // check for precision flags.
+            if ( JSON_INTEGER_PAT.matcher(numericString).matches() ){
+                if ( cfg.isPreciseIntegers() ){
+                    // make sure that it stays the same when converted to double and back.
+                    try{
+                        long x = new BigInteger(numericString).longValueExact();
+                        // check if any precision was lost.
+                        isSafeJavascriptNumber = x == new Double(x).longValue();
+                    }catch ( ArithmeticException e ){
+                        // overflowed a long.
+                        isSafeJavascriptNumber = false;
+                    }
+                }
+            }else if ( cfg.isPreciseFloatingPoint() ){
+                // if they don't compare equal then precision was lost.
+                isSafeJavascriptNumber = b.compareTo(new BigDecimal(d.toString())) == 0;
+            }
+        }
+
+        return isSafeJavascriptNumber;
     }
 
     /**

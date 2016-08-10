@@ -97,6 +97,9 @@ import org.apache.commons.logging.LogFactory;
  *   <li>passThroughEscapes = false</li>
  *   <li>encodeDatesAsStrings = false</li>
  *   <li>reflectUnknownObjects = false</li>
+ *   <li>preciseIntegers = false</li>
+ *   <li>preciseFloatingPoint = false</li>
+ *   <li>usePrimitiveArrays = false</li>
  * </ul>
  * <h3>
  *   Allow generation of certain types of non-standard JSON.
@@ -126,6 +129,16 @@ import org.apache.commons.logging.LogFactory;
  * "dateParseFormat0" through "dateParseFormat15" using String values as with
  * "dateGenFormat" described above.  They will be added in numeric order of
  * the name.
+ * <p>
+ * Classes to use for automatic reflection can also be set up via JNDI.
+ * You must define an integer "maxReflectIndex" which will be the index of
+ * the last reflected class name to be searched for.  This class will then
+ * look for String variables named "reflectClass0", "reflectClass1" and so on
+ * until the number at the end up the name reaches maxReflectIndex.  The
+ * class names need to load with {@link ClassLoader#loadClass(String)} or
+ * they will not be added to the list of reflected classes.  These classes
+ * will be added to all JSONConfig objects that are created in this class
+ * loader.
  * <p>
  * Number formats and date formats are cloned when they are added because they
  * are not thread safe.  They are cloned again when applied to a new
@@ -175,6 +188,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static volatile boolean passThroughEscapes;
     private static volatile boolean encodeDatesAsStrings;
     private static volatile boolean reflectUnknownObjects;
+    private static volatile boolean preciseIntegers;
+    private static volatile boolean preciseFloatingPoint;
+    private static volatile boolean usePrimitiveArrays;
 
     private static volatile boolean quoteIdentifier;
     private static volatile boolean useECMA6;
@@ -323,6 +339,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 d.setPassThroughEscapes(getBoolean(ctx, "passThroughEscapes", passThroughEscapes));
                 d.setEncodeDatesAsStrings(getBoolean(ctx, "encodeDatesAsStrings", encodeDatesAsStrings));
                 d.setReflectUnknownObjects(getBoolean(ctx, "reflectUnknownObjects", reflectUnknownObjects));
+                d.setPreciseIntegers(getBoolean(ctx, "preciseIntegers", preciseIntegers));
+                d.setPreciseFloatingPoint(getBoolean(ctx, "preciseFloatingPoint", preciseFloatingPoint));
+                d.setUsePrimitiveArrays(getBoolean(ctx, "usePrimitiveArrays", usePrimitiveArrays));
 
                 // non-standard encoding options.
                 d.setQuoteIdentifier(getBoolean(ctx, "quoteIdentifier", quoteIdentifier));
@@ -334,7 +353,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 try{
                     ReflectUtil.confirmLevel(reflectionPrivacy, new JSONConfig());
                 }catch ( JSONReflectionException ex ){
-                    reflectionPrivacy = ReflectUtil.PRIVATE;
+                    debug(ex.getLocalizedMessage(), ex);
+                    reflectionPrivacy = ReflectUtil.PUBLIC;
                 }
             }catch ( Exception e ){
                 // Nothing set in JNDI.  Use code defaults.  Not a problem.
@@ -398,6 +418,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             passThroughEscapes = false;
             encodeDatesAsStrings = false;
             reflectUnknownObjects = false;
+            preciseIntegers = false;
+            preciseFloatingPoint = false;
+            usePrimitiveArrays = false;
 
             quoteIdentifier = true;
             useECMA6 = false;
@@ -490,6 +513,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         cfg.setPassThroughEscapes(passThroughEscapes);
         cfg.setEncodeDatesAsStrings(encodeDatesAsStrings);
         cfg.setReflectUnknownObjects(reflectUnknownObjects);
+        cfg.setPreciseIntegers(preciseIntegers);
+        cfg.setPreciseFloatingPoint(preciseFloatingPoint);
+        cfg.setUsePrimitiveArrays(usePrimitiveArrays);
 
         // non-standard JSON options.
         cfg.setQuoteIdentifier(quoteIdentifier);
@@ -930,28 +956,41 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Get the reflection privacy level.
+     * <p>
+     * Accessible via MBean server.
      *
      * @return the reflection privacy level.
      * @since 1.9
      */
+    @Override
     public int getReflectionPrivacy()
     {
         return reflectionPrivacy;
     }
 
     /**
-     * Set the privacy level for reflection.
+     * Set the privacy level for reflection. Default is
+     * {@link ReflectUtil#PUBLIC}.
+     * <p>
+     * Accessible via MBean server.
      *
      * @param dflt the level to set
+     * @throws MBeanException If the privacy level is not allowed.
      * @see ReflectUtil#PRIVATE
      * @see ReflectUtil#PACKAGE
      * @see ReflectUtil#PROTECTED
      * @see ReflectUtil#PUBLIC
      * @since 1.9
      */
-    public void setReflectionPrivacy( int dflt )
+    @Override
+    public void setReflectionPrivacy( int dflt ) throws MBeanException
     {
-        reflectionPrivacy = ReflectUtil.confirmLevel(dflt, new JSONConfig());
+        try{
+            reflectionPrivacy = ReflectUtil.confirmLevel(dflt, new JSONConfig());
+        }catch ( JSONReflectionException e ){
+            error(e.getLocalizedMessage(), e);
+            throw new MBeanException(e);   // MBeans should only throw MBeanExceptions.
+        }
     }
 
     /**
@@ -1530,6 +1569,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Get the reflection of unknown objects policy.
+     * <p>
+     * Accessible via MBean server.
      *
      * @return the reflectUnknownObjects policy.
      * @since 1.9
@@ -1545,6 +1586,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * unknown object is encountered, this package will attempt to use
      * reflection to encode it.  Default is false.  When false, then unknown
      * objects will have their toString() method called.
+     * <p>
+     * Accessible via MBean server.
      *
      * @param dflt If true, then attempt to use reflection
      * to encode objects which are otherwise unknown.
@@ -1556,6 +1599,92 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         synchronized ( this.getClass() ){
             reflectUnknownObjects = dflt;
         }
+    }
+
+    /**
+     * Get the preciseIntegers policy.
+     *
+     * @return The preciseIntegers policy.
+     */
+    @Override
+    public boolean isPreciseIntegers()
+    {
+        return preciseIntegers;
+    }
+
+    /**
+     * If true then integer numbers which are not exactly representable
+     * by a 64 bit double precision floating point number will be quoted in the
+     * output.  If false, then they will be unquoted, as numbers and precision
+     * will likely be lost in the interpreter.
+     *
+     * @param dflt If true then quote integer numbers
+     * that lose precision in 64-bit floating point.
+     */
+    @Override
+    public void setPreciseIntegers( boolean dflt )
+    {
+        preciseIntegers = dflt;
+    }
+
+    /**
+     * Get the preciseFloatingPoint policy.
+     *
+     * @return The preciseFloatingPoint policy.
+     */
+    @Override
+    public boolean isPreciseFloatingPoint()
+    {
+        return preciseFloatingPoint;
+    }
+
+    /**
+     * If true then floating point numbers which are not exactly representable
+     * by a 64 bit double precision floating point number will be quoted in the
+     * output.  If false, then they will be unquoted, as numbers and precision
+     * will likely be lost in the interpreter.
+     *
+     * @param dflt If true then quote floating point numbers
+     * that lose precision in 64-bit floating point.
+     */
+    @Override
+    public void setPreciseFloatingPoint( boolean dflt )
+    {
+        preciseFloatingPoint = dflt;
+    }
+
+    /**
+     * The primitive arrays policy.
+     *
+     * @return the usePrimitiveArrays policy.
+     */
+    @Override
+    public boolean isUsePrimitiveArrays()
+    {
+        return usePrimitiveArrays;
+    }
+
+    /**
+     * If true, then when {@link JSONParser} encounters a JSON array of non-null
+     * wrappers of primitives and those primitives are all compatible with each
+     * other, then instead of an {@link ArrayList} of wrappers for those
+     * primitives it will create an array of those primitives in order to save
+     * memory.
+     * <p>
+     * This works for booleans and numbers. It will also convert an array of
+     * single character strings into an array of chars. Arrays of numbers will
+     * attempt to use the least complex type that does not lose information. You
+     * could easily end up with an array of bytes if all of your numbers are
+     * integers in the range -128 to 127. This option is meant to save as much
+     * memory as possible.
+     *
+     * @param dflt if true, then the parser will create arrays of primitives as
+     *            applicable.
+     */
+    @Override
+    public void setUsePrimitiveArrays( boolean dflt )
+    {
+       usePrimitiveArrays = dflt;
     }
 
     /**
