@@ -460,7 +460,7 @@ public class JSONParser
             for ( int i = 0; i < doubles.length; i++ ){
                 Number num = (Number)list.get(i);
                 if ( num instanceof Float ){
-                    doubles[i] = Double.parseDouble(num.toString());
+                    doubles[i] = Double.parseDouble(num.toString());    // avoid cast rounding errors.
                 }else{
                     doubles[i] = num.doubleValue();
                 }
@@ -520,13 +520,23 @@ public class JSONParser
                     }catch ( ParseException e ){
                     }
                 }
+                if ( cfg.isEncodeNumericStringsAsNumbers() ){
+                    Matcher matcher = JAVASCRIPT_FLOATING_POINT_PAT.matcher(unesc);
+                    if ( matcher.matches() ){
+                        return getDecimal(matcher.group(1));
+                    }
+                    matcher = JAVASCRIPT_INTEGER_PAT.matcher(unesc);
+                    if ( matcher.matches() ){
+                        return getInteger(matcher.group(1));
+                    }
+                }
                 return unesc;
             case FLOATING_POINT_NUMBER:
                 return getDecimal(token.value);
             case INTEGER_NUMBER:
                 return getInteger(token.value);
             case LITERAL:
-                if ( token.value.equals(JSONUtil.NULL) ){
+                if ( token.value.equals("null") ){
                     return null;
                 }else{
                     return Boolean.valueOf(token.value);
