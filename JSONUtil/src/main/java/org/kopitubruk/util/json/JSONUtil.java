@@ -175,11 +175,6 @@ import java.util.regex.Pattern;
  */
 public class JSONUtil
 {
-    /*
-     * Multi-use string.
-     */
-    static final String NULL = "null";
-
     /**
      * For strings that are really numbers.  ECMA JSON spec doesn't allow octal,
      * hexadecimal, NaN or Infinity in JSON.  It also doesn't allow for a "+"
@@ -296,7 +291,7 @@ public class JSONUtil
                                     /* future reserved words for ECMAScript 6 */
                           "await",
                                     /* literals */
-                          "true", "false", NULL, "undefined", "Infinity", "NaN"));
+                          "true", "false", "null", "undefined", "Infinity", "NaN"));
 
     /**
      * Convert an object to JSON and return it as a {@link String}. All options
@@ -397,7 +392,7 @@ public class JSONUtil
     private static void appendPropertyValue( Object propertyValue, Writer json, JSONConfig cfg ) throws IOException
     {
         if ( propertyValue == null ){
-            json.write(NULL);
+            json.write("null");
         }else{
             JSONType jsonType = new JSONType(propertyValue, cfg);
             if ( jsonType.isRecursible() ){

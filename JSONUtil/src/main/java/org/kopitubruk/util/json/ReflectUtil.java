@@ -1,6 +1,5 @@
 package org.kopitubruk.util.json;
 
-import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -107,9 +106,8 @@ public class ReflectUtil
      * @param propertyValue The object to be appended via reflection.
      * @param cfg A configuration object to use.
      * @return A map representing the object's fields.
-     * @throws IOException If there is an error on output.
      */
-    static Map<Object,Object> getReflectedObject( Object propertyValue, JSONConfig cfg ) throws IOException
+    static Map<Object,Object> getReflectedObject( Object propertyValue, JSONConfig cfg )
     {
         // add the fields to the object map.
         Map<Object,Object> obj = new LinkedHashMap<>();
@@ -266,17 +264,9 @@ public class ReflectUtil
      */
     private static boolean isCompatible( Class<?> fieldType, Class<?> retType )
     {
-        Class<?> tmpClass = retType;
-        while ( tmpClass != null ){
-            if ( fieldType.equals(tmpClass) ){
-                // fieldType is the same as or is a super type of retType.
-                return true;
-            }
-            tmpClass = tmpClass.getSuperclass();
-        }
-
-        // other compatible types for JSON.
-        if ( isNumber(fieldType) && isNumber(retType) ){
+        if ( isType(retType, fieldType) ){
+            return true;
+        }else if ( isNumber(fieldType) && isNumber(retType) ){
             return true;
         }else if ( isCharSequence(fieldType) && isCharSequence(retType) ){
             return true;
