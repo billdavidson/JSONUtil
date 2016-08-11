@@ -110,6 +110,20 @@ class JNDIUtil
      * @param defaultValue The result if you don't find it.
      * @return The value of the variable being looked up or defaultValue if not found.
      */
+    static int getInt( Context ctx, String name, int defaultValue )
+    {
+        Object obj = getObject(ctx, name);
+        return obj instanceof Integer ? (Integer)obj : defaultValue;
+    }
+
+    /**
+     * Shorthand for doing JNDI lookups.
+     *
+     * @param ctx The context.
+     * @param name The name to look up.
+     * @param defaultValue The result if you don't find it.
+     * @return The value of the variable being looked up or defaultValue if not found.
+     */
     static String getString( Context ctx, String name, String defaultValue )
     {
         Object obj = getObject(ctx, name);

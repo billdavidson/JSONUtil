@@ -15,6 +15,10 @@
  */
 package org.kopitubruk.util.json;
 
+import static org.kopitubruk.util.json.JNDIUtil.getBoolean;
+import static org.kopitubruk.util.json.JNDIUtil.getInt;
+import static org.kopitubruk.util.json.JNDIUtil.getString;
+
 import java.io.Serializable;
 import java.lang.management.ManagementFactory;
 import java.text.DateFormat;
@@ -23,23 +27,24 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.ResourceBundle;
 import java.util.Map.Entry;
+import java.util.ResourceBundle;
+import java.util.Set;
 
+import javax.management.MBeanException;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import javax.naming.Context;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
-import static org.kopitubruk.util.json.JNDIUtil.getString;
-import static org.kopitubruk.util.json.JNDIUtil.getBoolean;
 
 /**
  * <p>
@@ -91,6 +96,10 @@ import static org.kopitubruk.util.json.JNDIUtil.getBoolean;
  *   <li>escapeSurrogates = false</li>
  *   <li>passThroughEscapes = false</li>
  *   <li>encodeDatesAsStrings = false</li>
+ *   <li>reflectUnknownObjects = false</li>
+ *   <li>preciseIntegers = false</li>
+ *   <li>preciseFloatingPoint = false</li>
+ *   <li>usePrimitiveArrays = false</li>
  * </ul>
  * <h3>
  *   Allow generation of certain types of non-standard JSON.
@@ -120,6 +129,16 @@ import static org.kopitubruk.util.json.JNDIUtil.getBoolean;
  * "dateParseFormat0" through "dateParseFormat15" using String values as with
  * "dateGenFormat" described above.  They will be added in numeric order of
  * the name.
+ * <p>
+ * Classes to use for automatic reflection can also be set up via JNDI.
+ * You must define an integer "maxReflectIndex" which will be the index of
+ * the last reflected class name to be searched for.  This class will then
+ * look for String variables named "reflectClass0", "reflectClass1" and so on
+ * until the number at the end up the name reaches maxReflectIndex.  The
+ * class names need to load with {@link ClassLoader#loadClass(String)} or
+ * they will not be added to the list of reflected classes.  These classes
+ * will be added to all JSONConfig objects that are created in this class
+ * loader.
  * <p>
  * Number formats and date formats are cloned when they are added because they
  * are not thread safe.  They are cloned again when applied to a new
@@ -168,6 +187,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static volatile boolean escapeSurrogates;
     private static volatile boolean passThroughEscapes;
     private static volatile boolean encodeDatesAsStrings;
+    private static volatile boolean reflectUnknownObjects;
+    private static volatile boolean preciseIntegers;
+    private static volatile boolean preciseFloatingPoint;
+    private static volatile boolean usePrimitiveArrays;
 
     private static volatile boolean quoteIdentifier;
     private static volatile boolean useECMA6;
@@ -179,8 +202,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static volatile Map<Class<? extends Number>,NumberFormat> numberFormatMap;
     private static volatile DateFormat dateGenFormat;
     private static volatile List<DateFormat> dateParseFormats;
-    private static IndentPadding indentPadding = null;
-
+    private static volatile IndentPadding indentPadding = null;
+    private static volatile Set<Class<?>> reflectClasses = null;
+    private static volatile int reflectionPrivacy;
 
     // stored for deregistration on unload.
     private static ObjectName mBeanName = null;
@@ -190,6 +214,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     // logging.
     private static boolean logging;
+
+    // reflection support.
+    private static ClassLoader classLoader;
 
     /*
      * Initialize static data.
@@ -203,6 +230,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
         // annoying that there's no static equivalent to "this".
         Class<?> thisClass = d.getClass();
+
+        // needed for loading classes for reflection.
+        classLoader = thisClass.getClassLoader();
 
         String pkgName = thisClass.getPackage().getName();
         String registerMBeanName = "registerMBean";
@@ -274,6 +304,27 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                     }
                 }
 
+                // default reflection classes.
+                int maxReflectIndex = getInt(ctx, "maxReflectIndex", -1);
+                if ( maxReflectIndex >= 0 ){
+                    List<String> classNames = new ArrayList<String>();
+                    for ( int i = 0; i <= maxReflectIndex; i++ ){
+                        String className = getString(ctx, "reflectClass" + i, null);
+                        if ( className != null ){
+                            classNames.add(className);
+                        }
+                    }
+                    List<Class<?>> classes = new ArrayList<Class<?>>(classNames.size());
+                    for ( String className : classNames ){
+                        try{
+                            classes.add(getClassByName(className));
+                        }catch ( MBeanException e ){
+                            // Not actually an MBean operation at this point.
+                        }
+                    }
+                    addReflectClasses(classes);
+                }
+
                 // validation flags.
                 d.setValidatePropertyNames(getBoolean(ctx, "validatePropertyNames", validatePropertyNames));
                 d.setDetectDataStructureLoops(getBoolean(ctx, "detectDataStructureLoops", detectDataStructureLoops));
@@ -285,14 +336,26 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 d.setEscapeNonAscii(getBoolean(ctx, "escapeNonAscii", escapeNonAscii));
                 d.setUnEscapeWherePossible(getBoolean(ctx, "unEscapeWherePossible", unEscapeWherePossible));
                 d.setEscapeSurrogates(getBoolean(ctx, "escapeSurrogates", escapeSurrogates));
-                d.setEscapeSurrogates(getBoolean(ctx, "passThroughEscapes", passThroughEscapes));
+                d.setPassThroughEscapes(getBoolean(ctx, "passThroughEscapes", passThroughEscapes));
                 d.setEncodeDatesAsStrings(getBoolean(ctx, "encodeDatesAsStrings", encodeDatesAsStrings));
+                d.setReflectUnknownObjects(getBoolean(ctx, "reflectUnknownObjects", reflectUnknownObjects));
+                d.setPreciseIntegers(getBoolean(ctx, "preciseIntegers", preciseIntegers));
+                d.setPreciseFloatingPoint(getBoolean(ctx, "preciseFloatingPoint", preciseFloatingPoint));
+                d.setUsePrimitiveArrays(getBoolean(ctx, "usePrimitiveArrays", usePrimitiveArrays));
 
                 // non-standard encoding options.
                 d.setQuoteIdentifier(getBoolean(ctx, "quoteIdentifier", quoteIdentifier));
                 d.setUseECMA6(getBoolean(ctx, "useECMA6CodePoints", useECMA6));
                 d.setAllowReservedWordsInIdentifiers(getBoolean(ctx, "allowReservedWordsInIdentifiers", allowReservedWordsInIdentifiers));
                 d.setEncodeDatesAsObjects(getBoolean(ctx, "encodeDatesAsObjects", encodeDatesAsObjects));
+
+                reflectionPrivacy = getInt(ctx, "reflectionPrivacy", reflectionPrivacy);
+                try{
+                    ReflectUtil.confirmPrivacyLevel(reflectionPrivacy, new JSONConfig());
+                }catch ( JSONReflectionException ex ){
+                    debug(ex.getLocalizedMessage(), ex);
+                    reflectionPrivacy = ReflectUtil.PUBLIC;
+                }
             }catch ( Exception e ){
                 // Nothing set in JNDI.  Use code defaults.  Not a problem.
                 debug(bundle.getString("badJNDIforConfig"), e);
@@ -354,6 +417,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             escapeSurrogates = false;
             passThroughEscapes = false;
             encodeDatesAsStrings = false;
+            reflectUnknownObjects = false;
+            preciseIntegers = false;
+            preciseFloatingPoint = false;
+            usePrimitiveArrays = false;
 
             quoteIdentifier = true;
             useECMA6 = false;
@@ -365,6 +432,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             dateGenFormat = null;
             dateParseFormats = null;
             indentPadding = null;
+            reflectClasses = null;
+            reflectionPrivacy = ReflectUtil.PRIVATE;
         }
     }
 
@@ -427,6 +496,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         cfg.addNumberFormats(getNumberFormatMap());
         cfg.setDateGenFormat(getDateGenFormat());
         cfg.addDateParseFormats(getDateParseFormats());
+        cfg.addReflectClasses(reflectClasses);
+        cfg.setReflectionPrivacy(reflectionPrivacy);
 
         // validation options.
         cfg.setValidatePropertyNames(validatePropertyNames);
@@ -441,6 +512,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         cfg.setEscapeSurrogates(escapeSurrogates);
         cfg.setPassThroughEscapes(passThroughEscapes);
         cfg.setEncodeDatesAsStrings(encodeDatesAsStrings);
+        cfg.setReflectUnknownObjects(reflectUnknownObjects);
+        cfg.setPreciseIntegers(preciseIntegers);
+        cfg.setPreciseFloatingPoint(preciseFloatingPoint);
+        cfg.setUsePrimitiveArrays(usePrimitiveArrays);
 
         // non-standard JSON options.
         cfg.setQuoteIdentifier(quoteIdentifier);
@@ -849,9 +924,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Clear any date parse formats from the list of formats
-     * used by the parser when encodeDatesAsStrings or
-     * encodeDatesAsObjects is true.
+     * Clear any date parse formats from the list of formats used by the parser
+     * when encodeDatesAsStrings or encodeDatesAsObjects is true.
      * <p>
      * Accessible via MBean server.
      */
@@ -883,6 +957,323 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public static synchronized void setIndentPadding( IndentPadding indentPadding )
     {
         JSONConfigDefaults.indentPadding = indentPadding;
+    }
+
+    /**
+     * Get the reflection privacy level.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @return the reflection privacy level.
+     * @since 1.9
+     */
+    @Override
+    public int getReflectionPrivacy()
+    {
+        return reflectionPrivacy;
+    }
+
+    /**
+     * Set the privacy level for reflection. Default is
+     * {@link ReflectUtil#PUBLIC}.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @param dflt the level to set
+     * @throws MBeanException If the privacy level is not allowed.
+     * @see ReflectUtil#PRIVATE
+     * @see ReflectUtil#PACKAGE
+     * @see ReflectUtil#PROTECTED
+     * @see ReflectUtil#PUBLIC
+     * @since 1.9
+     */
+    @Override
+    public void setReflectionPrivacy( int dflt ) throws MBeanException
+    {
+        try{
+            reflectionPrivacy = ReflectUtil.confirmPrivacyLevel(dflt, new JSONConfig());
+        }catch ( JSONReflectionException e ){
+            error(e.getLocalizedMessage(), e);
+            throw new MBeanException(e);   // MBeans should only throw MBeanExceptions.
+        }
+    }
+
+    /**
+     * Return true if the given class is in the set of classes being
+     * automatically reflected.
+     *
+     * @param clazz The class.
+     * @return true if the class is automatically reflected.
+     * @since 1.9
+     */
+    public static synchronized boolean isReflectClass( Class<?> clazz )
+    {
+        return reflectClasses == null ? false : reflectClasses.contains(clazz);
+    }
+
+    /**
+     * Return true if objects with the same class given object are in the set of
+     * classes being automatically reflected.
+     *
+     * @param obj An object to check
+     * @return true if objects of the same type are reflected.
+     * @since 1.9
+     */
+    public static boolean isReflectClass( Object obj )
+    {
+        return obj == null ? false : isReflectClass(getClass(obj));
+    }
+
+    /**
+     * Add the class of the given object to the set of classes that
+     * automatically get reflected.
+     *
+     * @param obj The object whose class to add to the reflect list.
+     * @since 1.9
+     */
+    public static synchronized void addReflectClass( Object obj )
+    {
+        reflectClasses = addReflectClass(reflectClasses, obj);
+    }
+
+    /**
+     * Add the classes of all of the given objests to the list of classes
+     * that automatically get reflected.
+     *
+     * @param classes The objects to reflect.
+     * @since 1.9
+     */
+    public static synchronized void addReflectClasses( Collection<?> classes )
+    {
+        reflectClasses = addReflectClasses(reflectClasses, classes);
+    }
+
+    /**
+     * Remove the given class from the list of automatically reflected
+     * classes.
+     *
+     * @param obj An object of the type to be removed from the reflect list.
+     * @since 1.9
+     */
+    public static synchronized void removeReflectClass( Object obj )
+    {
+        reflectClasses = removeReflectClass(reflectClasses, obj);
+    }
+
+    /**
+     * Remove the classes of the given objects from the set of classes
+     * that automatically get reflected.
+     *
+     * @param classes The classes to remove.
+     * @since 1.9
+     */
+    public static synchronized void removeReflectClasses( Collection<?> classes )
+    {
+        reflectClasses = removeReflectClasses(reflectClasses, classes);
+    }
+
+    /**
+     * Clear all reflection classes, disabling all default automatic reflection.
+     *
+     * @since 1.9
+     */
+    @Override
+    public void clearReflectClasses()
+    {
+        synchronized ( this.getClass() ){
+            reflectClasses = null;
+        }
+    }
+
+    /**
+     * Add the given class to the set of classes to be reflected.
+     *
+     * @param className The name of the class suitable for
+     * (@link {@link ClassLoader#loadClass(String)}}.
+     * @throws MBeanException If there's a problem loading the class.
+     * @since 1.9
+     */
+    @Override
+    public void addReflectClassByName( String className ) throws MBeanException
+    {
+        addReflectClass(getClassByName(className));
+    }
+
+    /**
+     * Remove the given class from the set of classes to be reflected.
+     *
+     * @param className The name of the class suitable for
+     * (@link {@link ClassLoader#loadClass(String)}}.
+     * @throws MBeanException If there's a problem loading the class.
+     * @since 1.9
+     */
+    @Override
+    public void removeReflectClassByName( String className ) throws MBeanException
+    {
+        removeReflectClass(getClassByName(className));
+    }
+
+    /**
+     * Get a string with newline separated list of classes that get reflected.
+     *
+     * @return A string with newline separated list of classes that get reflected.
+     * @since 1.9
+     */
+    @Override
+    public String listReflectedClasses()
+    {
+        List<Class<?>> refClasses = null;
+        synchronized ( this.getClass() ){
+            if ( reflectClasses != null ){
+                refClasses = new ArrayList<Class<?>>(reflectClasses);
+            }
+        }
+        StringBuilder result = new StringBuilder();
+        if ( refClasses != null ){
+            List<String> classes = new ArrayList<String>(refClasses.size());
+            for ( Class<?> clazz : refClasses ){
+                classes.add(clazz.getCanonicalName());
+            }
+            Collections.sort(classes);
+            for ( String className : classes ){
+                result.append(className).append('\n');
+            }
+        }
+        return result.toString();
+    }
+
+    /**
+     * Get the class object for the given class name.
+     *
+     * @param className The name of the class.
+     * @return The class object for that class.
+     * @throws MBeanException If there's an error loading the class.
+     * @since 1.9
+     */
+    private static Class<?> getClassByName( String className ) throws MBeanException
+    {
+        try{
+            return classLoader.loadClass(className);
+        }catch ( ClassNotFoundException e ){
+            ResourceBundle bundle = JSONUtil.getBundle(getLocale());
+            String msg = String.format(bundle.getString("couldntLoadClass"), className);
+            error(msg, e);
+            throw new MBeanException(e, msg);   // MBeans should only throw MBeanExceptions.
+        }
+    }
+
+    /**
+     * Add the given class to the given list of automatically reflected
+     * classes.
+     *
+     * @param refClasses The current set of reflected classes.
+     * @param obj An object of the types to be added from the reflect set.
+     * @return The modified set of reflect classes or null if there are none.
+     * @since 1.9
+     */
+    static Set<Class<?>> addReflectClass( Set<Class<?>> refClasses, Object obj )
+    {
+        return obj == null ? refClasses : addReflectClasses(refClasses, Arrays.asList(obj));
+    }
+
+    /**
+     * Add the given classes to the given list of automatically reflected classes.
+     *
+     * @param refClasses The current set of reflected classes.
+     * @param classes A collection of objects of the types to be added from the reflect set.
+     * @return The modified set of reflect classes or null if there are none.
+     * @since 1.9
+     */
+    static Set<Class<?>> addReflectClasses( Set<Class<?>> refClasses, Collection<?> classes )
+    {
+        if ( classes == null || classes.size() < 1 ){
+            return refClasses;
+        }
+
+        boolean didSomething = false;
+        if ( refClasses == null ){
+            refClasses = new HashSet<Class<?>>();
+            didSomething = true;
+        }
+
+        for ( Object obj : classes ){
+            if ( obj != null ){
+                didSomething = refClasses.add(getClass(obj)) || didSomething;
+            }
+        }
+
+        if ( didSomething ){
+            refClasses = trimClasses(refClasses);
+        }
+
+        return refClasses;
+    }
+
+    /**
+     * Remove the given classes from the given list of automatically reflected
+     * classes.
+     *
+     * @param refClasses The current set of reflected classes.
+     * @param obj An object of the type to be removed from the reflect set.
+     * @return The modified set of reflect classes or null if there are none left.
+     */
+    static Set<Class<?>> removeReflectClass( Set<Class<?>> refClasses, Object obj )
+    {
+        return obj == null ? refClasses : removeReflectClasses(refClasses, Arrays.asList(obj));
+    }
+
+    /**
+     * Remove the given classes from the given list of automatically reflected
+     * classes.
+     *
+     * @param refClasses The current set of reflected classes.
+     * @param classes A collection objects of the types to be removed from the reflect set.
+     * @return The modified set of reflect classes or null if there are none left.
+     * @since 1.9
+     */
+    static Set<Class<?>> removeReflectClasses( Set<Class<?>> refClasses, Collection<?> classes )
+    {
+        if ( classes == null || refClasses == null || classes.size() < 1 ){
+            return refClasses;
+        }
+
+        boolean didSomething = false;
+        for ( Object obj : classes ){
+            if ( obj != null ){
+                didSomething = refClasses.remove(getClass(obj)) || didSomething;
+            }
+        }
+
+        if ( didSomething ){
+            refClasses = trimClasses(refClasses);
+        }
+
+        return refClasses;
+    }
+
+    /**
+     * Get the class of the given object or the object if it's a
+     * class object.
+     *
+     * @param obj The object
+     * @return The object's class.
+     * @since 1.9
+     */
+    static Class<?> getClass( Object obj )
+    {
+        return obj instanceof Class ? (Class<?>)obj : obj.getClass();
+    }
+
+    /**
+     * Trim the given set of classes down to size.
+     *
+     * @param refClasses The set to trim.
+     * @return The trimmed set or null if empty.
+     * @since 1.9
+     */
+    private static Set<Class<?>> trimClasses( Set<Class<?>> refClasses )
+    {
+        return refClasses.size() > 0 ? new HashSet<Class<?>>(refClasses) : null;
     }
 
     /**
@@ -1194,6 +1585,126 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 encodeDatesAsObjects = false;
             }
         }
+    }
+
+    /**
+     * Get the reflection of unknown objects policy.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @return the reflectUnknownObjects policy.
+     * @since 1.9
+     */
+    @Override
+    public boolean isReflectUnknownObjects()
+    {
+        return reflectUnknownObjects;
+    }
+
+    /**
+     * Set the reflection encoding policy.  If true, then any time that an
+     * unknown object is encountered, this package will attempt to use
+     * reflection to encode it.  Default is false.  When false, then unknown
+     * objects will have their toString() method called.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @param dflt If true, then attempt to use reflection
+     * to encode objects which are otherwise unknown.
+     * @since 1.9
+     */
+    @Override
+    public void setReflectUnknownObjects( boolean dflt )
+    {
+        synchronized ( this.getClass() ){
+            reflectUnknownObjects = dflt;
+        }
+    }
+
+    /**
+     * Get the preciseIntegers policy.
+     *
+     * @return The preciseIntegers policy.
+     */
+    @Override
+    public boolean isPreciseIntegers()
+    {
+        return preciseIntegers;
+    }
+
+    /**
+     * If true then integer numbers which are not exactly representable
+     * by a 64 bit double precision floating point number will be quoted in the
+     * output.  If false, then they will be unquoted, as numbers and precision
+     * will likely be lost in the interpreter.
+     *
+     * @param dflt If true then quote integer numbers
+     * that lose precision in 64-bit floating point.
+     */
+    @Override
+    public void setPreciseIntegers( boolean dflt )
+    {
+        preciseIntegers = dflt;
+    }
+
+    /**
+     * Get the preciseFloatingPoint policy.
+     *
+     * @return The preciseFloatingPoint policy.
+     */
+    @Override
+    public boolean isPreciseFloatingPoint()
+    {
+        return preciseFloatingPoint;
+    }
+
+    /**
+     * If true then floating point numbers which are not exactly representable
+     * by a 64 bit double precision floating point number will be quoted in the
+     * output.  If false, then they will be unquoted, as numbers and precision
+     * will likely be lost in the interpreter.
+     *
+     * @param dflt If true then quote floating point numbers
+     * that lose precision in 64-bit floating point.
+     */
+    @Override
+    public void setPreciseFloatingPoint( boolean dflt )
+    {
+        preciseFloatingPoint = dflt;
+    }
+
+    /**
+     * The primitive arrays policy.
+     *
+     * @return the usePrimitiveArrays policy.
+     */
+    @Override
+    public boolean isUsePrimitiveArrays()
+    {
+        return usePrimitiveArrays;
+    }
+
+    /**
+     * If true, then when {@link JSONParser} encounters a JSON array of non-null
+     * wrappers of primitives and those primitives are all compatible with each
+     * other, then instead of an {@link ArrayList} of wrappers for those
+     * primitives it will create an array of those primitives in order to save
+     * memory.
+     * <p>
+     * This works for booleans and numbers. It will also convert an array of
+     * single character strings into an array of chars. Arrays of numbers will
+     * attempt to use the least complex type that does not lose information. You
+     * could easily end up with an array of bytes if all of your numbers are
+     * integers in the range -128 to 127. This option is meant to save as much
+     * memory as possible.
+     *
+     * @param dflt if true, then the parser will create arrays of primitives as
+     *            applicable.
+     */
+    @Override
+    public void setUsePrimitiveArrays( boolean dflt )
+    {
+       usePrimitiveArrays = dflt;
     }
 
     /**

@@ -618,15 +618,31 @@ public class TestJSONUtil
         obj = JSONParser.parseJSON("null");
         assertEquals(null, obj);
 
-        obj = JSONParser.parseJSON("[1.1,2.2,-3.134598765,4.0]");
-        List<?> array = (List<?>)obj;
-        assertEquals(array.get(0), new Double(1.1));
-        assertEquals(array.get(1), new Double(2.2));
-        assertEquals(array.get(2), new Double(-3.134598765));
-        assertEquals(array.get(3), new Double(4.0));
+        JSONConfig cfg = new JSONConfig();
+        cfg.setUsePrimitiveArrays(true);
+
+        obj = JSONParser.parseJSON("[1.1,2.2,-3.134598765,4.0]", cfg);
+        double[] doubles = (double[])obj;
+        assertEquals(new Double(1.1), new Double(doubles[0]));
+        assertEquals(new Double(2.2), new Double(doubles[1]));
+        assertEquals(new Double(-3.134598765), new Double(doubles[2]));
+        assertEquals(new Double(4.0), new Double(doubles[3]));
+
+        obj = JSONParser.parseJSON("[1.1,2.2,-3.134,4.0]", cfg);
+        float[] floats = (float[])obj;
+        assertEquals(new Float(1.1), new Float(floats[0]));
+        assertEquals(new Float(2.2), new Float(floats[1]));
+        assertEquals(new Float(-3.134), new Float(floats[2]));
+        assertEquals(new Float(4.0), new Float(floats[3]));
+
+        obj = JSONParser.parseJSON("[1,2,-3,4]", cfg);
+        byte[] bytes = (byte[])obj;
+        assertEquals(new Byte((byte)1), new Byte(bytes[0]));
+        assertEquals(new Byte((byte)2), new Byte(bytes[1]));
+        assertEquals(new Byte((byte)-3), new Byte(bytes[2]));
+        assertEquals(new Byte((byte)4), new Byte(bytes[3]));
 
         // parse various forms of date strings.
-        JSONConfig cfg = new JSONConfig();
         cfg.setEncodeDatesAsStrings(true);
         DateFormat fmt = cfg.getDateGenFormat();
 
@@ -1327,7 +1343,7 @@ public class TestJSONUtil
         ArrayList<Object> innerObj = (ArrayList<Object>)obj.get("e");
         @SuppressWarnings("unchecked")
         Map<Object,Object> jsonAble = (Map<Object,Object>)innerObj.get(1);
-        assertThat((Long)jsonAble.get("b"), is(2L));
+        assertThat(((Number)jsonAble.get("b")).intValue(), is(2));
         //System.out.println(json);
     }
 
@@ -1427,5 +1443,33 @@ public class TestJSONUtil
         {
             return TestJSONUtil.this;
         }
+    }
+
+    /**
+     * Test reflection.
+     */
+    @Test
+    public void testReflect()
+    {
+        Map<Object,Object> jsonObj = new HashMap<Object,Object>();
+        jsonObj.put("f", new ReflectTestClass());
+        JSONConfig cfg = new JSONConfig();
+        cfg.setReflectUnknownObjects(true);
+
+        cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
+        String json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[],\"d\":null}}"));
+
+        cfg.setReflectionPrivacy(ReflectUtil.PACKAGE);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[]}}"));
+
+        cfg.setReflectionPrivacy(ReflectUtil.PROTECTED);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\"}}"));
+
+        cfg.setReflectionPrivacy(ReflectUtil.PUBLIC);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"f\":{\"a\":1}}"));
     }
 }
