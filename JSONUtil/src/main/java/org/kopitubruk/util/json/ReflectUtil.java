@@ -116,7 +116,7 @@ public class ReflectUtil
         String name = "";
         try {
             Class<?> clazz = JSONConfigDefaults.getClass(propertyValue);
-            Map<String,Method> methods = getMethods(clazz);
+            Map<String,Method> getterMethods = getGetterMethods(clazz);
             int level = cfg.getReflectionPrivacy();
             for ( Field field : getFields(clazz) ){
                 int modifiers = field.getModifiers();
@@ -124,7 +124,7 @@ public class ReflectUtil
                     continue;       // ignore static and transient fields.
                 }
                 name = field.getName();
-                Method getter = getGetter(field, methods);
+                Method getter = getGetter(field, getterMethods);
                 boolean success = false;
                 if ( getter != null ){
                     // prefer the argumentless getter over direct access.
@@ -201,97 +201,51 @@ public class ReflectUtil
     }
 
     /**
-     * Get all of the methods for a given class.
+     * Get all of the parameterless getter methods for a given class.
      *
      * @param clazz The class.
      * @return The methods.
      */
-    private static Map<String,Method> getMethods( Class<?> clazz )
+    private static Map<String,Method> getGetterMethods( Class<?> clazz )
     {
         // build a map of the object's properties.
-        Map<String,Method> methods = new HashMap<>();
+        Map<String,Method> getterMethods = new HashMap<>();
 
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
             for ( Method method : tmpClass.getDeclaredMethods() ){
                 String name = method.getName();
-                if ( ! methods.containsKey(name) ){
-                    if ( name.startsWith("get") && method.getParameterCount() == 0 ){
-                        // facilitate looking for parameterless getter.
-                        name = name + "__JSONUtil__0";
+                if ( name.startsWith("get") && method.getParameterCount() == 0 ){
+                    if ( ! getterMethods.containsKey(name) ){
+                        getterMethods.put(name, method);
                     }
-                    methods.put(name, method);
                 }
             }
             tmpClass = tmpClass.getSuperclass();
         }
 
-        return new HashMap<>(methods);
-    }
-
-    /**
-     * Get a complete list of interfaces for a given class including
-     * all super interfaces and interfaces of super classes and their
-     * super interfaces.
-     *
-     * @param clazz The class.
-     * @return The set of interfaces.
-     */
-    private static Set<Class<?>> getInterfaces( Class<?> clazz )
-    {
-        // build a map of the object's properties.
-        Set<Class<?>> interfaces = new LinkedHashSet<>();
-
-        if ( clazz.isInterface() ){
-            Class<?> tmpClass = clazz;
-            while ( tmpClass != null ){
-                if ( tmpClass.isInterface() && ! interfaces.contains(tmpClass) ){
-                    interfaces.add(tmpClass);
-                    for ( Class<?> itfc : tmpClass.getInterfaces() ){
-                        if ( ! interfaces.contains(itfc) ){
-                            interfaces.add(itfc);
-                            interfaces.addAll(getInterfaces(itfc));
-                        }
-                    }
-                }
-                tmpClass = tmpClass.getSuperclass();
-            }
-        }else{
-            Class<?> tmpClass = clazz;
-            while ( tmpClass != null ){
-                for ( Class<?> itfc : tmpClass.getInterfaces() ){
-                    if ( ! interfaces.contains(itfc) ){
-                        interfaces.add(itfc);
-                        interfaces.addAll(getInterfaces(itfc));
-                    }
-                }
-                tmpClass = tmpClass.getSuperclass();
-            }
-        }
-
-        return new LinkedHashSet<>(interfaces);
+        return new HashMap<>(getterMethods);
     }
 
     /**
      * Get the parameterless getter for the given field.
      *
      * @param fieldName The name of the field.
-     * @param methods The methods.
+     * @param getterMethods The methods.
      * @return The parameterless getter for the field or null if there isn't one.
      */
-    private static Method getGetter( Field field, Map<String,Method> methods )
+    private static Method getGetter( Field field, Map<String,Method> getterMethods )
     {
         // looking for a getter with no parameters.  uses bean naming convention.
         String fieldName = field.getName();
         String getterName = "get" +
                             fieldName.substring(0,1).toUpperCase() +
-                            (fieldName.length() > 1 ? fieldName.substring(1) : "") +
-                            "__JSONUtil__0";
+                            (fieldName.length() > 1 ? fieldName.substring(1) : "");
 
-        Method method = methods.get(getterName);
+        Method getter = getterMethods.get(getterName);
 
-        if ( method != null && isCompatible(field.getType(), method.getReturnType()) ){
-            return method;
+        if ( getter != null && isCompatible(field.getType(), getter.getReturnType()) ){
+            return getter;
         }
 
         // no getter method or types not compatible for JSON
@@ -431,5 +385,48 @@ public class ReflectUtil
         }
 
         return false;
+    }
+
+    /**
+     * Get a complete list of interfaces for a given class including
+     * all super interfaces and interfaces of super classes and their
+     * super interfaces.
+     *
+     * @param clazz The class.
+     * @return The set of interfaces.
+     */
+    private static Set<Class<?>> getInterfaces( Class<?> clazz )
+    {
+        // build a map of the object's properties.
+        Set<Class<?>> interfaces = new LinkedHashSet<>();
+
+        if ( clazz.isInterface() ){
+            Class<?> tmpClass = clazz;
+            while ( tmpClass != null ){
+                if ( tmpClass.isInterface() && ! interfaces.contains(tmpClass) ){
+                    interfaces.add(tmpClass);
+                    for ( Class<?> itfc : tmpClass.getInterfaces() ){
+                        if ( ! interfaces.contains(itfc) ){
+                            interfaces.add(itfc);
+                            interfaces.addAll(getInterfaces(itfc));
+                        }
+                    }
+                }
+                tmpClass = tmpClass.getSuperclass();
+            }
+        }else{
+            Class<?> tmpClass = clazz;
+            while ( tmpClass != null ){
+                for ( Class<?> itfc : tmpClass.getInterfaces() ){
+                    if ( ! interfaces.contains(itfc) ){
+                        interfaces.add(itfc);
+                        interfaces.addAll(getInterfaces(itfc));
+                    }
+                }
+                tmpClass = tmpClass.getSuperclass();
+            }
+        }
+
+        return new LinkedHashSet<>(interfaces);
     }
 }
