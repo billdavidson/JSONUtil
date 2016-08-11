@@ -1699,7 +1699,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void setUsePrimitiveArrays( boolean dflt )
     {
-       usePrimitiveArrays = dflt;
+        usePrimitiveArrays = dflt;
     }
 
     /**
