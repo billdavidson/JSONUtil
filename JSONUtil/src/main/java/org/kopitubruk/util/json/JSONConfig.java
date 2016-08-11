@@ -24,10 +24,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TimeZone;
 
 /**
@@ -54,6 +56,10 @@ import java.util.TimeZone;
  *   <li>escapeSurrogates = false</li>
  *   <li>passThroughEscapes = false</li>
  *   <li>encodeDatesAsStrings = false</li>
+ *   <li>reflectUnknownObjects = false</li>
+ *   <li>preciseIntegers = false</li>
+ *   <li>preciseFloatingPoint = false</li>
+ *   <li>usePrimitiveArrays = false</li>
  * </ul>
  * <h3>
  *   Allow generation of certain types of non-standard JSON.
@@ -126,9 +132,19 @@ public class JSONConfig implements Serializable, Cloneable
     private List<DateFormat> dateParseFormats = null;
 
     /**
+     * The set of classes that reflection should be used for.
+     */
+    private Set<Class<?>> reflectClasses = null;
+
+    /**
      * Indent padding object.
      */
     private IndentPadding indentPadding = null;
+
+    /**
+     * The privacy level for reflection.
+     */
+    private int reflectionPrivacy = ReflectUtil.PUBLIC;
 
     // various flags.  see their setters.
     private boolean validatePropertyNames;
@@ -142,6 +158,10 @@ public class JSONConfig implements Serializable, Cloneable
     private boolean escapeSurrogates;
     private boolean passThroughEscapes;
     private boolean encodeDatesAsStrings;
+    private boolean reflectUnknownObjects;
+    private boolean preciseIntegers;
+    private boolean preciseFloatingPoint;
+    private boolean usePrimitiveArrays;
 
     private boolean quoteIdentifier;
     private boolean useECMA6;
@@ -217,10 +237,14 @@ public class JSONConfig implements Serializable, Cloneable
             result.customDateParseFormats = null;
         }
 
+        result.reflectClasses = reflectClasses == null ? null : new HashSet<>(reflectClasses);
+
         result.indentPadding = indentPadding == null ? null : indentPadding.clone();
 
         // this will just be regenerated on the next call if needed.
         result.dateParseFormats = null;
+
+        result.reflectionPrivacy = reflectionPrivacy;
 
         // validation options.
         result.validatePropertyNames = validatePropertyNames;
@@ -235,6 +259,10 @@ public class JSONConfig implements Serializable, Cloneable
         result.escapeSurrogates = escapeSurrogates;
         result.passThroughEscapes = passThroughEscapes;
         result.encodeDatesAsStrings = encodeDatesAsStrings;
+        result.reflectUnknownObjects = reflectUnknownObjects;
+        result.preciseIntegers = preciseIntegers;
+        result.preciseFloatingPoint = preciseFloatingPoint;
+        result.usePrimitiveArrays = usePrimitiveArrays;
 
         // non-standard JSON.
         result.quoteIdentifier = quoteIdentifier;
@@ -603,6 +631,118 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
+     * Get the reflection privacy level.
+     *
+     * @return the reflection privacy level.
+     * @since 1.9
+     */
+    public int getReflectionPrivacy()
+    {
+        return reflectionPrivacy;
+    }
+
+    /**
+     * Set the privacy level for reflection. Default is
+     * {@link ReflectUtil#PUBLIC}.
+     *
+     * @param reflectionPrivacy the level to set
+     * @see ReflectUtil#PRIVATE
+     * @see ReflectUtil#PACKAGE
+     * @see ReflectUtil#PROTECTED
+     * @see ReflectUtil#PUBLIC
+     * @since 1.9
+     */
+    public void setReflectionPrivacy( int reflectionPrivacy )
+    {
+        this.reflectionPrivacy = ReflectUtil.confirmPrivacyLevel(reflectionPrivacy, this);
+    }
+
+    /**
+     * Return true if the given class is in the set of classes being
+     * automatically reflected.
+     *
+     * @param clazz The class.
+     * @return true if the class is automatically reflected.
+     * @since 1.9
+     */
+    public boolean isReflectClass( Class<?> clazz )
+    {
+        return reflectClasses == null ? false : reflectClasses.contains(clazz);
+    }
+
+    /**
+     * Return true if objects with the same class given object are in the set of
+     * classes being automatically reflected.
+     *
+     * @param obj An object to check
+     * @return true if objects of the same type are reflected.
+     * @since 1.9
+     */
+    public boolean isReflectClass( Object obj )
+    {
+        return obj == null ? false : isReflectClass(JSONConfigDefaults.getClass(obj));
+    }
+
+    /**
+     * Add the class of the given object to the set of classes that
+     * automatically get reflected.
+     *
+     * @param obj The object whose class to add to the reflect list.
+     * @since 1.9
+     */
+    public void addReflectClass( Object obj )
+    {
+        reflectClasses = JSONConfigDefaults.addReflectClass(reflectClasses, obj);
+    }
+
+    /**
+     * Add the classes of all of the given objests to the list of classes
+     * that automatically get reflected.
+     *
+     * @param classes The objects to reflect.
+     * @since 1.9
+     */
+    public void addReflectClasses( Collection<?> classes )
+    {
+        reflectClasses = JSONConfigDefaults.addReflectClasses(reflectClasses, classes);
+    }
+
+    /**
+     * Remove the given class from the list of automatically reflected
+     * classes.
+     *
+     * @param obj An object of the type to be removed from the reflect list.
+     * @since 1.9
+     */
+    public void removeReflectClass( Object obj )
+    {
+        reflectClasses = JSONConfigDefaults.removeReflectClass(reflectClasses, obj);
+    }
+
+    /**
+     * Remove the given classes from the list of automatically reflected
+     * classes.
+     *
+     * @param classes A collection objects of the types to be removed from
+     * the reflect list.
+     * @since 1.9
+     */
+    public void removeReflectClasses( Collection<?> classes )
+    {
+        reflectClasses = JSONConfigDefaults.removeReflectClasses(reflectClasses, classes);
+    }
+
+    /**
+     * Clear all reflection classes, disabling all automatic reflection.
+     *
+     * @since 1.9
+     */
+    public void clearReflectClasses()
+    {
+        reflectClasses = null;
+    }
+
+    /**
      * Check if property names will be validated.
      *
      * @return true if property names are set to be validated.
@@ -866,9 +1006,114 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
+     * Get the reflection of unknown objects policy.
+     *
+     * @return the reflectUnknownObjects policy.
+     */
+    public boolean isReflectUnknownObjects()
+    {
+        return reflectUnknownObjects;
+    }
+
+    /**
+     * Set the reflection encoding policy.  If true, then any time that an
+     * unknown object is encountered, this package will attempt to use
+     * reflection to encode it.  Default is false.  When false, then unknown
+     * objects will have their toString() method called.
+     *
+     * @param reflectUnknownObjects If true, then attempt to use reflection
+     * to encode objects which are otherwise unknown.
+     * @since 1.9
+     */
+    public void setReflectUnknownObjects( boolean reflectUnknownObjects )
+    {
+        this.reflectUnknownObjects = reflectUnknownObjects;
+    }
+
+    /**
+     * Get the preciseIntegers policy.
+     *
+     * @return The preciseIntegers policy.
+     */
+    public boolean isPreciseIntegers()
+    {
+        return preciseIntegers;
+    }
+
+    /**
+     * If true then integer numbers which are not exactly representable by a 64
+     * bit double precision floating point number will be quoted in the output.
+     * If false, then they will be unquoted, as numbers and precision will
+     * likely be lost in the interpreter.
+     *
+     * @param preciseIntegers If true then quote integer numbers that lose precision in 64-bit floating point.
+     */
+    public void setPreciseIntegers( boolean preciseIntegers )
+    {
+        this.preciseIntegers = preciseIntegers;
+    }
+
+    /**
+     * Get the preciseFloatingPoint policy.
+     *
+     * @return The preciseFloatingPoint policy.
+     */
+    public boolean isPreciseFloatingPoint()
+    {
+        return preciseFloatingPoint;
+    }
+
+    /**
+     * If true then floating point numbers which are not exactly representable
+     * by a 64 bit double precision floating point number will be quoted in the
+     * output.  If false, then they will be unquoted, as numbers and precision
+     * will likely be lost in the interpreter.
+     *
+     * @param preciseFloatingPoint If true then quote floating point numbers
+     * that lose precision in 64-bit floating point.
+     */
+    public void setPreciseFloatingPoint( boolean preciseFloatingPoint )
+    {
+        this.preciseFloatingPoint = preciseFloatingPoint;
+    }
+
+    /**
+     * The primitive arrays policy.
+     *
+     * @return the usePrimitiveArrays policy.
+     */
+    public boolean isUsePrimitiveArrays()
+    {
+        return usePrimitiveArrays;
+    }
+
+    /**
+     * If true, then when {@link JSONParser} encounters a JSON array of non-null
+     * wrappers of primitives and those primitives are all compatible with each
+     * other, then instead of an {@link ArrayList} of wrappers for those
+     * primitives it will create an array of those primitives in order to save
+     * memory.
+     * <p>
+     * This works for booleans and numbers. It will also convert an array of
+     * single character strings into an array of chars. Arrays of numbers will
+     * attempt to use the least complex type that does not lose information.
+     * You could easily end up with an array of bytes if all of your numbers are
+     * integers in the range -128 to 127. This option is meant to save as much
+     * memory as possible.
+     *
+     * @param usePrimitiveArrays if true, then the parser will create arrays of
+     *            primitives as applicable.
+     */
+    public void setUsePrimitiveArrays( boolean usePrimitiveArrays )
+    {
+        this.usePrimitiveArrays = usePrimitiveArrays;
+    }
+
+    /**
      * Find out what the identifier quote policy is.
      *
      * @return If true, then all identifiers will be quoted.
+     * @since 1.9
      */
     public boolean isQuoteIdentifier()
     {
@@ -976,6 +1221,16 @@ public class JSONConfig implements Serializable, Cloneable
     public boolean isFormatDates()
     {
         return encodeDatesAsStrings || encodeDatesAsObjects;
+    }
+
+    /**
+     * Return true if any precision options are enabled.
+     *
+     * @return true if either preciseIntegers or preciseFloatingPoint is true.
+     */
+    public boolean havePrecisionOpts()
+    {
+        return preciseIntegers || preciseFloatingPoint;
     }
 
     private static final long serialVersionUID = 1L;

@@ -17,8 +17,11 @@ package org.kopitubruk.util.json;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Locale;
+
+import javax.management.MBeanException;
 
 /**
  * MBean interface for JSONConfigDefaults to expose its methods to view and
@@ -94,6 +97,64 @@ public interface JSONConfigDefaultsMBean
      * @return The default validate property names policy.
      */
     public boolean isValidatePropertyNames();
+
+    /**
+     * Get the reflection privacy level.
+     *
+     * @return the reflection privacy level.
+     * @since 1.9
+     */
+    public int getReflectionPrivacy();
+
+    /**
+     * Set the privacy level for reflection. Default is
+     * {@link ReflectUtil#PRIVATE} which includes all fields when reflection is
+     * enabled.
+     *
+     * @param dflt the level to set
+     * @throws MBeanException If the privacy level is not allowed.
+     * @see ReflectUtil#PRIVATE
+     * @see ReflectUtil#PACKAGE
+     * @see ReflectUtil#PROTECTED
+     * @see ReflectUtil#PUBLIC
+     * @since 1.9
+     */
+    public void setReflectionPrivacy( int dflt ) throws MBeanException;
+
+    /**
+     * Clear all reflection classes, disabling all default automatic reflection.
+     *
+     * @since 1.9
+     */
+    public void clearReflectClasses();
+
+    /**
+     * Add the given class to the set of classes to be reflected.
+     *
+     * @param className The name of the class suitable for
+     * (@link {@link ClassLoader#loadClass(String)}}.
+     * @throws MBeanException If there's a problem loading the class.
+     * @since 1.9
+     */
+    public void addReflectClassByName( String className ) throws MBeanException;
+
+    /**
+     * Remove the given class from the set of classes to be reflected.
+     *
+     * @param className The name of the class suitable for
+     * (@link {@link ClassLoader#loadClass(String)}}.
+     * @throws MBeanException If there's a problem loading the class.
+     * @since 1.9
+     */
+    public void removeReflectClassByName( String className ) throws MBeanException;
+
+    /**
+     * Get a string with newline separated list of classes that get reflected.
+     *
+     * @return A string with newline separated list of classes that get reflected.
+     * @since 1.9
+     */
+    public String listReflectedClasses();
 
     /**
      * Set the default flag for validation of property names.
@@ -254,6 +315,87 @@ public interface JSONConfigDefaultsMBean
      * {@link JSONConfigDefaults#setDateGenFormat(DateFormat)}.
      */
     public void setEncodeDatesAsStrings( boolean dflt );
+
+    /**
+     * Get the reflection of unknown objects policy.
+     *
+     * @return the reflectUnknownObjects policy.
+     * @since 1.9
+     */
+    public boolean isReflectUnknownObjects();
+
+    /**
+     * Set the reflection encoding policy.  If true, then any time that an
+     * unknown object is encountered, this package will attempt to use
+     * reflection to encode it.  Default is false.  When false, then unknown
+     * objects will have their toString() method called.
+     *
+     * @param dflt If true, then attempt to use reflection
+     * to encode objects which are otherwise unknown.
+     * @since 1.9
+     */
+    public void setReflectUnknownObjects( boolean dflt );
+
+    /**
+     * Get the preciseFloatingPoint policy.
+     *
+     * @return The preciseFloatingPoint policy.
+     */
+    public boolean isPreciseIntegers();
+
+    /**
+     * If true then integer numbers which are not exactly representable
+     * by a 64 bit double precision floating point number will be quoted in the
+     * output.  If false, then they will be unquoted, as numbers and precision
+     * will likely be lost in the interpreter.
+     *
+     * @param dflt If true then quote integer numbers
+     * that lose precision in 64-bit floating point.
+     */
+    public void setPreciseIntegers( boolean dflt );
+    /**
+     * Get the preciseFloatingPoint policy.
+     *
+     * @return The preciseFloatingPoint policy.
+     */
+    public boolean isPreciseFloatingPoint();
+
+    /**
+     * If true then floating point numbers which are not exactly representable
+     * by a 64 bit double precision floating point number will be quoted in the
+     * output.  If false, then they will be unquoted, as numbers and precision
+     * will likely be lost in the interpreter.
+     *
+     * @param dflt If true then quote floating point numbers
+     * that lose precision in 64-bit floating point.
+     */
+    public void setPreciseFloatingPoint( boolean dflt );
+
+    /**
+     * The primitive arrays policy.
+     *
+     * @return the usePrimitiveArrays policy.
+     */
+    public boolean isUsePrimitiveArrays();
+
+    /**
+     * If true, then when {@link JSONParser} encounters a JSON array of non-null
+     * wrappers of primitives and those primitives are all compatible with each
+     * other, then instead of an {@link ArrayList} of wrappers for those
+     * primitives it will create an array of those primitives in order to save
+     * memory.
+     * <p>
+     * This works for booleans and numbers. It will also convert an array of
+     * single character strings into an array of chars. Arrays of numbers will
+     * attempt to use the least complex type that does not lose information. You
+     * could easily end up with an array of bytes if all of your numbers are
+     * integers in the range -128 to 127. This option is meant to save as much
+     * memory as possible.
+     *
+     * @param dflt if true, then the parser will create arrays of primitives as
+     *            applicable.
+     */
+    public void setUsePrimitiveArrays( boolean dflt );
 
     /**
      * Get the default quote identifier policy.
