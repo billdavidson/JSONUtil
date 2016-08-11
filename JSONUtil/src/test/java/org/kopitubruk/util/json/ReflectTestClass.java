@@ -8,7 +8,7 @@ import java.util.List;
  *
  * @author Bill Davidson
  */
-public class ReflectTestClass
+class ReflectTestClass
 {
     private int a = 1;
     private String b = "something";
