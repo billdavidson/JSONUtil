@@ -89,6 +89,9 @@ import java.util.TimeZone;
  * the way date strings are generated and the way that they are
  * parsed.
  * <p>
+ * This class also keeps track of classes which will be automatically
+ * reflected when encountered.
+ * <p>
  * This class NOT thread safe.  There are issues with the loop
  * detection logic and any custom number or date formats used.  Never
  * share objects of this class between threads.
@@ -863,7 +866,9 @@ public class JSONConfig implements Serializable, Cloneable
 
     /**
      * If true, then strings will be checked for number patterns and if they
-     * look like numbers, then they won't be quoted.  Default is false.
+     * look like numbers, then they won't be quoted.  In {@link JSONParser},
+     * strings will examined and if they look like numbers, then they will be
+     * parsed as numbers in the output.  Default is false.
      *
      * @param encodeNumericStringsAsNumbers the encodeNumericStringsAsNumbers to set
      */
@@ -1043,7 +1048,7 @@ public class JSONConfig implements Serializable, Cloneable
     /**
      * If true then integer numbers which are not exactly representable by a 64
      * bit double precision floating point number will be quoted in the output.
-     * If false, then they will be unquoted, as numbers and precision will
+     * If false, then they will be unquoted, and precision will
      * likely be lost in the interpreter.
      *
      * @param preciseIntegers If true then quote integer numbers that lose precision in 64-bit floating point.
@@ -1068,7 +1073,7 @@ public class JSONConfig implements Serializable, Cloneable
     /**
      * If true then floating point numbers which are not exactly representable
      * by a 64 bit double precision floating point number will be quoted in the
-     * output.  If false, then they will be unquoted, as numbers and precision
+     * output.  If false, then they will be unquoted, and precision
      * will likely be lost in the interpreter.
      *
      * @param preciseFloatingPoint If true then quote floating point numbers

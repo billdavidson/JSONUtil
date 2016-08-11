@@ -61,7 +61,7 @@ import org.apache.commons.logging.LogFactory;
  * methods is to support MBean access to the defaults.  A few defaults
  * are only available programmatically.  Those are accessed statically.
  * <p>
- * It is possible to configure the default values of these flags
+ * It is possible to configure most of the default values
  * via JNDI such as is typically available in a web application
  * by adding values to your application's environment under
  * java:/comp/env/org/kopitubruk/util/json.  That way you can do things
@@ -130,7 +130,7 @@ import org.apache.commons.logging.LogFactory;
  * "dateGenFormat" described above.  They will be added in numeric order of
  * the name.
  * <p>
- * Classes to use for automatic reflection can also be set up via JNDI.
+ * Classes to use for automatic reflection can be set up via JNDI.
  * You must define an integer "maxReflectIndex" which will be the index of
  * the last reflected class name to be searched for.  This class will then
  * look for String variables named "reflectClass0", "reflectClass1" and so on
@@ -167,6 +167,11 @@ import org.apache.commons.logging.LogFactory;
  * permission to do it and does so before this class is loaded.  If logging
  * is not set via a system property at all, then JDNI can also be used to
  * disable logging by setting the boolean named "org/kopitubruk/util/json/logging".
+ * <p>
+ * You can also set the appName as in "-DappName=MyApp".  The appName is used
+ * in the MBean ObjectName and is recommended when this library is used with
+ * multiple apps in the same web tier container.  The appName may also be set
+ * via JNDI as a String in same json context as the other JNDI variables.
  *
  * @see JSONConfig
  * @author Bill Davidson
@@ -239,7 +244,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         String loggingName = "logging";
         String trueStr = Boolean.TRUE.toString();
 
-        // allow disabling JNDI, MBean and logging from the command line.
+        // allow disabling JNDI, MBean and logging from the command line and setting the appName.
+        String appName = System.getProperty("appName", null);
         boolean useJNDI = Boolean.parseBoolean(System.getProperty(pkgName+".useJNDI", trueStr));
         boolean registerMBean = Boolean.parseBoolean(System.getProperty(pkgName+'.'+registerMBeanName, trueStr));
 
@@ -279,6 +285,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 }
 
                 registerMBean = getBoolean(ctx, registerMBeanName, registerMBean);
+
+                if ( registerMBean && appName == null ){
+                    appName = getString(ctx, "appName", null);
+                }
 
                 // locale.
                 String languageTag = getString(ctx, "locale", null);
@@ -367,7 +377,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             try{
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
 
-                mBeanName = JNDIUtil.getObjectName(d);
+                mBeanName = JNDIUtil.getObjectName(d, appName);
                 mBeanServer.registerMBean(d, mBeanName);
                 debug(String.format(bundle.getString("registeredMbean"), mBeanName));
             }catch ( Exception e ){
@@ -1633,7 +1643,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     /**
      * If true then integer numbers which are not exactly representable
      * by a 64 bit double precision floating point number will be quoted in the
-     * output.  If false, then they will be unquoted, as numbers and precision
+     * output.  If false, then they will be unquoted, and precision
      * will likely be lost in the interpreter.
      *
      * @param dflt If true then quote integer numbers
@@ -1663,7 +1673,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     /**
      * If true then floating point numbers which are not exactly representable
      * by a 64 bit double precision floating point number will be quoted in the
-     * output.  If false, then they will be unquoted, as numbers and precision
+     * output.  If false, then they will be unquoted, and precision
      * will likely be lost in the interpreter.
      *
      * @param dflt If true then quote floating point numbers

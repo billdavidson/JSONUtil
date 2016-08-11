@@ -107,10 +107,18 @@ import java.util.regex.Pattern;
  *     to use these as top level objects or as values inside other objects but it's
  *     kind of redundant to use them as top level.
  *   </dd>
+ *   <dt>Reflected Objects</dt>
+ *   <dd>
+ *     Any object that has been added to the JSONConfig as an object to use
+ *     reflection on to encode.  See {@link JSONConfig#addReflectClass(Object)}
+ *     and {@link JSONConfig#addReflectClasses(Collection)}.  If
+ *     {@link JSONConfig#isReflectUnknownObjects()} returns true, then any
+ *     unrecognized object will become a reflected object.
+ *   </dd>
  * </dl>
  * <h3>
  *   Other objects which can commonly be values in {@link Map}s, {@link Iterable}s,
- *   {@link Enumeration}s and arrays.
+ *   {@link Enumeration}s, arrays and reflected objects.
  * </h3>
  * <dl>
  *   <dt>{@link Number}s</dt>
@@ -140,22 +148,21 @@ import java.util.regex.Pattern;
  *     strict JSON parsers.  The date format can be changed to something else by
  *     {@link JSONConfig#setDateGenFormat(java.text.DateFormat)}.
  *   </dd>
- *   <dt>CharSequence's</dt>
+ *   <dt>{@link CharSequence}s</dt>
  *   <dd>
- *     CharSequence's such as {@link String} and {@StringBuilder} are encoded as Javascript
- *     strings with escapes used as needed according to the ECMA JSON standard and escape
- *     options from JSONConfig.
+ *     {@link CharSequence}s such as {@link String} and {@link StringBuilder} are encoded as
+ *     Javascript strings with escapes used as needed according to the ECMA JSON standard
+ *     and escape options from JSONConfig.
  *   </dd>
  *   <dt>Any other object</dt>
  *   <dd>
  *     If reflection is disabled (which it is by default), then any other object just gets
- *     its toString() method called and it's surrounded by quotes with escapes used as
- *     needed according to the ECMA JSON standard and escape options from JSONConfig.
+ *     its toString() method called and it's encoded like any other {@link String}.
  *     <p>
  *     If reflection is enabled for the specific type or for all unknown types then
  *     The package will attempt to figure out how to encode the fields of the given object
  *     according to the privacy level set by {@link JSONConfig#setReflectionPrivacy(int)}
- *     using Javabeans compliant getters if available or accessing fields directly if not.
+ *     using JavaBeans compliant getters if available or accessing fields directly if not.
  *     See {@link JSONConfig#addReflectClass(Object)},
  *     {@link JSONConfig#addReflectClasses(Collection)} and
  *     {@link JSONConfig#setReflectUnknownObjects(boolean)} for ways to enable reflection.

@@ -46,13 +46,31 @@ import java.util.regex.Pattern;
  * Javascript objects are converted to {@link LinkedHashMap}s with the
  * identifiers being the keys.
  * <p>
- * Javascript arrays are converted to {@link ArrayList}s.
+ * Javascript arrays are converted to {@link ArrayList}s.  If
+ * {@link JSONConfig#isUsePrimitiveArrays()} returns true, then the list
+ * will be examined and if it contains only wrappers for primitives and
+ * those primitives are compatible with each other, then the list will be
+ * converted to an array of primitives.  This works for booleans and
+ * all primitive numbers.  It also works if the list only contains strings
+ * that consist of a single character each, which get converted to an
+ * array of chars.  For primitive numbers, it uses smallest type that does
+ * not lose information though if doubles or floats are used, they could
+ * lose information from longs or ints that are in the same list.  This
+ * can cut down on memory use considerably for large arrays.
  * <p>
  * Literal null is just a null value and boolean values are converted to
  * {@link Boolean}s.
  * <p>
  * Floating point numbers are converted to {@link Double} and integers are
- * converted to {@link Long}.
+ * converted to {@link Long}.  If a floating point number loses precision when
+ * converted to {@link Double}, then {@link BigDecimal} will be used instead
+ * in order to retain all of the precision of the original number depicted by
+ * the string.  Likewise, if an integer number is too big to fit in a
+ * {@link Long}, then a {@link BigInteger} will be used in order to retain the
+ * original number depicted by the string.
+ * <p>
+ * If {@link JSONConfig#isEncodeNumericStringsAsNumbers()} returns true, then
+ * strings which look like numbers will be converted to numbers in the result.
  * <p>
  * If the {@link JSONConfig#isEncodeDatesAsObjects()} or
  * {@link JSONConfig#isEncodeDatesAsStrings()} returns true, then strings that
@@ -319,6 +337,8 @@ public class JSONParser
                 throw new JSONParserException(TokenType.END_ARRAY, token.tokenType, tokens.cfg);
             }
         }
+        // minimize memory usage.
+        list.trimToSize();
 
         if ( tokens.cfg.isUsePrimitiveArrays() ){
             // try to make it an array of primitives if possible.
@@ -328,8 +348,6 @@ public class JSONParser
             }
         }
 
-        // minimize memory usage.
-        list.trimToSize();
         return list;
     }
 
@@ -388,6 +406,7 @@ public class JSONParser
             boolean[] booleans = new boolean[list.size()];
             for ( int i = 0; i < booleans.length; i++ ){
                 booleans[i] = (Boolean)list.get(i);
+                list.set(i, null);
             }
             return booleans;
         }
@@ -400,6 +419,7 @@ public class JSONParser
             char[] chars = new char[list.size()];
             for ( int i = 0; i < chars.length; i++ ){
                 chars[i] = ((String)list.get(i)).charAt(0);
+                list.set(i, null);
             }
             return chars;
         }
@@ -465,36 +485,42 @@ public class JSONParser
                 }else{
                     doubles[i] = num.doubleValue();
                 }
+                list.set(i, null);
             }
             return doubles;
         }else if ( haveFloat ){
             float[] floats = new float[list.size()];
             for ( int i = 0; i < floats.length; i++ ){
                 floats[i] = ((Number)list.get(i)).floatValue();
+                list.set(i, null);
             }
             return floats;
         }else if ( haveLong ){
             long[] longs = new long[list.size()];
             for ( int i = 0; i < longs.length; i++ ){
                 longs[i] = ((Number)list.get(i)).longValue();
+                list.set(i, null);
             }
             return longs;
         }else if ( haveInt ){
             int[] ints = new int[list.size()];
             for ( int i = 0; i < ints.length; i++ ){
                 ints[i] = ((Number)list.get(i)).intValue();
+                list.set(i, null);
             }
             return ints;
         }else if ( haveShort ){
             short[] shorts = new short[list.size()];
             for ( int i = 0; i < shorts.length; i++ ){
                 shorts[i] = ((Number)list.get(i)).shortValue();
+                list.set(i, null);
             }
             return shorts;
         }else{
             byte[] bytes = new byte[list.size()];
             for ( int i = 0; i < bytes.length; i++ ){
                 bytes[i] = ((Number)list.get(i)).byteValue();
+                list.set(i, null);
             }
             return bytes;
         }

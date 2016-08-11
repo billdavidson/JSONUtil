@@ -347,7 +347,7 @@ public interface JSONConfigDefaultsMBean
     /**
      * If true then integer numbers which are not exactly representable
      * by a 64 bit double precision floating point number will be quoted in the
-     * output.  If false, then they will be unquoted, as numbers and precision
+     * output.  If false, then they will be unquoted, and precision
      * will likely be lost in the interpreter.
      *
      * @param dflt If true then quote integer numbers
@@ -367,7 +367,7 @@ public interface JSONConfigDefaultsMBean
     /**
      * If true then floating point numbers which are not exactly representable
      * by a 64 bit double precision floating point number will be quoted in the
-     * output.  If false, then they will be unquoted, as numbers and precision
+     * output.  If false, then they will be unquoted, and precision
      * will likely be lost in the interpreter.
      *
      * @param dflt If true then quote floating point numbers

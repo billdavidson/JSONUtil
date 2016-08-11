@@ -15,7 +15,9 @@ import java.util.ResourceBundle;
 import java.util.Set;
 
 /**
- * Some reflection utility constants.
+ * Some reflection utility constants to be used with
+ * {@link JSONConfig#setReflectionPrivacy(int)} and
+ * {@link JSONConfigDefaults#setReflectionPrivacy(int)}
  *
  * @author Bill Davidson
  * @since 1.9
@@ -33,7 +35,7 @@ public class ReflectUtil
     /**
      * Reflection will attempt to serialize package private, protected and
      * public fields or fields that have package private, protected or public get
-     * methods that conform to Java bean naming conventions.
+     * methods that conform to JavaBean naming conventions.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -42,8 +44,8 @@ public class ReflectUtil
 
     /**
      * Reflection will attempt to serialize protected and public fields or
-     * fields that have protected or public get methods that conform to Java
-     * bean naming conventions.
+     * fields that have protected or public get methods that conform to
+     * JavaBean naming conventions.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -52,7 +54,7 @@ public class ReflectUtil
 
     /**
      * Reflection will attempt to serialize only fields that are public
-     * or have public get methods that conform to Java bean naming
+     * or have public get methods that conform to JavaBean naming
      * conventions.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
@@ -395,33 +397,34 @@ public class ReflectUtil
         // build a map of the object's properties.
         Set<Class<?>> interfaces = new LinkedHashSet<>();
 
-        if ( clazz.isInterface() ){
-            Class<?> tmpClass = clazz;
-            while ( tmpClass != null ){
-                if ( tmpClass.isInterface() && ! interfaces.contains(tmpClass) ){
+        Class<?> tmpClass = clazz;
+        while ( tmpClass != null ){
+            boolean doInterfaces = true;
+            if ( tmpClass.isInterface() ){
+                if ( interfaces.contains(tmpClass) ){
+                    doInterfaces = false;
+                }else{
                     interfaces.add(tmpClass);
-                    for ( Class<?> itfc : tmpClass.getInterfaces() ){
-                        if ( ! interfaces.contains(itfc) ){
-                            interfaces.add(itfc);
-                            interfaces.addAll(getInterfaces(itfc));
-                        }
-                    }
                 }
-                tmpClass = tmpClass.getSuperclass();
             }
-        }else{
-            Class<?> tmpClass = clazz;
-            while ( tmpClass != null ){
+            if ( doInterfaces ){
                 for ( Class<?> itfc : tmpClass.getInterfaces() ){
                     if ( ! interfaces.contains(itfc) ){
                         interfaces.add(itfc);
                         interfaces.addAll(getInterfaces(itfc));
                     }
                 }
-                tmpClass = tmpClass.getSuperclass();
             }
+            tmpClass = tmpClass.getSuperclass();
         }
 
         return new LinkedHashSet<>(interfaces);
+    }
+
+    /**
+     * This class should never be instantiated.
+     */
+    private ReflectUtil()
+    {
     }
 }
