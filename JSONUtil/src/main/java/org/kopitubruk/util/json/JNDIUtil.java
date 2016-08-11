@@ -78,14 +78,23 @@ class JNDIUtil
      * Make an ObjectName based upon the class's canonical name.
      *
      * @param obj The object/class.
+     * @param appName The name of the app, if known.
      * @return The ObjectName.
      * @throws MalformedObjectNameException If it makes a bad name.
      */
-    static ObjectName getObjectName( Object obj ) throws MalformedObjectNameException
+    static ObjectName getObjectName( Object obj, String appName ) throws MalformedObjectNameException
     {
         Class<?> objClass = obj instanceof Class ? (Class<?>)obj : obj.getClass();
+        StringBuilder name = new StringBuilder();
+        name.append(objClass.getPackage().getName())
+            .append(":type=")
+            .append(objClass.getSimpleName());
+        if ( appName != null ){
+            name.append(",appName=")
+                .append(appName);
+        }
 
-        return new ObjectName(objClass.getPackage().getName() + ":type=" + objClass.getSimpleName());
+        return new ObjectName(name.toString());
     }
 
     /**
