@@ -352,6 +352,7 @@ public class JSONParser
      *
      * @param list The list.
      * @return The array or null if one could not be made.
+     * @since 1.9
      */
     private static Object getArrayOfPrimitives( ArrayList<Object> list )
     {
@@ -558,6 +559,7 @@ public class JSONParser
      *
      * @param decimalString A string representing a decimal/floating point number.
      * @return A {@link Double} or {@link BigDecimal} as needed to accurately represent the number.
+     * @since 1.9
      */
     private static Number getDecimal( String decimalString )
     {
@@ -590,6 +592,7 @@ public class JSONParser
      * @param integerString A string representing an integer number.
      * @return A {@link Long} or {@link BigInteger} as needed to accurately
      *         represent the number.
+     * @since 1.9
      */
     private static Number getInteger( String integerString )
     {

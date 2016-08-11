@@ -1034,6 +1034,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Get the preciseIntegers policy.
      *
      * @return The preciseIntegers policy.
+     * @since 1.9
      */
     public boolean isPreciseIntegers()
     {
@@ -1047,6 +1048,7 @@ public class JSONConfig implements Serializable, Cloneable
      * likely be lost in the interpreter.
      *
      * @param preciseIntegers If true then quote integer numbers that lose precision in 64-bit floating point.
+     * @since 1.9
      */
     public void setPreciseIntegers( boolean preciseIntegers )
     {
@@ -1057,6 +1059,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Get the preciseFloatingPoint policy.
      *
      * @return The preciseFloatingPoint policy.
+     * @since 1.9
      */
     public boolean isPreciseFloatingPoint()
     {
@@ -1071,6 +1074,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param preciseFloatingPoint If true then quote floating point numbers
      * that lose precision in 64-bit floating point.
+     * @since 1.9
      */
     public void setPreciseFloatingPoint( boolean preciseFloatingPoint )
     {
@@ -1081,6 +1085,7 @@ public class JSONConfig implements Serializable, Cloneable
      * The primitive arrays policy.
      *
      * @return the usePrimitiveArrays policy.
+     * @since 1.9
      */
     public boolean isUsePrimitiveArrays()
     {
@@ -1103,6 +1108,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param usePrimitiveArrays if true, then the parser will create arrays of
      *            primitives as applicable.
+     * @since 1.9
      */
     public void setUsePrimitiveArrays( boolean usePrimitiveArrays )
     {
@@ -1113,7 +1119,6 @@ public class JSONConfig implements Serializable, Cloneable
      * Find out what the identifier quote policy is.
      *
      * @return If true, then all identifiers will be quoted.
-     * @since 1.9
      */
     public boolean isQuoteIdentifier()
     {
