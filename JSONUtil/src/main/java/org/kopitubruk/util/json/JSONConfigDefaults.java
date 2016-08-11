@@ -351,7 +351,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
                 reflectionPrivacy = getInt(ctx, "reflectionPrivacy", reflectionPrivacy);
                 try{
-                    ReflectUtil.confirmLevel(reflectionPrivacy, new JSONConfig());
+                    ReflectUtil.confirmPrivacyLevel(reflectionPrivacy, new JSONConfig());
                 }catch ( JSONReflectionException ex ){
                     debug(ex.getLocalizedMessage(), ex);
                     reflectionPrivacy = ReflectUtil.PUBLIC;
@@ -986,7 +986,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public void setReflectionPrivacy( int dflt ) throws MBeanException
     {
         try{
-            reflectionPrivacy = ReflectUtil.confirmLevel(dflt, new JSONConfig());
+            reflectionPrivacy = ReflectUtil.confirmPrivacyLevel(dflt, new JSONConfig());
         }catch ( JSONReflectionException e ){
             error(e.getLocalizedMessage(), e);
             throw new MBeanException(e);   // MBeans should only throw MBeanExceptions.

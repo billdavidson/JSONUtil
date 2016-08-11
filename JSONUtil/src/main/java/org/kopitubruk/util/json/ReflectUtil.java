@@ -87,17 +87,17 @@ public class ReflectUtil
     /**
      * Check that the given privacy level is valid.
      *
-     * @param level The level to check.
+     * @param privacyLevel The privacy level to check.
      * @param cfg The config for the exception.
      * @return The value if valid.
-     * @throws JSONReflectionException if the level is invalid.
+     * @throws JSONReflectionException if the privacyLevel is invalid.
      */
-    static int confirmLevel( int level, JSONConfig cfg ) throws JSONReflectionException
+    static int confirmPrivacyLevel( int privacyLevel, JSONConfig cfg ) throws JSONReflectionException
     {
-        if ( PERMITTED_LEVELS.contains(level) ){
-            return level;
+        if ( PERMITTED_LEVELS.contains(privacyLevel) ){
+            return privacyLevel;
         }else{
-            throw new JSONReflectionException(level, cfg);
+            throw new JSONReflectionException(privacyLevel, cfg);
         }
     }
 
@@ -113,11 +113,11 @@ public class ReflectUtil
         // add the fields to the object map.
         Map<Object,Object> obj = new LinkedHashMap<>();
 
-        String name = "";
+        String name = "getGetterMethods";
         try {
             Class<?> clazz = JSONConfigDefaults.getClass(propertyValue);
-            Map<String,Method> getterMethods = getGetterMethods(clazz);
-            int level = cfg.getReflectionPrivacy();
+            int privacyLevel = cfg.getReflectionPrivacy();
+            Map<String,Method> getterMethods = getGetterMethods(clazz, privacyLevel);
             for ( Field field : getFields(clazz) ){
                 int modifiers = field.getModifiers();
                 if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
@@ -125,23 +125,16 @@ public class ReflectUtil
                 }
                 name = field.getName();
                 Method getter = getGetter(field, getterMethods);
-                boolean success = false;
                 if ( getter != null ){
                     // prefer the argumentless getter over direct access.
-                    int getterLevel = getLevel(getter.getModifiers());
-                    if ( getterLevel >= level ){
-                        if ( ! getter.isAccessible() ){
-                            getter.setAccessible(true);
-                        }
-                        obj.put(name, getter.invoke(propertyValue));
-                        success = true;
-
+                    if ( ! getter.isAccessible() ){
+                        getter.setAccessible(true);
                     }
-                }
-                if ( ! success ){
+                    obj.put(name, getter.invoke(propertyValue));
+                }else{
                     // no getter -> direct access.
                     int fieldLevel = getLevel(modifiers);
-                    if ( fieldLevel >= level ){
+                    if ( fieldLevel >= privacyLevel ){
                         if ( ! field.isAccessible() ){
                             field.setAccessible(true);
                         }
@@ -201,12 +194,14 @@ public class ReflectUtil
     }
 
     /**
-     * Get all of the parameterless getter methods for a given class.
+     * Get all of the parameterless getter methods for a given class that
+     * are visible with the given privacy level.
      *
      * @param clazz The class.
+     * @param privacyLevel the minimum class privacy level
      * @return The methods.
      */
-    private static Map<String,Method> getGetterMethods( Class<?> clazz )
+    private static Map<String,Method> getGetterMethods( Class<?> clazz, int privacyLevel )
     {
         // build a map of the object's properties.
         Map<String,Method> getterMethods = new HashMap<>();
@@ -215,10 +210,10 @@ public class ReflectUtil
         while ( tmpClass != null ){
             for ( Method method : tmpClass.getDeclaredMethods() ){
                 String name = method.getName();
-                if ( name.startsWith("get") && method.getParameterCount() == 0 ){
-                    if ( ! getterMethods.containsKey(name) ){
-                        getterMethods.put(name, method);
-                    }
+                int getterLevel = getLevel(method.getModifiers());
+                if ( method.getParameterCount() == 0 && getterLevel >= privacyLevel &&
+                                name.startsWith("get") && ! getterMethods.containsKey(name) ){
+                    getterMethods.put(name, method);
                 }
             }
             tmpClass = tmpClass.getSuperclass();

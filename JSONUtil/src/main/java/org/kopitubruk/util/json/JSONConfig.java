@@ -653,7 +653,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public void setReflectionPrivacy( int reflectionPrivacy )
     {
-        this.reflectionPrivacy = ReflectUtil.confirmLevel(reflectionPrivacy, this);
+        this.reflectionPrivacy = ReflectUtil.confirmPrivacyLevel(reflectionPrivacy, this);
     }
 
     /**
