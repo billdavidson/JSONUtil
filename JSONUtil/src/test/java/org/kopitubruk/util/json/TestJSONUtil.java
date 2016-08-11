@@ -1448,43 +1448,21 @@ public class TestJSONUtil
         jsonObj.put("f", new ReflectTestClass());
         JSONConfig cfg = new JSONConfig();
         cfg.setReflectUnknownObjects(true);
+
+        cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
         String json = JSONUtil.toJSON(jsonObj, cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[],\"d\":null}}"));
-    }
 
-    /**
-     * Class used to test reflection.
-     */
-    @SuppressWarnings("unused")
-    private static class ReflectTestClass
-    {
-        private int a = 1;
-        private String b = "something";
-        private ArrayList<Long> c = new ArrayList<>();
-        private List<Short> d = null;
+        cfg.setReflectionPrivacy(ReflectUtil.PACKAGE);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[]}}"));
 
-        public Integer getA()
-        {
-            return a;
-        }
+        cfg.setReflectionPrivacy(ReflectUtil.PROTECTED);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\"}}"));
 
-        public List<Long> getC()
-        {
-            return c;
-        }
-
-        public List<Short> getD()
-        {
-            return d;
-        }
-
-        public ReflectTestClass()
-        {
-        }
-
-        public String getB()
-        {
-            return b;
-        }
+        cfg.setReflectionPrivacy(ReflectUtil.PUBLIC);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"f\":{\"a\":1}}"));
     }
 }

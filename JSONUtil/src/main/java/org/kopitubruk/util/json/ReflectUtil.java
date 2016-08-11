@@ -9,12 +9,13 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
 
 /**
- * Some reflection utility methods.
+ * Some reflection utility constants.
  *
  * @author Bill Davidson
  * @since 1.9
@@ -229,6 +230,49 @@ public class ReflectUtil
     }
 
     /**
+     * Get a complete list of interfaces for a given class including
+     * all super interfaces and interfaces of super classes and their
+     * super interfaces.
+     *
+     * @param clazz The class.
+     * @return The set of interfaces.
+     */
+    private static Set<Class<?>> getInterfaces( Class<?> clazz )
+    {
+        // build a map of the object's properties.
+        Set<Class<?>> interfaces = new LinkedHashSet<>();
+
+        if ( clazz.isInterface() ){
+            Class<?> tmpClass = clazz;
+            while ( tmpClass != null ){
+                if ( tmpClass.isInterface() && ! interfaces.contains(tmpClass) ){
+                    interfaces.add(tmpClass);
+                    for ( Class<?> itfc : tmpClass.getInterfaces() ){
+                        if ( ! interfaces.contains(itfc) ){
+                            interfaces.add(itfc);
+                            interfaces.addAll(getInterfaces(itfc));
+                        }
+                    }
+                }
+                tmpClass = tmpClass.getSuperclass();
+            }
+        }else{
+            Class<?> tmpClass = clazz;
+            while ( tmpClass != null ){
+                for ( Class<?> itfc : tmpClass.getInterfaces() ){
+                    if ( ! interfaces.contains(itfc) ){
+                        interfaces.add(itfc);
+                        interfaces.addAll(getInterfaces(itfc));
+                    }
+                }
+                tmpClass = tmpClass.getSuperclass();
+            }
+        }
+
+        return new LinkedHashSet<>(interfaces);
+    }
+
+    /**
      * Get the parameterless getter for the given field.
      *
      * @param fieldName The name of the field.
@@ -379,7 +423,8 @@ public class ReflectUtil
             }
             tmpClass = tmpClass.getSuperclass();
         }
-        for ( Class<?> itfc : objType.getInterfaces() ){
+
+        for ( Class<?> itfc : getInterfaces(objType) ){
             if ( types.contains(itfc) ){
                 return true;
             }
