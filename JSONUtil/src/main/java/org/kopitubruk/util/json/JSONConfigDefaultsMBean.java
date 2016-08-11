@@ -340,6 +340,7 @@ public interface JSONConfigDefaultsMBean
      * Get the preciseFloatingPoint policy.
      *
      * @return The preciseFloatingPoint policy.
+     * @since 1.9
      */
     public boolean isPreciseIntegers();
 
@@ -351,12 +352,15 @@ public interface JSONConfigDefaultsMBean
      *
      * @param dflt If true then quote integer numbers
      * that lose precision in 64-bit floating point.
+     * @since 1.9
      */
     public void setPreciseIntegers( boolean dflt );
+
     /**
      * Get the preciseFloatingPoint policy.
      *
      * @return The preciseFloatingPoint policy.
+     * @since 1.9
      */
     public boolean isPreciseFloatingPoint();
 
@@ -375,6 +379,7 @@ public interface JSONConfigDefaultsMBean
      * The primitive arrays policy.
      *
      * @return the usePrimitiveArrays policy.
+     * @since 1.9
      */
     public boolean isUsePrimitiveArrays();
 
@@ -394,6 +399,7 @@ public interface JSONConfigDefaultsMBean
      *
      * @param dflt if true, then the parser will create arrays of primitives as
      *            applicable.
+     * @since 1.9
      */
     public void setUsePrimitiveArrays( boolean dflt );
 

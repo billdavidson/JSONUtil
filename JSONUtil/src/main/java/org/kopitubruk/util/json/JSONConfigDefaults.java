@@ -982,7 +982,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public void setReflectionPrivacy( int dflt ) throws MBeanException
     {
         try{
-            reflectionPrivacy = ReflectUtil.confirmPrivacyLevel(dflt, new JSONConfig());
+            synchronized ( this.getClass() ){
+                reflectionPrivacy = ReflectUtil.confirmPrivacyLevel(dflt, new JSONConfig());
+            }
         }catch ( JSONReflectionException e ){
             error(e.getLocalizedMessage(), e);
             throw new MBeanException(e);   // MBeans should only throw MBeanExceptions.
@@ -1599,6 +1601,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Get the preciseIntegers policy.
      *
      * @return The preciseIntegers policy.
+     * @since 1.9
      */
     public boolean isPreciseIntegers()
     {
@@ -1613,16 +1616,20 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true then quote integer numbers
      * that lose precision in 64-bit floating point.
+     * @since 1.9
      */
     public void setPreciseIntegers( boolean dflt )
     {
-        preciseIntegers = dflt;
+        synchronized ( this.getClass() ){
+            preciseIntegers = dflt;
+        }
     }
 
     /**
      * Get the preciseFloatingPoint policy.
      *
      * @return The preciseFloatingPoint policy.
+     * @since 1.9
      */
     public boolean isPreciseFloatingPoint()
     {
@@ -1637,16 +1644,20 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true then quote floating point numbers
      * that lose precision in 64-bit floating point.
+     * @since 1.9
      */
     public void setPreciseFloatingPoint( boolean dflt )
     {
-        preciseFloatingPoint = dflt;
+        synchronized ( this.getClass() ){
+            preciseFloatingPoint = dflt;
+        }
     }
 
     /**
      * The primitive arrays policy.
      *
      * @return the usePrimitiveArrays policy.
+     * @since 1.9
      */
     public boolean isUsePrimitiveArrays()
     {
@@ -1667,12 +1678,14 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * integers in the range -128 to 127. This option is meant to save as much
      * memory as possible.
      *
-     * @param dflt if true, then the parser will create arrays of primitives as
-     *            applicable.
+     * @param dflt if true, then the parser will create arrays of primitives as applicable.
+     * @since 1.9
      */
     public void setUsePrimitiveArrays( boolean dflt )
     {
-       usePrimitiveArrays = dflt;
+        synchronized ( this.getClass() ){
+            usePrimitiveArrays = dflt;
+        }
     }
 
     /**
