@@ -1067,8 +1067,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         reflectClasses = removeReflectClasses(reflectClasses, classes);
     }
 
-    /* (non-Javadoc)
-     * @see org.kopitubruk.util.json.JSONConfigDefaultsMBean#clearReflectClasses()
+    /**
+     * Clear all reflection classes, disabling all default automatic reflection.
+     *
+     * @since 1.9
      */
     @Override
     public void clearReflectClasses()
@@ -1078,8 +1080,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         }
     }
 
-    /* (non-Javadoc)
-     * @see org.kopitubruk.util.json.JSONConfigDefaultsMBean#addReflectClassByName(java.lang.String)
+    /**
+     * Add the given class to the set of classes to be reflected.
+     *
+     * @param className The name of the class suitable for
+     * (@link {@link ClassLoader#loadClass(String)}}.
+     * @throws MBeanException If there's a problem loading the class.
+     * @since 1.9
      */
     @Override
     public void addReflectClassByName( String className ) throws MBeanException
@@ -1087,8 +1094,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         addReflectClass(getClassByName(className));
     }
 
-    /* (non-Javadoc)
-     * @see org.kopitubruk.util.json.JSONConfigDefaultsMBean#removeReflectClassByName(java.lang.String)
+    /**
+     * Remove the given class from the set of classes to be reflected.
+     *
+     * @param className The name of the class suitable for
+     * (@link {@link ClassLoader#loadClass(String)}}.
+     * @throws MBeanException If there's a problem loading the class.
+     * @since 1.9
      */
     @Override
     public void removeReflectClassByName( String className ) throws MBeanException
@@ -1096,8 +1108,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         removeReflectClass(getClassByName(className));
     }
 
-    /* (non-Javadoc)
-     * @see org.kopitubruk.util.json.JSONConfigDefaultsMBean#listReflectedClasses()
+    /**
+     * Get a string with newline separated list of classes that get reflected.
+     *
+     * @return A string with newline separated list of classes that get reflected.
+     * @since 1.9
      */
     @Override
     public String listReflectedClasses()
@@ -1172,7 +1187,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
         boolean didSomething = false;
         if ( refClasses == null ){
-            refClasses = new HashSet<>(classes.size());
+            refClasses = new HashSet<>();
             didSomething = true;
         }
 
