@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Bill Davidson
+ * Copyright 2016 Bill Davidson
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,40 +15,40 @@
  */
 package org.kopitubruk.util.json;
 
-import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
 
 /**
- * Exception for handling loops in the data structures sent to
- * various toJSON methods.
+ * Exception for wrapping reflection exceptions.
  *
  * @author Bill Davidson
+ * @since 1.9
  */
-public final class DataStructureLoopException extends JSONException
+public final class JSONReflectionException extends JSONException
 {
-    /**
-     * toString() of the offending object.
-     */
-    private Object offender;
-
-    /**
-     * Copy of the object stack.
-     */
-    private Object[] objStack = null;
+    private Object offender = null;
+    private String field = null;
+    private int level;
 
     /**
      * Constructor.
      *
      * @param offender The offending object.
+     * @param field The field name for which access caused the exception.
+     * @param e The exception that this is wrapping.
      * @param cfg the config object
      */
-    DataStructureLoopException( Object offender, JSONConfig cfg )
+    JSONReflectionException( Object offender, String field, Exception e, JSONConfig cfg )
+    {
+        super(e, cfg);
+        this.offender = offender;
+        this.field = field;
+    }
+
+    JSONReflectionException( int level, JSONConfig cfg )
     {
         super(cfg);
-        this.offender = offender;
-        List<Object> stk = cfg.getObjStack();
-        objStack = stk.toArray(new Object[stk.size()]);
+        this.level = level;
     }
 
     /**
@@ -61,21 +61,14 @@ public final class DataStructureLoopException extends JSONException
     String internalGetMessage( Locale locale )
     {
         ResourceBundle bundle = JSONUtil.getBundle(locale);
-        StringBuilder message = new StringBuilder();
 
-        message.append(String.format(bundle.getString("dataStructureLoop"), getClassName(offender)));
-
-        // show the stack and indicate which object is duplicated.
-        for ( int i = 0; i < objStack.length; i++ ){
-            Object currentObject = objStack[i];
-            message.append("\n\t").append(i).append(' ')
-                   .append(getClassName(currentObject));
-            if ( offender == currentObject ){
-                message.append(" <<<");
-            }
+        if ( offender != null ){
+            String fmt = bundle.getString("reflectionException");
+            return String.format(fmt, getClassName(offender), field, getClassName(this.getCause()));
+        }else{
+            String fmt = bundle.getString("badPrivacyLevel");
+            return String.format(fmt, level);
         }
-
-        return message.toString();
     }
 
     private static final long serialVersionUID = 1L;

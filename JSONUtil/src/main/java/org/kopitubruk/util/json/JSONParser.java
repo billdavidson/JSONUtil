@@ -21,13 +21,14 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -103,7 +104,7 @@ public class JSONParser
      * Recognize Javascript integers.
      */
     private static final Pattern JAVASCRIPT_INTEGER_PAT =
-            Pattern.compile("^([-+]?(?:\\d+|0x[\\da-fA-F]+))$");
+            Pattern.compile("^([-+]?(?:\\d+|0[xX][\\da-fA-F]+))$");
 
     /**
      * Recognize an embedded new Date().
@@ -116,6 +117,16 @@ public class JSONParser
     private static final Pattern TZ_PAT = Pattern.compile("^(.+)(([-+]\\d{2})(?::(\\d{2}))?|Z)$");
 
     private static final Pattern ISO8601_PAT = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([,\\.]\\d+)?$");
+
+    /*
+     * Maximum possible significant digits in a 32 bit floating point number.
+     */
+    private static final int MAX_PRECISION_FOR_FLOAT = 9;
+
+    /**
+     * Maximum possible significant digits in a 64 bit floating point number.
+     */
+    private static final int MAX_PRECISION_FOR_DOUBLE = 17;
 
     /**
      * Types of tokens in a JSON input string.
@@ -302,7 +313,7 @@ public class JSONParser
      * @throws IOException If there's a problem with I/O.
      * @throws ParseException If there's a problem parsing dates.
      */
-    private static List<?> parseArray( TokenReader tokens ) throws IOException, ParseException
+    private static Object parseArray( TokenReader tokens ) throws IOException, ParseException
     {
         ArrayList<Object> list = new ArrayList<Object>();
         Token token = tokens.nextToken();
@@ -317,9 +328,184 @@ public class JSONParser
                 throw new JSONParserException(TokenType.END_ARRAY, token.tokenType, tokens.cfg);
             }
         }
+
+        if ( tokens.cfg.isUsePrimitiveArrays() ){
+            // try to make it an array of primitives if possible.
+            Object array = getArrayOfPrimitives(list);
+            if ( array != null ){
+                return array;
+            }
+        }
+
         // minimize memory usage.
         list.trimToSize();
         return list;
+    }
+
+    /**
+     * Gets an array of primitives from a list if possible. This means that all
+     * values in the list are non-null and either they are all boolean or all
+     * strings with a single char or all numbers. If they are numbers, then the
+     * most complex type of them will be the type of the array. In other words,
+     * if there's one Double and five Integers, it will be an array of double.
+     * <p>
+     * An array of primitives can save a lot of memory vs a list of wrappers for
+     * primitives. At the very least, you lose the memory overhead of the
+     * references to each wrapper object which could be up to 8 bytes per
+     * primitive. For numbers that can be bytes, this could be saving up to 15
+     * bytes per number vs. making everything Long in a list as the code did
+     * before.  Arrays also have slightly less memory overhead than an ArrayList
+     * which maintains additional size and modCount ints as well as a reference
+     * to its own internal array for up to 16 bytes of additional space required
+     * by an ArrayList than an array.
+     *
+     * @param list The list.
+     * @return The array or null if one could not be made.
+     */
+    private static Object getArrayOfPrimitives( ArrayList<Object> list )
+    {
+        if ( list.size() < 1 ){
+            return null;
+        }
+
+        boolean haveNumber = false;
+        boolean haveBoolean = false;
+        boolean haveChar = false;
+
+        for ( Object obj : list ){
+            if ( obj instanceof Number ){
+                if ( obj instanceof BigInteger || obj instanceof BigDecimal ){
+                    return null;
+                }
+                haveNumber = true;
+            }else if ( obj instanceof Boolean ){
+                haveBoolean = true;
+            }else if ( obj instanceof String && ((String)obj).length() == 1 ){
+                haveChar = true;
+            }else{
+                // null or not a primitive -- no compatibility.
+                return null;
+            }
+        }
+
+        if ( haveBoolean ){
+            if ( haveNumber || haveChar ){
+                // boolean is not compatible with other types.
+                return null;
+            }
+            boolean[] booleans = new boolean[list.size()];
+            for ( int i = 0; i < booleans.length; i++ ){
+                booleans[i] = (Boolean)list.get(i);
+            }
+            return booleans;
+        }
+
+        if ( haveChar ){
+            if ( haveNumber ){
+                // char is not compatible with other types.
+                return null;
+            }
+            char[] chars = new char[list.size()];
+            for ( int i = 0; i < chars.length; i++ ){
+                chars[i] = ((String)list.get(i)).charAt(0);
+            }
+            return chars;
+        }
+
+        // all Double or Long
+
+        boolean haveDouble = false;
+        boolean haveFloat = false;
+        boolean haveLong = false;
+        boolean haveInt = false;
+        boolean haveShort = false;
+
+        // make everything as small as possible without losing information.
+        for ( int i = 0, len = list.size(); i < len; i++ ){
+            Number num = (Number)list.get(i);
+            if ( num instanceof Double ){
+                Double d = (Double)num;
+                boolean gotFloat = false;
+                if ( d.isInfinite() || d.isNaN() ){
+                    list.set(i, Float.valueOf(d.toString()));
+                    gotFloat = true;
+                }else{
+                    BigDecimal bigDec = new BigDecimal(d.toString());
+                    if ( bigDec.precision() <= MAX_PRECISION_FOR_FLOAT ){
+                        Float f = Float.valueOf(bigDec.floatValue());
+                        if ( !f.isInfinite() && bigDec.compareTo(new BigDecimal(f.toString())) == 0 ){
+                            list.set(i, f);
+                            gotFloat = true;
+                        }
+                    }
+                }
+                haveFloat = haveFloat || gotFloat;
+                haveDouble = haveDouble || ! gotFloat;
+            }else{
+                long ln = num.longValue();
+                BigDecimal bigInt = BigDecimal.valueOf(ln);
+                try{
+                    list.set(i, Byte.valueOf(bigInt.byteValueExact()));
+                }catch ( ArithmeticException e ){
+                    try{
+                        list.set(i, Short.valueOf(bigInt.shortValueExact()));
+                        haveShort = true;
+                    }catch ( ArithmeticException ex ){
+                        try{
+                            list.set(i, Integer.valueOf(bigInt.intValueExact()));
+                            haveInt = true;
+                        }catch ( ArithmeticException ey ){
+                            haveLong = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // make an array of the most complex type in the list and return it.
+
+        if ( haveDouble ){
+            double[] doubles = new double[list.size()];
+            for ( int i = 0; i < doubles.length; i++ ){
+                Number num = (Number)list.get(i);
+                if ( num instanceof Float ){
+                    doubles[i] = Double.parseDouble(num.toString());    // avoid cast rounding errors.
+                }else{
+                    doubles[i] = num.doubleValue();
+                }
+            }
+            return doubles;
+        }else if ( haveFloat ){
+            float[] floats = new float[list.size()];
+            for ( int i = 0; i < floats.length; i++ ){
+                floats[i] = ((Number)list.get(i)).floatValue();
+            }
+            return floats;
+        }else if ( haveLong ){
+            long[] longs = new long[list.size()];
+            for ( int i = 0; i < longs.length; i++ ){
+                longs[i] = ((Number)list.get(i)).longValue();
+            }
+            return longs;
+        }else if ( haveInt ){
+            int[] ints = new int[list.size()];
+            for ( int i = 0; i < ints.length; i++ ){
+                ints[i] = ((Number)list.get(i)).intValue();
+            }
+            return ints;
+        }else if ( haveShort ){
+            short[] shorts = new short[list.size()];
+            for ( int i = 0; i < shorts.length; i++ ){
+                shorts[i] = ((Number)list.get(i)).shortValue();
+            }
+            return shorts;
+        }else{
+            byte[] bytes = new byte[list.size()];
+            for ( int i = 0; i < bytes.length; i++ ){
+                bytes[i] = ((Number)list.get(i)).byteValue();
+            }
+            return bytes;
+        }
     }
 
     /**
@@ -343,19 +529,23 @@ public class JSONParser
                     }catch ( ParseException e ){
                     }
                 }
+                if ( cfg.isEncodeNumericStringsAsNumbers() ){
+                    Matcher matcher = JAVASCRIPT_FLOATING_POINT_PAT.matcher(unesc);
+                    if ( matcher.matches() ){
+                        return getDecimal(matcher.group(1));
+                    }
+                    matcher = JAVASCRIPT_INTEGER_PAT.matcher(unesc);
+                    if ( matcher.matches() ){
+                        return getInteger(matcher.group(1));
+                    }
+                }
                 return unesc;
             case FLOATING_POINT_NUMBER:
-                return Double.parseDouble(token.value);
+                return getDecimal(token.value);
             case INTEGER_NUMBER:
-                if ( token.value.startsWith("0x") ){
-                    return Long.valueOf(token.value.substring(2), 16);
-                }else if ( OCTAL_PAT.matcher(token.value).matches() ){
-                    return Long.valueOf(token.value, 8);
-                }else{
-                    return Long.valueOf(token.value);
-                }
+                return getInteger(token.value);
             case LITERAL:
-                if ( token.value.equals(JSONUtil.NULL) ){
+                if ( token.value.equals("null") ){
                     return null;
                 }else{
                     return Boolean.valueOf(token.value);
@@ -367,6 +557,66 @@ public class JSONParser
                 return parseTokens(token, tokens);
             default:
                 throw new JSONParserException(TokenType.STRING, token.tokenType, tokens.cfg);
+        }
+    }
+
+    /**
+     * Convert a decimal string into a {@link Double} or if it doesn't fit in a
+     * {@link Double} without losing information, then convert it to a
+     * {@link BigDecimal}.
+     *
+     * @param decimalString A string representing a decimal/floating point number.
+     * @return A {@link Double} or {@link BigDecimal} as needed to accurately represent the number.
+     */
+    private static Number getDecimal( String decimalString )
+    {
+        try{
+            // this will work except for NaN and Infinity
+            BigDecimal bigDec = new BigDecimal(decimalString);
+            // check significant digit count.
+            if ( bigDec.precision() <= MAX_PRECISION_FOR_DOUBLE ){
+                int scale = bigDec.scale();
+                String fmt = '%' + (scale > 0 ? "." + scale : "") + 'e';
+                double d = bigDec.doubleValue();
+                if ( !Double.isInfinite(d) && bigDec.compareTo(new BigDecimal(String.format(fmt, d))) == 0 ){
+                    // no precision loss going to double
+                    return Double.valueOf(d);
+                }
+            }
+            // precision loss, maintain precision using BigDecimal
+            return bigDec;
+        }catch ( NumberFormatException e ){
+            // BigDecimal doesn't do NaN or Infinity
+            return Double.valueOf(decimalString);
+        }
+    }
+
+    /**
+     * Convert an integer string into a {@link Long} or if it doesn't fit in a
+     * {@link Long} without losing information, then convert it to a
+     * {@link BigInteger}.
+     *
+     * @param integerString A string representing an integer number.
+     * @return A {@link Long} or {@link BigInteger} as needed to accurately
+     *         represent the number.
+     */
+    private static Number getInteger( String integerString )
+    {
+        // parse with BigInteger because that will always work at this point.
+        BigInteger bigInt;
+        if ( integerString.startsWith("0x") || integerString.startsWith("0X") ){
+            bigInt = new BigInteger(integerString.substring(2), 16);
+        }else if ( OCTAL_PAT.matcher(integerString).matches() ){
+            bigInt = new BigInteger(integerString, 8);
+        }else{
+            bigInt = new BigInteger(integerString);
+        }
+
+        try{
+            return Long.valueOf(new BigDecimal(bigInt).longValueExact());
+        }catch ( ArithmeticException e ){
+            // too big to fit in a long.
+            return bigInt;
         }
     }
 

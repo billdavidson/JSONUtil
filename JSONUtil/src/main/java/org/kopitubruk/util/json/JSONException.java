@@ -88,5 +88,20 @@ public abstract class JSONException extends IllegalArgumentException
      */
     abstract String internalGetMessage( Locale locale );
 
+    /**
+     * Get the name of the class of the object.
+     *
+     * @param obj the object
+     * @return the class name.
+     */
+    protected String getClassName( Object obj )
+    {
+        String name = obj.getClass().getCanonicalName();
+        if ( name == null ){
+            name = obj.getClass().isArray() ? "[array]" : "[unknown]";
+        }
+        return name;
+    }
+
     private static final long serialVersionUID = 1L;
 }
