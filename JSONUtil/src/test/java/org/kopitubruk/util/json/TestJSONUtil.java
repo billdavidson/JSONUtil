@@ -38,7 +38,6 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -112,8 +111,9 @@ public class TestJSONUtil
             ctx.bind("appName", "TestJSONUtil");
             ctx.bind("maxReflectIndex", 0);
             ctx.bind("reflectClass0", "org.kopitubruk.util.json.ReflectTestClass,a,e");
-        }catch ( NamingException ex ){
-            s_log.error("Couldn't create context", ex);
+        }catch ( NamingException e ){
+            s_log.fatal("Couldn't create context", e);
+            System.exit(-1);
         }
 
         String validateJs = "validate.js";

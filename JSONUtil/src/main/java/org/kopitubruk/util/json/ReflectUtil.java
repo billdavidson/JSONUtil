@@ -71,8 +71,8 @@ public class ReflectUtil
     /**
      * Primitive number type names.
      */
-    private static final Set<String> PRIMITIVE_NUMBERS =
-            new HashSet<>(Arrays.asList("double","float","long","int","short","byte"));
+    private static final Set<Class<?>> PRIMITIVE_NUMBERS =
+            new HashSet<>(Arrays.asList(Double.TYPE, Float.TYPE, Long.TYPE, Integer.TYPE, Short.TYPE, Byte.TYPE));
 
     /**
      * Types that become arrays in JSON.
@@ -320,7 +320,7 @@ public class ReflectUtil
      */
     private static boolean isNumber( Class<?> type )
     {
-        return (type.isPrimitive() && PRIMITIVE_NUMBERS.contains(type.getCanonicalName())) || isType(type, Number.class);
+        return PRIMITIVE_NUMBERS.contains(type) || isType(type, Number.class);
     }
 
     /**
@@ -331,7 +331,7 @@ public class ReflectUtil
      */
     private static boolean isBoolean( Class<?> type )
     {
-        return Boolean.class.equals(type) || (type.isPrimitive() && "boolean".equals(type.getCanonicalName()));
+        return Boolean.class.equals(type) || Boolean.TYPE.equals(type);
     }
 
     /**
@@ -342,7 +342,7 @@ public class ReflectUtil
      */
     private static boolean isCharacter( Class<?> type )
     {
-        return Character.class.equals(type) || (type.isPrimitive() && "char".equals(type.getCanonicalName()));
+        return Character.class.equals(type) || Character.TYPE.equals(type);
     }
 
     /**

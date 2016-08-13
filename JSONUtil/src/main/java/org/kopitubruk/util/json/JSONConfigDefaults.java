@@ -1428,7 +1428,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      */
     static Class<?> getClass( Object obj )
     {
-        return obj instanceof Class ? (Class<?>)obj : obj.getClass();
+        return obj instanceof Class ? (Class<?>)obj :
+            (obj instanceof JSONReflectedClass ? ((JSONReflectedClass)obj).getObjClass() : obj.getClass());
     }
 
     /**
