@@ -15,7 +15,7 @@
  */
 package org.kopitubruk.util.json;
 
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
@@ -45,7 +45,7 @@ import java.util.Set;
  *     but do have zero arguments and have names that look like JavaBeans
  *     compliant getter names.  Just specify a name as if it's the name
  *     of a field in your fieldNames and it will look for the getter that
- *     matches that name.
+ *     matches that pseudo field name.
  *   </li>
  * </ul>
  *
@@ -118,7 +118,7 @@ public class JSONReflectedClass implements Cloneable
     public JSONReflectedClass clone()
     {
         JSONReflectedClass result = new JSONReflectedClass(objClass, null);
-        result.fieldNames = fieldNames == null ? null : new HashSet<>(fieldNames);
+        result.fieldNames = fieldNames == null ? null : new LinkedHashSet<>(fieldNames);
         return result;
     }
 

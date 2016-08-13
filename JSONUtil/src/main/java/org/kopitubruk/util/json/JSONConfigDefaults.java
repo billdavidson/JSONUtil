@@ -30,11 +30,13 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.ResourceBundle;
+import java.util.Set;
 
 import javax.management.MBeanException;
 import javax.management.MBeanServer;
@@ -134,9 +136,11 @@ import org.apache.commons.logging.LogFactory;
  * look for String variables named "reflectClass0", "reflectClass1" and so on
  * until the number at the end up the name reaches maxReflectIndex.  The
  * class names need to load with {@link ClassLoader#loadClass(String)} or
- * they will not be added to the list of reflected classes.  These classes
- * will be added to all JSONConfig objects that are created in this class
- * loader.
+ * they will not be added to the list of reflected classes.  If the class
+ * names are followed by a commas and strings separated by commas, those
+ * strings will be taken as field names to use for {@link JSONReflectedClass}
+ * These classes will be added to all JSONConfig objects that are created
+ * in this class loader.
  * <p>
  * Number formats and date formats are cloned when they are added because they
  * are not thread safe.  They are cloned again when applied to a new
@@ -326,41 +330,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 }
             }
 
-            // date generation format.
-            String dgf = getString(ctx, "dateGenFormat", null);
-            if ( dgf != null ){
-                d.setDateGenFormat(dgf);
-            }
-
-            // date parse formats.
-            for ( int i = 0; i < 16; i++ ){
-                String dpf = getString(ctx, "dateParseFormat" + i, null);
-                if ( dpf != null ){
-                    d.addDateParseFormat(dpf);
-                }
-            }
-
-            // default reflection classes.
-            int maxReflectIndex = getInt(ctx, "maxReflectIndex", -1);
-            if ( maxReflectIndex >= 0 ){
-                List<String> classNames = new ArrayList<>();
-                for ( int i = 0; i <= maxReflectIndex; i++ ){
-                    String className = getString(ctx, "reflectClass" + i, null);
-                    if ( className != null ){
-                        classNames.add(className);
-                    }
-                }
-                List<Class<?>> classes = new ArrayList<>(classNames.size());
-                for ( String className : classNames ){
-                    try{
-                        classes.add(getClassByName(className));
-                    }catch ( MBeanException e ){
-                        // Not actually an MBean operation at this point.
-                    }
-                }
-                addReflectClasses(classes);
-            }
-
+            loadDateFormatsFromJNDI(ctx);
+            loadReflectClassesFromJNDI(ctx);
             setFlagsFromJNDI(ctx);
 
             reflectionPrivacy = getInt(ctx, "reflectionPrivacy", reflectionPrivacy);
@@ -380,6 +351,74 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         }
 
         return registerMBean;
+    }
+
+    /**
+     * Load date formats from JNDI, if any.
+     *
+     * @param ctx The context to use.
+     */
+    private static void loadDateFormatsFromJNDI( Context ctx )
+    {
+        JSONConfigDefaults d = getInstance();
+
+        // date generation format.
+        String dgf = getString(ctx, "dateGenFormat", null);
+        if ( dgf != null ){
+            d.setDateGenFormat(dgf);
+        }
+
+        // date parse formats.
+        for ( int i = 0; i < 16; i++ ){
+            String dpf = getString(ctx, "dateParseFormat" + i, null);
+            if ( dpf != null ){
+                d.addDateParseFormat(dpf);
+            }
+        }
+    }
+
+    /**
+     * Load reflection classes from JNDI, if any.
+     *
+     * @param ctx The context to use.
+     */
+    private static void loadReflectClassesFromJNDI( Context ctx )
+    {
+        // default reflection classes.
+        int maxReflectIndex = getInt(ctx, "maxReflectIndex", -1);
+        if ( maxReflectIndex >= 0 ){
+            List<String> classNames = new ArrayList<>();
+            for ( int i = 0; i <= maxReflectIndex; i++ ){
+                String className = getString(ctx, "reflectClass" + i, null);
+                if ( className != null ){
+                    classNames.add(className);
+                }
+            }
+            List<JSONReflectedClass> classes = new ArrayList<>(classNames.size());
+            for ( String className : classNames ){
+                String[] parts = className.split(",");
+                try{
+                    Class<?> clazz = getClassByName(parts[0]);
+                    Set<String> fields = null;
+                    if ( parts.length > 1 ){
+                        fields = new LinkedHashSet<>();
+                        for ( int i = 1; i < parts.length; i++ ){
+                            String fieldName = parts[i].trim();
+                            if ( fieldName.length() > 0 ){
+                                fields.add(fieldName);
+                            }
+                        }
+                        if ( fields.size() < 1 ){
+                            fields = null;
+                        }
+                        classes.add(new JSONReflectedClass(clazz, fields));
+                    }
+                }catch ( MBeanException e ){
+                    // Not actually an MBean operation at this point.
+                }
+            }
+            addReflectClasses(classes);
+        }
     }
 
     /**

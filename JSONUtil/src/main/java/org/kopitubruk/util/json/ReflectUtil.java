@@ -246,7 +246,8 @@ public class ReflectUtil
                 String name = method.getName();
                 int getterLevel = getLevel(modifiers);
                 if ( method.getParameterCount() == 0 && getterLevel >= privacyLevel &&
-                                name.startsWith("get") && ! getterMethods.containsKey(name) ){
+                                name.startsWith("get") && ! getterMethods.containsKey(name) &&
+                                ! Void.TYPE.equals(method.getReturnType()) ){
                     getterMethods.put(name, method);
                 }
             }
@@ -272,8 +273,10 @@ public class ReflectUtil
 
         Method getter = getterMethods.get(getterName);
 
-        if ( getter != null && (field == null || (isCompatible(field.getType(), getter.getReturnType()))) ){
-            return getter;
+        if ( getter != null ){
+            if ( field == null || (isCompatible(field.getType(), getter.getReturnType())) ){
+                return getter;
+            }
         }
 
         // no getter method or types not compatible for JSON

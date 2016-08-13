@@ -37,8 +37,8 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -111,7 +111,7 @@ public class TestJSONUtil
 
             ctx.bind("appName", "TestJSONUtil");
             ctx.bind("maxReflectIndex", 0);
-            ctx.bind("reflectClass0", "org.kopitubruk.util.json.ReflectTestClass");
+            ctx.bind("reflectClass0", "org.kopitubruk.util.json.ReflectTestClass,a,e");
         }catch ( NamingException ex ){
             s_log.error("Couldn't create context", ex);
         }
@@ -1457,8 +1457,15 @@ public class TestJSONUtil
         jsonObj.put("f", new ReflectTestClass());
         JSONConfig cfg = new JSONConfig();
 
-        cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
+        // JNDI set up to only show fields a and e.
         String json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"f\":{\"a\":1,\"e\":25.0}}"));
+
+        cfg.clearReflectClasses();
+        cfg.addReflectClass(ReflectTestClass.class);
+
+        cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
+        json = JSONUtil.toJSON(jsonObj, cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[],\"d\":null}}"));
 
         cfg.setReflectionPrivacy(ReflectUtil.PACKAGE);
@@ -1473,8 +1480,7 @@ public class TestJSONUtil
         json = JSONUtil.toJSON(jsonObj, cfg);
         assertThat(json, is("{\"f\":{\"a\":1}}"));
 
-        cfg.clearReflectClasses();
-        cfg.addReflectClass(new JSONReflectedClass(jsonObj.get("f"), new HashSet<String>(Arrays.asList("a","e"))));
+        cfg = new JSONConfig(); // reload defaults.
         json = JSONUtil.toJSON(jsonObj, cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"e\":25.0}}"));
     }
