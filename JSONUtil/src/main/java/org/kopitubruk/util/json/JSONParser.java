@@ -529,7 +529,7 @@ public class JSONParser
             for ( int i = 0, len = workList.size(); i < len && ! haveDouble; i++ ){
                 Number num = workList.get(i);
                 if ( num instanceof Float || num instanceof Double ){
-                    // try to convert floats to all longs if possible
+                    // try to convert floats and doubles to all longs if possible
                     try{
                         num = Long.valueOf(new BigDecimal(num.toString()).longValueExact());
                         workList.set(i, num);
@@ -546,7 +546,7 @@ public class JSONParser
                         BigDecimal bigDec = new BigDecimal(num.toString());
                         Double d = bigDec.doubleValue();
                         if ( bigDec.compareTo(new BigDecimal(d.toString())) != 0 ){
-                            return null;    // data loss.  can't do it.
+                            return null;    // data loss.  abort.
                         }
                     }
                 }
@@ -634,7 +634,7 @@ public class JSONParser
             if ( smallNumbers && scale <= 0 && (precision-scale) <= MAX_PRECISION_FOR_LONG ){
                 try{
                     Number num = getInteger(Long.toString(bigDec.longValueExact()), smallNumbers);
-                    if ( num instanceof Long ){
+                    if ( num instanceof Long && precision <= MAX_PRECISION_FOR_FLOAT ){
                         longVal = (Long)num;    // float might still work and be smaller.
                     }else{
                         return num;
