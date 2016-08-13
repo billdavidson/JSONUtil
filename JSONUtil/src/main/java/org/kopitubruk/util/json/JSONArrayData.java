@@ -45,16 +45,16 @@ class JSONArrayData implements Iterable<Object>
     /* (non-Javadoc)
      * @see java.lang.Iterable#iterator()
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     @Override
-    public Iterator iterator()
+    public Iterator<Object> iterator()
     {
         if ( obj instanceof Iterable ){
-            Iterable iterable = (Iterable)obj;
+            @SuppressWarnings("unchecked")
+            Iterable<Object> iterable = (Iterable<Object>)obj;  // gag.
             return iterable.iterator();
         }else if ( obj instanceof Enumeration ){
             return new Iterator<Object>() {
-                private Enumeration enumeration = (Enumeration)obj;
+                private Enumeration<?> enumeration = (Enumeration<?>)obj;
 
                 @Override
                 public boolean hasNext()

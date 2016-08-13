@@ -29,6 +29,7 @@ public final class JSONReflectionException extends JSONException
     private Object offender = null;
     private String field = null;
     private int level;
+    private boolean badObject = false;
 
     /**
      * Constructor.
@@ -45,10 +46,25 @@ public final class JSONReflectionException extends JSONException
         this.field = field;
     }
 
+    /**
+     * Exception for bad privacy levels.
+     *
+     * @param level the bad level
+     * @param cfg the config object
+     */
     JSONReflectionException( int level, JSONConfig cfg )
     {
         super(cfg);
         this.level = level;
+    }
+
+    /**
+     * Recursive reflection exception.
+     */
+    JSONReflectionException()
+    {
+        super(new JSONConfig());
+        badObject = true;
     }
 
     /**
@@ -65,6 +81,8 @@ public final class JSONReflectionException extends JSONException
         if ( offender != null ){
             String fmt = bundle.getString("reflectionException");
             return String.format(fmt, getClassName(offender), field, getClassName(this.getCause()));
+        }else if ( badObject ){
+            return bundle.getString("recursiveReflection");
         }else{
             String fmt = bundle.getString("badPrivacyLevel");
             return String.format(fmt, level);

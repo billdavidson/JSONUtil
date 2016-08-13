@@ -15,8 +15,6 @@
  */
 package org.kopitubruk.util.json;
 
-import javax.management.MalformedObjectNameException;
-import javax.management.ObjectName;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -72,20 +70,6 @@ class JNDIUtil
     static Context getEnvContext( String path ) throws NamingException
     {
         return (Context)getEnvContext().lookup(path);
-    }
-
-    /**
-     * Make an ObjectName based upon the class's canonical name.
-     *
-     * @param obj The object/class.
-     * @return The ObjectName.
-     * @throws MalformedObjectNameException If it makes a bad name.
-     */
-    static ObjectName getObjectName( Object obj ) throws MalformedObjectNameException
-    {
-        Class<?> objClass = obj instanceof Class ? (Class<?>)obj : obj.getClass();
-
-        return new ObjectName(objClass.getPackage().getName() + ":type=" + objClass.getSimpleName());
     }
 
     /**
