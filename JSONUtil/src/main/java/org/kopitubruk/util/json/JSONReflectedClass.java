@@ -37,7 +37,7 @@ import java.util.Set;
  *     all others.  Privacy settings are ignored.
  *   </li>
  *   <li>
- *     You can specify to include static or volatile fields, which normally
+ *     You can specify to include static or transient fields, which normally
  *     are not allowed.
  *   </li>
  *   <li>

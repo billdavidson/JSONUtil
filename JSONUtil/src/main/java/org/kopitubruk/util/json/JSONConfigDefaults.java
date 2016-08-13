@@ -1157,7 +1157,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Add the class of the given object to the set of classes that
-     * automatically get reflected.
+     * automatically get reflected. Note that default reflected classes can also
+     * be added via JNDI.
      *
      * @param obj The object whose class to add to the reflect list.
      * @since 1.9
@@ -1168,8 +1169,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Add the classes of all of the given objests to the list of classes
-     * that automatically get reflected.
+     * Add the classes of all of the given objects to the list of classes that
+     * automatically get reflected. Note that default reflected classes can also
+     * be added via JNDI.
      *
      * @param classes The objects to reflect.
      * @since 1.9
@@ -1324,10 +1326,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             return refClasses;
         }
 
-        boolean didSomething = false;
+        boolean needTrim = false;
         if ( refClasses == null ){
             refClasses = new HashMap<>();
-            didSomething = true;
+            needTrim = true;
         }
 
         for ( Object obj : classes ){
@@ -1336,14 +1338,14 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 if ( refClass != null ){
                     Class<?> clazz = refClass.getObjClass();
                     if ( ! refClasses.containsKey(clazz) ){
-                        didSomething = true;
+                        needTrim = true;
                     }
                     refClasses.put(clazz, refClass);
                 }
             }
         }
 
-        if ( didSomething ){
+        if ( needTrim ){
             refClasses = trimClasses(refClasses);
         }
 
@@ -1378,7 +1380,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             return refClasses;
         }
 
-        boolean didSomething = false;
+        boolean needTrim = false;
         for ( Object obj : classes ){
             if ( obj != null ){
                 JSONReflectedClass refClass = ensureReflectedClass(obj);
@@ -1386,13 +1388,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                     Class<?> clazz = refClass.getObjClass();
                     if ( refClasses.containsKey(clazz) ){
                         refClasses.remove(clazz);
-                        didSomething = true;
+                        needTrim = true;
                     }
                 }
             }
         }
 
-        if ( didSomething ){
+        if ( needTrim ){
             refClasses = trimClasses(refClasses);
         }
 
