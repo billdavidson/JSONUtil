@@ -14,6 +14,11 @@ import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
 
+import javax.management.MBeanException;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /**
  * Some reflection utility constants to be used with
  * {@link JSONConfig#setReflectionPrivacy(int)} and
@@ -24,6 +29,10 @@ import java.util.Set;
  */
 public class ReflectUtil
 {
+    private static Log s_log = null;
+
+    private static ClassLoader classLoader;
+
     /**
      * Reflection will attempt to serialize all fields including private.
      *
@@ -85,6 +94,11 @@ public class ReflectUtil
      */
     private static final Set<Class<?>> MAP_TYPES =
             new HashSet<>(Arrays.asList(Map.class,ResourceBundle.class));
+
+    static {
+        // needed for loading classes for reflection.
+        classLoader = ReflectUtil.class.getClassLoader();
+    }
 
     /**
      * Check that the given privacy level is valid.
@@ -453,6 +467,75 @@ public class ReflectUtil
         }
 
         return new LinkedHashSet<>(interfaces);
+    }
+
+    /**
+     * Get the class of the given object or the object if it's a class object.
+     *
+     * @param obj The object
+     * @return The object's class.
+     * @since 1.9
+     */
+    static Class<?> getClass( Object obj )
+    {
+        if ( obj == null ){
+            throw new JSONReflectionException();
+        }
+        Class<?> result = null;
+        if ( obj instanceof Class ){
+            result = (Class<?>)obj;
+        }else if ( obj instanceof JSONReflectedClass ){
+            result = ((JSONReflectedClass)obj).getObjClass();
+        }else{
+            result = obj.getClass();
+        }
+        return result;
+    }
+
+    /**
+     * Get the {@link JSONReflectedClass} version of this object class.
+     *
+     * @param obj The object.
+     * @return the {@link JSONReflectedClass} version of this object class.
+     */
+    static JSONReflectedClass ensureReflectedClass( Object obj )
+    {
+        if ( obj instanceof JSONReflectedClass ){
+            if ( ((JSONReflectedClass)obj).getObjClass() != null  ){
+                return (JSONReflectedClass)obj;
+            }else{
+                return null;
+            }
+        }else if ( obj != null ){
+            return new JSONReflectedClass(getClass(obj), null);
+        }else{
+            return null;
+        }
+    }
+
+    /**
+     * Get the class object for the given class name.
+     *
+     * @param className The name of the class.
+     * @return The class object for that class.
+     * @throws MBeanException If there's an error loading the class.
+     * @since 1.9
+     */
+    static Class<?> getClassByName( String className ) throws MBeanException
+    {
+        try{
+            return classLoader.loadClass(className);
+        }catch ( ClassNotFoundException e ){
+            ResourceBundle bundle = JSONUtil.getBundle(JSONConfigDefaults.getLocale());
+            String msg = String.format(bundle.getString("couldntLoadClass"), className);
+            if ( JSONConfigDefaults.isLogging() ){
+                if ( s_log == null ){
+                    s_log = LogFactory.getLog(ReflectUtil.class);
+                }
+                s_log.error(msg, e);
+            }
+            throw new MBeanException(e, msg);   // MBeans should only throw MBeanExceptions.
+        }
     }
 
     /**

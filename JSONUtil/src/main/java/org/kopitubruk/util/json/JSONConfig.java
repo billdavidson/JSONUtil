@@ -412,7 +412,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public void addNumberFormats( Map<Class<? extends Number>,NumberFormat> numFmtMap )
     {
-        numberFormatMap = JSONConfigDefaults.mergeFormatMaps(numberFormatMap, numFmtMap);
+        numberFormatMap = JSONConfigUtil.mergeFormatMaps(numberFormatMap, numFmtMap);
     }
 
     /**
@@ -600,7 +600,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public void addDateParseFormats( Collection<? extends DateFormat> fmts )
     {
-        customDateParseFormats = JSONConfigDefaults.addDateParseFormats(customDateParseFormats, fmts);
+        customDateParseFormats = JSONConfigUtil.addDateParseFormats(customDateParseFormats, fmts);
 
         // make sure that custom formats get included in the future.
         dateParseFormats = null;
@@ -689,7 +689,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public boolean isReflectClass( Object obj )
     {
-        return obj == null ? false : isReflectClass(JSONConfigDefaults.ensureReflectedClass(obj));
+        return obj == null ? false : isReflectClass(ReflectUtil.ensureReflectedClass(obj));
     }
 
     /**
@@ -704,13 +704,13 @@ public class JSONConfig implements Serializable, Cloneable
     {
         JSONReflectedClass result = null;
         if ( reflectClasses == null ){
-            result = JSONConfigDefaults.ensureReflectedClass(obj);
+            result = ReflectUtil.ensureReflectedClass(obj);
         }else if ( obj instanceof JSONReflectedClass ){
             result = (JSONReflectedClass)obj;
         }else{
-            result = reflectClasses.get(JSONConfigDefaults.getClass(obj));
+            result = reflectClasses.get(ReflectUtil.getClass(obj));
             if ( result == null ){
-                result = JSONConfigDefaults.ensureReflectedClass(obj);
+                result = ReflectUtil.ensureReflectedClass(obj);
             }
         }
         return result;
@@ -724,7 +724,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public JSONReflectedClass getReflectedClass( Object obj )
     {
-        return reflectClasses.get(JSONConfigDefaults.getClass(obj));
+        return reflectClasses.get(ReflectUtil.getClass(obj));
     }
 
     /**
@@ -736,7 +736,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public void addReflectClass( Object obj )
     {
-        reflectClasses = JSONConfigDefaults.addReflectClass(reflectClasses, obj);
+        reflectClasses = JSONConfigUtil.addReflectClass(reflectClasses, obj);
     }
 
     /**
@@ -748,7 +748,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public void addReflectClasses( Collection<?> classes )
     {
-        reflectClasses = JSONConfigDefaults.addReflectClasses(reflectClasses, classes);
+        reflectClasses = JSONConfigUtil.addReflectClasses(reflectClasses, classes);
     }
 
     /**
@@ -760,7 +760,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public void removeReflectClass( Object obj )
     {
-        reflectClasses = JSONConfigDefaults.removeReflectClass(reflectClasses, obj);
+        reflectClasses = JSONConfigUtil.removeReflectClass(reflectClasses, obj);
     }
 
     /**
@@ -773,7 +773,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public void removeReflectClasses( Collection<?> classes )
     {
-        reflectClasses = JSONConfigDefaults.removeReflectClasses(reflectClasses, classes);
+        reflectClasses = JSONConfigUtil.removeReflectClasses(reflectClasses, classes);
     }
 
     /**

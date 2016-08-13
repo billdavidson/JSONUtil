@@ -64,11 +64,8 @@ public class JSONReflectedClass implements Cloneable
      */
     public JSONReflectedClass( Object obj, Set<String> fieldNames )
     {
-        if ( obj == null || obj instanceof JSONReflectedClass ){
-            throw new JSONReflectionException();
-        }
-        objClass = JSONConfigDefaults.getClass(obj);
-        this.fieldNames = fieldNames;
+        setObjClass(obj);
+        setFieldNames(fieldNames);
     }
 
     /**
@@ -88,7 +85,7 @@ public class JSONReflectedClass implements Cloneable
      */
     public void setObjClass( Object obj )
     {
-        objClass = JSONConfigDefaults.getClass(obj);
+        objClass = ReflectUtil.getClass(obj);
     }
 
     /**
