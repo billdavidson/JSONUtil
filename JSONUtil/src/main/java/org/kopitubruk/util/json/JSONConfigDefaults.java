@@ -410,9 +410,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                         }
                         if ( fields.size() < 1 ){
                             fields = null;
+                        }else{
+                            fields = new LinkedHashSet<>(fields);
                         }
-                        classes.add(new JSONReflectedClass(clazz, fields));
                     }
+                    classes.add(new JSONReflectedClass(clazz, fields));
                 }catch ( MBeanException e ){
                     // Not actually an MBean operation at this point.
                 }
