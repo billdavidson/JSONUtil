@@ -432,7 +432,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             // Register an instance with MBean server if one is available.
             MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
 
-            mBeanName = JNDIUtil.getObjectName(d, appName);
+            mBeanName = JMXUtil.getObjectName(d, appName);
             mBeanServer.registerMBean(d, mBeanName);
             if ( logging ){
                 s_log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));

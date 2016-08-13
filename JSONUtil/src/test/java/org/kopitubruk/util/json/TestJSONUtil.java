@@ -1477,6 +1477,5 @@ public class TestJSONUtil
         cfg.addReflectClass(new JSONReflectedClass(jsonObj.get("f"), new HashSet<String>(Arrays.asList("a","e"))));
         json = JSONUtil.toJSON(jsonObj, cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"e\":25.0}}"));
-
     }
 }
