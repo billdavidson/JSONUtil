@@ -17,7 +17,9 @@ import java.util.ResourceBundle;
 import java.util.Set;
 
 /**
- * Some reflection utility constants.
+ * Some reflection utility constants to be used with
+ * {@link JSONConfig#setReflectionPrivacy(int)} and
+ * {@link JSONConfigDefaults#setReflectionPrivacy(int)}
  *
  * @author Bill Davidson
  * @since 1.9
@@ -35,7 +37,7 @@ public class ReflectUtil
     /**
      * Reflection will attempt to serialize package private, protected and
      * public fields or fields that have package private, protected or public get
-     * methods that conform to Java bean naming conventions.
+     * methods that conform to JavaBean naming conventions.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -44,8 +46,8 @@ public class ReflectUtil
 
     /**
      * Reflection will attempt to serialize protected and public fields or
-     * fields that have protected or public get methods that conform to Java
-     * bean naming conventions.
+     * fields that have protected or public get methods that conform to
+     * JavaBean naming conventions.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -54,7 +56,7 @@ public class ReflectUtil
 
     /**
      * Reflection will attempt to serialize only fields that are public
-     * or have public get methods that conform to Java bean naming
+     * or have public get methods that conform to JavaBean naming
      * conventions.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
@@ -71,8 +73,7 @@ public class ReflectUtil
     /**
      * Primitive number type names.
      */
-    private static final Set<String> PRIMITIVE_NUMBERS =
-            new HashSet<>(Arrays.asList("double","float","long","int","short","byte"));
+    private static final Set<Class<?>> PRIMITIVE_NUMBERS;
 
     /**
      * Types that become arrays in JSON.
@@ -85,6 +86,16 @@ public class ReflectUtil
      */
     private static final Set<Class<?>> MAP_TYPES =
             new HashSet<>(Arrays.asList(Map.class,ResourceBundle.class));
+
+    static {
+        // Java 7 doesn't handle this as well as Java 8
+        List<?> list1 = Arrays.asList(Double.TYPE, Float.TYPE, Long.TYPE, Integer.TYPE, Short.TYPE, Byte.TYPE);
+        List<Class<?>> list2 = new ArrayList<>(list1.size());
+        for ( Object type : list1 ){
+            list2.add((Class<?>)type);
+        }
+        PRIMITIVE_NUMBERS = new HashSet<>(list2);
+    }
 
     /**
      * Check that the given privacy level is valid.
@@ -117,27 +128,58 @@ public class ReflectUtil
 
         String name = "getGetterMethods";
         try {
-            Class<?> clazz = JSONConfigDefaults.getClass(propertyValue);
-            int privacyLevel = cfg.getReflectionPrivacy();
-            Map<String,Method> getterMethods = getGetterMethods(clazz, privacyLevel);
-            for ( Field field : getFields(clazz) ){
-                int modifiers = field.getModifiers();
-                if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
-                    continue;       // ignore static and transient fields.
-                }
-                name = field.getName();
-                Method getter = getGetter(field, getterMethods);
-                if ( getter != null ){
-                    // prefer the argumentless getter over direct access.
-                    if ( ! getter.isAccessible() ){
-                        getter.setAccessible(true);
+            JSONReflectedClass refClass = cfg.ensureReflectedClass(propertyValue);
+            Set<String> fieldNames = refClass.getFieldNames();
+
+            if ( fieldNames == null || fieldNames.size() < 1 ){
+                // no field names specified
+                int privacyLevel = cfg.getReflectionPrivacy();
+                Map<String,Method> getterMethods = getGetterMethods(refClass.getObjClass(), privacyLevel);
+                for ( Field field : getFields(refClass.getObjClass()) ){
+                    int modifiers = field.getModifiers();
+                    if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
+                        continue;       // ignore static and transient fields.
                     }
-                    obj.put(name, getter.invoke(propertyValue));
-                }else{
-                    // no getter -> direct access.
-                    int fieldLevel = getLevel(modifiers);
-                    if ( fieldLevel >= privacyLevel ){
-                        if ( ! field.isAccessible() ){
+                    name = field.getName();
+                    Method getter = getGetter(field, name, getterMethods);
+                    if ( getter != null ){
+                        // prefer the argumentless getter over direct access.
+                        if ( ! getter.isAccessible() ){
+                            getter.setAccessible(true);
+                        }
+                        obj.put(name, getter.invoke(propertyValue));
+                    }else{
+                        // no getter -> direct access.
+                        int fieldLevel = getLevel(modifiers);
+                        if ( fieldLevel >= privacyLevel ){
+                            if ( ! field.isAccessible() ){
+                                field.setAccessible(true);
+                            }
+                            obj.put(name, field.get(propertyValue));
+                        }
+                    }
+                }
+            }else{
+                // field names specified -- privacy out the window
+                int privacyLevel = PRIVATE;
+                Map<String,Method> getterMethods = getGetterMethods(refClass.getObjClass(), privacyLevel);
+                Map<String,Field> fields = new HashMap<>();
+                for ( Field field : getFields(refClass.getObjClass()) ){
+                    fields.put(field.getName(), field);
+                }
+                for ( String fieldName : fieldNames ){
+                    Field field = fields.get(fieldName);
+                    name = fieldName;
+                    Method getter = getGetter(field, name, getterMethods);
+                    if ( getter != null ){
+                        // prefer the argumentless getter over direct access.
+                        if ( ! getter.isAccessible() ){
+                            getter.setAccessible(true);
+                        }
+                        obj.put(name, getter.invoke(propertyValue));
+                    }else if ( field != null ){
+                        // no getter -> direct access.
+                        if ( !field.isAccessible() ){
                             field.setAccessible(true);
                         }
                         obj.put(name, field.get(propertyValue));
@@ -211,11 +253,13 @@ public class ReflectUtil
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
             for ( Method method : tmpClass.getDeclaredMethods() ){
+                int modifiers = method.getModifiers();
                 String name = method.getName();
-                int getterLevel = getLevel(method.getModifiers());
+                int getterLevel = getLevel(modifiers);
                 Class<?>[] parameterTypes = method.getParameterTypes();
                 if ( parameterTypes.length == 0 && getterLevel >= privacyLevel &&
-                                name.startsWith("get") && ! getterMethods.containsKey(name) ){
+                                name.startsWith("get") && ! getterMethods.containsKey(name) &&
+                                ! Void.TYPE.equals(method.getReturnType()) ){
                     getterMethods.put(name, method);
                 }
             }
@@ -232,18 +276,19 @@ public class ReflectUtil
      * @param getterMethods The methods.
      * @return The parameterless getter for the field or null if there isn't one.
      */
-    private static Method getGetter( Field field, Map<String,Method> getterMethods )
+    private static Method getGetter( Field field, String fieldName, Map<String,Method> getterMethods )
     {
         // looking for a getter with no parameters.  uses bean naming convention.
-        String fieldName = field.getName();
         String getterName = "get" +
                             fieldName.substring(0,1).toUpperCase() +
                             (fieldName.length() > 1 ? fieldName.substring(1) : "");
 
         Method getter = getterMethods.get(getterName);
 
-        if ( getter != null && isCompatible(field.getType(), getter.getReturnType()) ){
-            return getter;
+        if ( getter != null ){
+            if ( field == null || (isCompatible(field.getType(), getter.getReturnType())) ){
+                return getter;
+            }
         }
 
         // no getter method or types not compatible for JSON
@@ -287,7 +332,7 @@ public class ReflectUtil
      */
     private static boolean isNumber( Class<?> type )
     {
-        return (type.isPrimitive() && PRIMITIVE_NUMBERS.contains(type.getCanonicalName())) || isType(type, Number.class);
+        return PRIMITIVE_NUMBERS.contains(type) || isType(type, Number.class);
     }
 
     /**
@@ -298,7 +343,7 @@ public class ReflectUtil
      */
     private static boolean isBoolean( Class<?> type )
     {
-        return Boolean.class.equals(type) || (type.isPrimitive() && "boolean".equals(type.getCanonicalName()));
+        return Boolean.class.equals(type) || Boolean.TYPE.equals(type);
     }
 
     /**
@@ -309,7 +354,7 @@ public class ReflectUtil
      */
     private static boolean isCharacter( Class<?> type )
     {
-        return Character.class.equals(type) || (type.isPrimitive() && "char".equals(type.getCanonicalName()));
+        return Character.class.equals(type) || Character.TYPE.equals(type);
     }
 
     /**
@@ -400,33 +445,34 @@ public class ReflectUtil
         // build a map of the object's properties.
         Set<Class<?>> interfaces = new LinkedHashSet<>();
 
-        if ( clazz.isInterface() ){
-            Class<?> tmpClass = clazz;
-            while ( tmpClass != null ){
-                if ( tmpClass.isInterface() && ! interfaces.contains(tmpClass) ){
+        Class<?> tmpClass = clazz;
+        while ( tmpClass != null ){
+            boolean doInterfaces = true;
+            if ( tmpClass.isInterface() ){
+                if ( interfaces.contains(tmpClass) ){
+                    doInterfaces = false;
+                }else{
                     interfaces.add(tmpClass);
-                    for ( Class<?> itfc : tmpClass.getInterfaces() ){
-                        if ( ! interfaces.contains(itfc) ){
-                            interfaces.add(itfc);
-                            interfaces.addAll(getInterfaces(itfc));
-                        }
-                    }
                 }
-                tmpClass = tmpClass.getSuperclass();
             }
-        }else{
-            Class<?> tmpClass = clazz;
-            while ( tmpClass != null ){
+            if ( doInterfaces ){
                 for ( Class<?> itfc : tmpClass.getInterfaces() ){
                     if ( ! interfaces.contains(itfc) ){
                         interfaces.add(itfc);
                         interfaces.addAll(getInterfaces(itfc));
                     }
                 }
-                tmpClass = tmpClass.getSuperclass();
             }
+            tmpClass = tmpClass.getSuperclass();
         }
 
         return new LinkedHashSet<>(interfaces);
+    }
+
+    /**
+     * This class should never be instantiated.
+     */
+    private ReflectUtil()
+    {
     }
 }

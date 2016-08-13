@@ -30,7 +30,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -61,7 +61,7 @@ import org.apache.commons.logging.LogFactory;
  * methods is to support MBean access to the defaults.  A few defaults
  * are only available programmatically.  Those are accessed statically.
  * <p>
- * It is possible to configure the default values of these flags
+ * It is possible to configure most of the default values
  * via JNDI such as is typically available in a web application
  * by adding values to your application's environment under
  * java:/comp/env/org/kopitubruk/util/json.  That way you can do things
@@ -98,7 +98,7 @@ import org.apache.commons.logging.LogFactory;
  *   <li>encodeDatesAsStrings = false</li>
  *   <li>reflectUnknownObjects = false</li>
  *   <li>preciseIntegers = false</li>
- *   <li>preciseFloatingPoint = false</li>
+ *   <li>smallNumbers = false</li>
  *   <li>usePrimitiveArrays = false</li>
  * </ul>
  * <h3>
@@ -130,15 +130,17 @@ import org.apache.commons.logging.LogFactory;
  * "dateGenFormat" described above.  They will be added in numeric order of
  * the name.
  * <p>
- * Classes to use for automatic reflection can also be set up via JNDI.
+ * Classes to use for automatic reflection can be set up via JNDI.
  * You must define an integer "maxReflectIndex" which will be the index of
  * the last reflected class name to be searched for.  This class will then
  * look for String variables named "reflectClass0", "reflectClass1" and so on
  * until the number at the end up the name reaches maxReflectIndex.  The
  * class names need to load with {@link ClassLoader#loadClass(String)} or
- * they will not be added to the list of reflected classes.  These classes
- * will be added to all JSONConfig objects that are created in this class
- * loader.
+ * they will not be added to the list of reflected classes.  If the class
+ * names are followed by a commas and strings separated by commas, those
+ * strings will be taken as field names to use for {@link JSONReflectedClass}
+ * These classes will be added to all JSONConfig objects that are created
+ * in this class loader.
  * <p>
  * Number formats and date formats are cloned when they are added because they
  * are not thread safe.  They are cloned again when applied to a new
@@ -167,6 +169,11 @@ import org.apache.commons.logging.LogFactory;
  * permission to do it and does so before this class is loaded.  If logging
  * is not set via a system property at all, then JDNI can also be used to
  * disable logging by setting the boolean named "org/kopitubruk/util/json/logging".
+ * <p>
+ * You can also set the appName as in "-DappName=MyApp".  The appName is used
+ * in the MBean ObjectName and is recommended when this library is used with
+ * multiple apps in the same web tier container.  The appName may also be set
+ * via JNDI as a String in same json context as the other JNDI variables.
  *
  * @see JSONConfig
  * @author Bill Davidson
@@ -189,7 +196,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static volatile boolean encodeDatesAsStrings;
     private static volatile boolean reflectUnknownObjects;
     private static volatile boolean preciseIntegers;
-    private static volatile boolean preciseFloatingPoint;
+    private static volatile boolean smallNumbers;
     private static volatile boolean usePrimitiveArrays;
 
     private static volatile boolean quoteIdentifier;
@@ -203,7 +210,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static volatile DateFormat dateGenFormat;
     private static volatile List<DateFormat> dateParseFormats;
     private static volatile IndentPadding indentPadding = null;
-    private static volatile Set<Class<?>> reflectClasses = null;
+    private static volatile Map<Class<?>,JSONReflectedClass> reflectClasses = null;
     private static volatile int reflectionPrivacy;
 
     // stored for deregistration on unload.
@@ -235,144 +242,244 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         classLoader = thisClass.getClassLoader();
 
         String pkgName = thisClass.getPackage().getName();
-        String registerMBeanName = "registerMBean";
-        String loggingName = "logging";
-        String trueStr = Boolean.TRUE.toString();
 
-        // allow disabling JNDI, MBean and logging from the command line.
-        boolean useJNDI = Boolean.parseBoolean(System.getProperty(pkgName+".useJNDI", trueStr));
-        boolean registerMBean = Boolean.parseBoolean(System.getProperty(pkgName+'.'+registerMBeanName, trueStr));
+        // allow disabling JNDI, MBean and logging from the command line and setting the appName.
+        String appName = System.getProperty(pkgName+'.'+"appName", null);
+        boolean useJNDI = Boolean.parseBoolean(System.getProperty(pkgName+".useJNDI", "true"));
+        boolean registerMBean = Boolean.parseBoolean(System.getProperty(pkgName+'.'+"registerMBean", "true"));
 
-        String loggingProperty = System.getProperty(pkgName+'.'+loggingName);
+        String loggingProperty = System.getProperty(pkgName+'.'+"logging");
         if ( loggingProperty != null ){
             logging = Boolean.parseBoolean(loggingProperty);
         }else{
             logging = true;
         }
 
-        ResourceBundle bundle = null;
-        if ( useJNDI || registerMBean ){
-            bundle = JSONUtil.getBundle(getLocale());
-            if ( logging ){
-                s_log = LogFactory.getLog(thisClass);
-            }
-        }else{
+        if ( !(useJNDI || registerMBean) ){
             // bundle not used and logging is only used for JNDI and MBeans.
             logging = false;
         }
 
+        if ( logging ){
+            s_log = LogFactory.getLog(thisClass);
+        }
+
         if ( useJNDI ){
-            // Look for defaults in JNDI.
-            try{
-                Context ctx = JNDIUtil.getEnvContext(pkgName.replaceAll("\\.", "/"));
-
-                if ( loggingProperty == null ){
-                    // logging was not set by a system property. allow JNDI override.
-                    logging = getBoolean(ctx, loggingName, logging);
-                    if ( logging ){
-                        if ( s_log == null ){
-                            s_log = LogFactory.getLog(thisClass);
-                        }
-                    }else{
-                        s_log = null;
-                    }
-                }
-
-                registerMBean = getBoolean(ctx, registerMBeanName, registerMBean);
-
-                // locale.
-                String languageTag = getString(ctx, "locale", null);
-                if ( languageTag != null ){
-                    d.setLocale(languageTag);
-                    if ( bundle != null ){
-                        // possibly changed the locale.  redo the bundle.
-                        bundle = JSONUtil.getBundle(getLocale());
-                    }
-                }
-
-                // date generation format.
-                String dgf = getString(ctx, "dateGenFormat", null);
-                if ( dgf != null ){
-                    d.setDateGenFormat(dgf);
-                }
-
-                // date parse formats.
-                for ( int i = 0; i < 16; i++ ){
-                    String dpf = getString(ctx, "dateParseFormat" + i, null);
-                    if ( dpf != null ){
-                        d.addDateParseFormat(dpf);
-                    }
-                }
-
-                // default reflection classes.
-                int maxReflectIndex = getInt(ctx, "maxReflectIndex", -1);
-                if ( maxReflectIndex >= 0 ){
-                    List<String> classNames = new ArrayList<>();
-                    for ( int i = 0; i <= maxReflectIndex; i++ ){
-                        String className = getString(ctx, "reflectClass" + i, null);
-                        if ( className != null ){
-                            classNames.add(className);
-                        }
-                    }
-                    List<Class<?>> classes = new ArrayList<>(classNames.size());
-                    for ( String className : classNames ){
-                        try{
-                            classes.add(getClassByName(className));
-                        }catch ( MBeanException e ){
-                            // Not actually an MBean operation at this point.
-                        }
-                    }
-                    addReflectClasses(classes);
-                }
-
-                // validation flags.
-                d.setValidatePropertyNames(getBoolean(ctx, "validatePropertyNames", validatePropertyNames));
-                d.setDetectDataStructureLoops(getBoolean(ctx, "detectDataStructureLoops", detectDataStructureLoops));
-                d.setEscapeBadIdentifierCodePoints(getBoolean(ctx, "escapeBadIdentifierCodePoints", escapeBadIdentifierCodePoints));
-                d.setFullJSONIdentifierCodePoints(getBoolean(ctx, "fullJSONIdentifierCodePoints", fullJSONIdentifierCodePoints));
-
-                // safe alternate encoding options.
-                d.setEncodeNumericStringsAsNumbers(getBoolean(ctx, "encodeNumericStringsAsNumbers", encodeNumericStringsAsNumbers));
-                d.setEscapeNonAscii(getBoolean(ctx, "escapeNonAscii", escapeNonAscii));
-                d.setUnEscapeWherePossible(getBoolean(ctx, "unEscapeWherePossible", unEscapeWherePossible));
-                d.setEscapeSurrogates(getBoolean(ctx, "escapeSurrogates", escapeSurrogates));
-                d.setPassThroughEscapes(getBoolean(ctx, "passThroughEscapes", passThroughEscapes));
-                d.setEncodeDatesAsStrings(getBoolean(ctx, "encodeDatesAsStrings", encodeDatesAsStrings));
-                d.setReflectUnknownObjects(getBoolean(ctx, "reflectUnknownObjects", reflectUnknownObjects));
-                d.setPreciseIntegers(getBoolean(ctx, "preciseIntegers", preciseIntegers));
-                d.setPreciseFloatingPoint(getBoolean(ctx, "preciseFloatingPoint", preciseFloatingPoint));
-                d.setUsePrimitiveArrays(getBoolean(ctx, "usePrimitiveArrays", usePrimitiveArrays));
-
-                // non-standard encoding options.
-                d.setQuoteIdentifier(getBoolean(ctx, "quoteIdentifier", quoteIdentifier));
-                d.setUseECMA6(getBoolean(ctx, "useECMA6CodePoints", useECMA6));
-                d.setAllowReservedWordsInIdentifiers(getBoolean(ctx, "allowReservedWordsInIdentifiers", allowReservedWordsInIdentifiers));
-                d.setEncodeDatesAsObjects(getBoolean(ctx, "encodeDatesAsObjects", encodeDatesAsObjects));
-
-                reflectionPrivacy = getInt(ctx, "reflectionPrivacy", reflectionPrivacy);
-                try{
-                    ReflectUtil.confirmPrivacyLevel(reflectionPrivacy, new JSONConfig());
-                }catch ( JSONReflectionException ex ){
-                    debug(ex.getLocalizedMessage(), ex);
-                    reflectionPrivacy = ReflectUtil.PUBLIC;
-                }
-            }catch ( Exception e ){
-                // Nothing set in JNDI.  Use code defaults.  Not a problem.
-                debug(bundle.getString("badJNDIforConfig"), e);
-            }
+            Map<String,String> results = new HashMap<>();
+            results.put("appName", appName);
+            registerMBean = initJNDI(loggingProperty, registerMBean, appName, results);
+            appName = results.get("appName");
         }
 
         if ( registerMBean ){
-            // Register an instance with MBean server if one is available.
-            try{
-                MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
+            initMBean(appName);
+        }
+    }
 
-                mBeanName = JNDIUtil.getObjectName(d);
-                mBeanServer.registerMBean(d, mBeanName);
-                debug(String.format(bundle.getString("registeredMbean"), mBeanName));
-            }catch ( Exception e ){
-                // No MBean server.  Not a problem.
-                debug(bundle.getString("couldntRegisterMBean"), e);
+    /**
+     * Do JNDI Initializations.
+     *
+     * @param loggingProperty System property for logging flag.
+     * @param registerMBean boolean system property for registering the mbean.
+     * @param appName the appName if any
+     * @param results a map to hold additional results
+     * @return the value of registerMBean which might have changed during the JNDI lookups.
+     */
+    private static boolean initJNDI( String loggingProperty, boolean registerMBean, String appName, Map<String,String> results )
+    {
+        JSONConfigDefaults d = getInstance();
+        Class<?> thisClass = d.getClass();
+        String pkgName = thisClass.getPackage().getName();
+        ResourceBundle bundle = null;
+        if ( logging ){
+            bundle = JSONUtil.getBundle(getLocale());
+        }
+        // Look for defaults in JNDI.
+        try{
+            Context ctx = JNDIUtil.getEnvContext(pkgName.replaceAll("\\.", "/"));
+
+            if ( loggingProperty == null ){
+                // logging was not set by a system property. allow JNDI override.
+                logging = getBoolean(ctx, "logging", logging);
+                if ( logging ){
+                    if ( s_log == null ){
+                        s_log = LogFactory.getLog(thisClass);
+                    }
+                    if ( bundle == null ){
+                        bundle = JSONUtil.getBundle(getLocale());
+                    }
+                }else{
+                    s_log = null;
+                }
+            }
+
+            registerMBean = getBoolean(ctx, "registerMBean", registerMBean);
+
+            if ( registerMBean && appName == null ){
+                appName = getString(ctx, "appName", null);
+                results.put("appName", appName);
+            }
+
+            // locale.
+            String languageTag = getString(ctx, "locale", null);
+            if ( languageTag != null ){
+                d.setLocale(languageTag);
+                if ( logging ){
+                    // possibly changed the locale.  redo the bundle.
+                    bundle = JSONUtil.getBundle(getLocale());
+                }
+            }
+
+            loadDateFormatsFromJNDI(ctx);
+            loadReflectClassesFromJNDI(ctx);
+            setFlagsFromJNDI(ctx);
+
+            reflectionPrivacy = getInt(ctx, "reflectionPrivacy", reflectionPrivacy);
+            try{
+                ReflectUtil.confirmPrivacyLevel(reflectionPrivacy, new JSONConfig());
+            }catch ( JSONReflectionException ex ){
+                if ( logging ){
+                    s_log.debug(ex.getLocalizedMessage(), ex);
+                }
+                reflectionPrivacy = ReflectUtil.PUBLIC;
+            }
+        }catch ( Exception e ){
+            // Nothing set in JNDI.  Use code defaults.  Not a problem.
+            if ( logging ){
+                s_log.debug(bundle.getString("badJNDIforConfig"), e);
+            }
+        }
+
+        return registerMBean;
+    }
+
+    /**
+     * Load date formats from JNDI, if any.
+     *
+     * @param ctx The context to use.
+     */
+    private static void loadDateFormatsFromJNDI( Context ctx )
+    {
+        JSONConfigDefaults d = getInstance();
+
+        // date generation format.
+        String dgf = getString(ctx, "dateGenFormat", null);
+        if ( dgf != null ){
+            d.setDateGenFormat(dgf);
+        }
+
+        // date parse formats.
+        for ( int i = 0; i < 16; i++ ){
+            String dpf = getString(ctx, "dateParseFormat" + i, null);
+            if ( dpf != null ){
+                d.addDateParseFormat(dpf);
+            }
+        }
+    }
+
+    /**
+     * Load reflection classes from JNDI, if any.
+     *
+     * @param ctx The context to use.
+     */
+    private static void loadReflectClassesFromJNDI( Context ctx )
+    {
+        // default reflection classes.
+        int maxReflectIndex = getInt(ctx, "maxReflectIndex", -1);
+        if ( maxReflectIndex >= 0 ){
+            List<String> classNames = new ArrayList<>();
+            for ( int i = 0; i <= maxReflectIndex; i++ ){
+                String className = getString(ctx, "reflectClass" + i, null);
+                if ( className != null ){
+                    classNames.add(className);
+                }
+            }
+            List<JSONReflectedClass> classes = new ArrayList<>(classNames.size());
+            for ( String className : classNames ){
+                String[] parts = className.split(",");
+                try{
+                    Class<?> clazz = getClassByName(parts[0]);
+                    Set<String> fields = null;
+                    if ( parts.length > 1 ){
+                        fields = new LinkedHashSet<>();
+                        for ( int i = 1; i < parts.length; i++ ){
+                            String fieldName = parts[i].trim();
+                            if ( fieldName.length() > 0 ){
+                                fields.add(fieldName);
+                            }
+                        }
+                        if ( fields.size() < 1 ){
+                            fields = null;
+                        }
+                        classes.add(new JSONReflectedClass(clazz, fields));
+                    }
+                }catch ( MBeanException e ){
+                    // Not actually an MBean operation at this point.
+                }
+            }
+            addReflectClasses(classes);
+        }
+    }
+
+    /**
+     * Initialize the boolean flags from JNDI.
+     *
+     * @param ctx The context to use.
+     */
+    private static void setFlagsFromJNDI( Context ctx )
+    {
+        JSONConfigDefaults d = getInstance();
+
+        // validation flags.
+        d.setValidatePropertyNames(getBoolean(ctx, "validatePropertyNames", validatePropertyNames));
+        d.setDetectDataStructureLoops(getBoolean(ctx, "detectDataStructureLoops", detectDataStructureLoops));
+        d.setEscapeBadIdentifierCodePoints(getBoolean(ctx, "escapeBadIdentifierCodePoints", escapeBadIdentifierCodePoints));
+        d.setFullJSONIdentifierCodePoints(getBoolean(ctx, "fullJSONIdentifierCodePoints", fullJSONIdentifierCodePoints));
+
+        // safe alternate encoding options.
+        d.setEncodeNumericStringsAsNumbers(getBoolean(ctx, "encodeNumericStringsAsNumbers", encodeNumericStringsAsNumbers));
+        d.setEscapeNonAscii(getBoolean(ctx, "escapeNonAscii", escapeNonAscii));
+        d.setUnEscapeWherePossible(getBoolean(ctx, "unEscapeWherePossible", unEscapeWherePossible));
+        d.setEscapeSurrogates(getBoolean(ctx, "escapeSurrogates", escapeSurrogates));
+        d.setPassThroughEscapes(getBoolean(ctx, "passThroughEscapes", passThroughEscapes));
+        d.setEncodeDatesAsStrings(getBoolean(ctx, "encodeDatesAsStrings", encodeDatesAsStrings));
+        d.setReflectUnknownObjects(getBoolean(ctx, "reflectUnknownObjects", reflectUnknownObjects));
+        d.setPreciseIntegers(getBoolean(ctx, "preciseIntegers", preciseIntegers));
+        d.setSmallNumbers(getBoolean(ctx, "smallNumbers", smallNumbers));
+        d.setUsePrimitiveArrays(getBoolean(ctx, "usePrimitiveArrays", usePrimitiveArrays));
+
+        // non-standard encoding options.
+        d.setQuoteIdentifier(getBoolean(ctx, "quoteIdentifier", quoteIdentifier));
+        d.setUseECMA6(getBoolean(ctx, "useECMA6CodePoints", useECMA6));
+        d.setAllowReservedWordsInIdentifiers(getBoolean(ctx, "allowReservedWordsInIdentifiers", allowReservedWordsInIdentifiers));
+        d.setEncodeDatesAsObjects(getBoolean(ctx, "encodeDatesAsObjects", encodeDatesAsObjects));
+    }
+
+    /**
+     * Initialize the JMX MBean for this class.
+     *
+     * @param appName The name of the app.
+     */
+    private static void initMBean( String appName )
+    {
+        JSONConfigDefaults d = getInstance();
+        ResourceBundle bundle = null;
+        if ( logging ){
+            bundle = JSONUtil.getBundle(getLocale());
+        }
+        try{
+            // Register an instance with MBean server if one is available.
+            MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
+
+            mBeanName = JMXUtil.getObjectName(d, appName);
+            mBeanServer.registerMBean(d, mBeanName);
+            if ( logging ){
+                s_log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));
+            }
+        }catch ( Exception e ){
+            // No MBean server.  Not a problem.
+            if ( logging ){
+                s_log.debug(bundle.getString("couldntRegisterMBean"), e);
             }
         }
     }
@@ -419,7 +526,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             encodeDatesAsStrings = false;
             reflectUnknownObjects = false;
             preciseIntegers = false;
-            preciseFloatingPoint = false;
+            smallNumbers = false;
             usePrimitiveArrays = false;
 
             quoteIdentifier = true;
@@ -433,7 +540,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             dateParseFormats = null;
             indentPadding = null;
             reflectClasses = null;
-            reflectionPrivacy = ReflectUtil.PRIVATE;
+            reflectionPrivacy = ReflectUtil.PUBLIC;
         }
     }
 
@@ -471,9 +578,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             try{
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
                 mBeanServer.unregisterMBean(mBeanName);
-                debug(String.format(bundle.getString("unregistered"), mBeanName));
+                if ( logging ){
+                    s_log.debug(String.format(bundle.getString("unregistered"), mBeanName));
+                }
             }catch ( Exception e ){
-                error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
+                if ( logging ){
+                    s_log.error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
+                }
             }finally{
                 // don't try again.
                 mBeanName = null;
@@ -496,8 +607,16 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         cfg.addNumberFormats(getNumberFormatMap());
         cfg.setDateGenFormat(getDateGenFormat());
         cfg.addDateParseFormats(getDateParseFormats());
-        cfg.addReflectClasses(reflectClasses);
         cfg.setReflectionPrivacy(reflectionPrivacy);
+
+        if ( reflectClasses != null ){
+            Collection<JSONReflectedClass> refClasses = reflectClasses.values();
+            List<JSONReflectedClass> refCopy = new ArrayList<>(refClasses.size());
+            for ( JSONReflectedClass refClass : refClasses ){
+                refCopy.add(refClass.clone());
+            }
+            cfg.addReflectClasses(refCopy);
+        }
 
         // validation options.
         cfg.setValidatePropertyNames(validatePropertyNames);
@@ -513,8 +632,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         cfg.setPassThroughEscapes(passThroughEscapes);
         cfg.setEncodeDatesAsStrings(encodeDatesAsStrings);
         cfg.setReflectUnknownObjects(reflectUnknownObjects);
-        cfg.setPreciseIntegers(preciseIntegers);
-        cfg.setPreciseFloatingPoint(preciseFloatingPoint);
+        cfg.setPreciseNumbers(preciseIntegers);
+        cfg.setSmallNumbers(smallNumbers);
         cfg.setUsePrimitiveArrays(usePrimitiveArrays);
 
         // non-standard JSON options.
@@ -990,7 +1109,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 reflectionPrivacy = ReflectUtil.confirmPrivacyLevel(dflt, new JSONConfig());
             }
         }catch ( JSONReflectionException e ){
-            error(e.getLocalizedMessage(), e);
+            if ( logging ){
+                s_log.error(e.getLocalizedMessage(), e);
+            }
             throw new MBeanException(e);   // MBeans should only throw MBeanExceptions.
         }
     }
@@ -999,13 +1120,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Return true if the given class is in the set of classes being
      * automatically reflected.
      *
-     * @param clazz The class.
+     * @param refClass The reflected class.
      * @return true if the class is automatically reflected.
      * @since 1.9
      */
-    public static synchronized boolean isReflectClass( Class<?> clazz )
+    public static synchronized boolean isReflectClass( JSONReflectedClass refClass )
     {
-        return reflectClasses == null ? false : reflectClasses.contains(clazz);
+        return reflectClasses == null ? false : reflectClasses.containsKey(refClass.getObjClass());
     }
 
     /**
@@ -1018,7 +1139,18 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      */
     public static boolean isReflectClass( Object obj )
     {
-        return obj == null ? false : isReflectClass(getClass(obj));
+        return obj == null ? false : isReflectClass(ensureReflectedClass(obj));
+    }
+
+    /**
+     * Return the JSONReflectedClass for this object if it is stored as a default.
+     *
+     * @param obj The class to look up.
+     * @return the reflected class object or null if not found.
+     */
+    public static JSONReflectedClass getReflectedClass( Object obj )
+    {
+        return reflectClasses.get(getClass(obj));
     }
 
     /**
@@ -1119,16 +1251,17 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public String listReflectedClasses()
     {
-        List<Class<?>> refClasses = null;
+        List<JSONReflectedClass> refClasses = null;
         synchronized ( this.getClass() ){
             if ( reflectClasses != null ){
-                refClasses = new ArrayList<>(reflectClasses);
+                refClasses = new ArrayList<>(reflectClasses.values());
             }
         }
         StringBuilder result = new StringBuilder();
         if ( refClasses != null ){
             List<String> classes = new ArrayList<>(refClasses.size());
-            for ( Class<?> clazz : refClasses ){
+            for ( JSONReflectedClass refClass : refClasses ){
+                Class<?> clazz = refClass.getObjClass();
                 classes.add(clazz.getCanonicalName());
             }
             Collections.sort(classes);
@@ -1154,7 +1287,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         }catch ( ClassNotFoundException e ){
             ResourceBundle bundle = JSONUtil.getBundle(getLocale());
             String msg = String.format(bundle.getString("couldntLoadClass"), className);
-            error(msg, e);
+            if ( logging ){
+                s_log.error(msg, e);
+            }
             throw new MBeanException(e, msg);   // MBeans should only throw MBeanExceptions.
         }
     }
@@ -1168,7 +1303,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @return The modified set of reflect classes or null if there are none.
      * @since 1.9
      */
-    static Set<Class<?>> addReflectClass( Set<Class<?>> refClasses, Object obj )
+    static Map<Class<?>,JSONReflectedClass> addReflectClass( Map<Class<?>,JSONReflectedClass> refClasses, Object obj )
     {
         return obj == null ? refClasses : addReflectClasses(refClasses, Arrays.asList(obj));
     }
@@ -1181,7 +1316,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @return The modified set of reflect classes or null if there are none.
      * @since 1.9
      */
-    static Set<Class<?>> addReflectClasses( Set<Class<?>> refClasses, Collection<?> classes )
+    static Map<Class<?>,JSONReflectedClass> addReflectClasses( Map<Class<?>,JSONReflectedClass> refClasses, Collection<?> classes )
     {
         if ( classes == null || classes.size() < 1 ){
             return refClasses;
@@ -1189,13 +1324,20 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
         boolean didSomething = false;
         if ( refClasses == null ){
-            refClasses = new HashSet<>();
+            refClasses = new HashMap<>();
             didSomething = true;
         }
 
         for ( Object obj : classes ){
             if ( obj != null ){
-                didSomething = refClasses.add(getClass(obj)) || didSomething;
+                JSONReflectedClass refClass = ensureReflectedClass(obj);
+                if ( refClass != null ){
+                    Class<?> clazz = refClass.getObjClass();
+                    if ( ! refClasses.containsKey(clazz) ){
+                        didSomething = true;
+                    }
+                    refClasses.put(clazz, refClass);
+                }
             }
         }
 
@@ -1214,7 +1356,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @param obj An object of the type to be removed from the reflect set.
      * @return The modified set of reflect classes or null if there are none left.
      */
-    static Set<Class<?>> removeReflectClass( Set<Class<?>> refClasses, Object obj )
+    static Map<Class<?>,JSONReflectedClass> removeReflectClass( Map<Class<?>,JSONReflectedClass> refClasses, Object obj )
     {
         return obj == null ? refClasses : removeReflectClasses(refClasses, Arrays.asList(obj));
     }
@@ -1228,7 +1370,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @return The modified set of reflect classes or null if there are none left.
      * @since 1.9
      */
-    static Set<Class<?>> removeReflectClasses( Set<Class<?>> refClasses, Collection<?> classes )
+    static Map<Class<?>,JSONReflectedClass> removeReflectClasses( Map<Class<?>,JSONReflectedClass> refClasses, Collection<?> classes )
     {
         if ( classes == null || refClasses == null || classes.size() < 1 ){
             return refClasses;
@@ -1237,7 +1379,14 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         boolean didSomething = false;
         for ( Object obj : classes ){
             if ( obj != null ){
-                didSomething = refClasses.remove(getClass(obj)) || didSomething;
+                JSONReflectedClass refClass = ensureReflectedClass(obj);
+                if ( refClass != null ){
+                    Class<?> clazz = refClass.getObjClass();
+                    if ( refClasses.containsKey(clazz) ){
+                        refClasses.remove(clazz);
+                        didSomething = true;
+                    }
+                }
             }
         }
 
@@ -1246,6 +1395,27 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         }
 
         return refClasses;
+    }
+
+    /**
+     * Get the {@link JSONReflectedClass} version of this object class.
+     *
+     * @param obj The object.
+     * @return the {@link JSONReflectedClass} version of this object class.
+     */
+    static JSONReflectedClass ensureReflectedClass( Object obj )
+    {
+        if ( obj instanceof JSONReflectedClass ){
+            if ( ((JSONReflectedClass)obj).getObjClass() != null  ){
+                return (JSONReflectedClass)obj;
+            }else{
+                return null;
+            }
+        }else if ( obj != null ){
+            return new JSONReflectedClass(getClass(obj), null);
+        }else{
+            return null;
+        }
     }
 
     /**
@@ -1258,7 +1428,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      */
     static Class<?> getClass( Object obj )
     {
-        return obj instanceof Class ? (Class<?>)obj : obj.getClass();
+        return obj instanceof Class ? (Class<?>)obj :
+            (obj instanceof JSONReflectedClass ? ((JSONReflectedClass)obj).getObjClass() : obj.getClass());
     }
 
     /**
@@ -1268,9 +1439,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @return The trimmed set or null if empty.
      * @since 1.9
      */
-    private static Set<Class<?>> trimClasses( Set<Class<?>> refClasses )
+    private static Map<Class<?>,JSONReflectedClass> trimClasses( Map<Class<?>,JSONReflectedClass> refClasses )
     {
-        return refClasses.size() > 0 ? new HashSet<>(refClasses) : null;
+        return refClasses.size() > 0 ? new HashMap<>(refClasses) : null;
     }
 
     /**
@@ -1633,7 +1804,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     /**
      * If true then integer numbers which are not exactly representable
      * by a 64 bit double precision floating point number will be quoted in the
-     * output.  If false, then they will be unquoted, as numbers and precision
+     * output.  If false, then they will be unquoted, and precision
      * will likely be lost in the interpreter.
      *
      * @param dflt If true then quote integer numbers
@@ -1649,32 +1820,32 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the preciseFloatingPoint policy.
+     * Get the smallNumbers policy.
      *
-     * @return The preciseFloatingPoint policy.
+     * @return The smallNumbers policy.
      * @since 1.9
      */
     @Override
-    public boolean isPreciseFloatingPoint()
+    public boolean isSmallNumbers()
     {
-        return preciseFloatingPoint;
+        return smallNumbers;
     }
 
     /**
-     * If true then floating point numbers which are not exactly representable
-     * by a 64 bit double precision floating point number will be quoted in the
-     * output.  If false, then they will be unquoted, as numbers and precision
-     * will likely be lost in the interpreter.
+     * If true then {@link JSONParser} will attempt to minimize the
+     * storage used for all numbers.  Decimal numbers will be reduced
+     * to floats instead of doubles if it can done without losing
+     * precision.  Integer numbers will be reduced from long to int
+     * or short or byte if they fit.
      *
-     * @param dflt If true then quote floating point numbers
-     * that lose precision in 64-bit floating point.
+     * @param dflt If true then numbers will be made to use as little memory as possible.
      * @since 1.9
      */
     @Override
-    public void setPreciseFloatingPoint( boolean dflt )
+    public void setSmallNumbers( boolean dflt )
     {
         synchronized ( this.getClass() ){
-            preciseFloatingPoint = dflt;
+            smallNumbers = dflt;
         }
     }
 
@@ -1838,47 +2009,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             if ( encodeDatesAsObjects ){
                 encodeDatesAsStrings = false;
             }
-        }
-    }
-
-    /**
-     * Shorthand wrapper around the debug logging to make other code less
-     * awkward.
-     *
-     * @param message the message.
-     * @param t the throwable.
-     */
-    private static void debug( String message, Throwable t )
-    {
-        if ( logging ){
-            s_log.debug(message, t);
-        }
-    }
-
-    /**
-     * Shorthand wrapper around the debug logging to make other code less
-     * awkward.
-     *
-     * @param message the message.
-     */
-    private static void debug( String message )
-    {
-        if ( logging ){
-            s_log.debug(message);
-        }
-    }
-
-    /**
-     * Shorthand wrapper around the error logging to make other code less
-     * awkward.
-     *
-     * @param message the message.
-     * @param t the throwable.
-     */
-    private static void error( String message, Throwable t )
-    {
-        if ( logging ){
-            s_log.error(message, t);
         }
     }
 
