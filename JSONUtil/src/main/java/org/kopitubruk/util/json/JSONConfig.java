@@ -24,12 +24,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.TimeZone;
 
 /**
@@ -57,8 +55,8 @@ import java.util.TimeZone;
  *   <li>passThroughEscapes = false</li>
  *   <li>encodeDatesAsStrings = false</li>
  *   <li>reflectUnknownObjects = false</li>
- *   <li>preciseIntegers = false</li>
- *   <li>preciseFloatingPoint = false</li>
+ *   <li>preciseNumbers = false</li>
+ *   <li>smallNumbers = false</li>
  *   <li>usePrimitiveArrays = false</li>
  * </ul>
  * <h3>
@@ -88,6 +86,9 @@ import java.util.TimeZone;
  * If you've enabled special date handling options, you can change
  * the way date strings are generated and the way that they are
  * parsed.
+ * <p>
+ * This class also keeps track of classes which will be automatically
+ * reflected when encountered.
  * <p>
  * This class NOT thread safe.  There are issues with the loop
  * detection logic and any custom number or date formats used.  Never
@@ -134,7 +135,7 @@ public class JSONConfig implements Serializable, Cloneable
     /**
      * The set of classes that reflection should be used for.
      */
-    private Set<Class<?>> reflectClasses = null;
+    private Map<Class<?>,JSONReflectedClass> reflectClasses = null;
 
     /**
      * Indent padding object.
@@ -159,8 +160,8 @@ public class JSONConfig implements Serializable, Cloneable
     private boolean passThroughEscapes;
     private boolean encodeDatesAsStrings;
     private boolean reflectUnknownObjects;
-    private boolean preciseIntegers;
-    private boolean preciseFloatingPoint;
+    private boolean preciseNumbers;
+    private boolean smallNumbers;
     private boolean usePrimitiveArrays;
 
     private boolean quoteIdentifier;
@@ -237,7 +238,16 @@ public class JSONConfig implements Serializable, Cloneable
             result.customDateParseFormats = null;
         }
 
-        result.reflectClasses = reflectClasses == null ? null : new HashSet<Class<?>>(reflectClasses);
+        if ( reflectClasses == null ){
+            result.reflectClasses = null;
+        }else{
+            Collection<JSONReflectedClass> refClasses = reflectClasses.values();
+            List<JSONReflectedClass> refCopy = new ArrayList<JSONReflectedClass>(refClasses.size());
+            for ( JSONReflectedClass refClass : refClasses ){
+                refCopy.add(refClass.clone());
+            }
+            result.addReflectClasses(refCopy);
+        }
 
         result.indentPadding = indentPadding == null ? null : indentPadding.clone();
 
@@ -260,8 +270,8 @@ public class JSONConfig implements Serializable, Cloneable
         result.passThroughEscapes = passThroughEscapes;
         result.encodeDatesAsStrings = encodeDatesAsStrings;
         result.reflectUnknownObjects = reflectUnknownObjects;
-        result.preciseIntegers = preciseIntegers;
-        result.preciseFloatingPoint = preciseFloatingPoint;
+        result.preciseNumbers = preciseNumbers;
+        result.smallNumbers = smallNumbers;
         result.usePrimitiveArrays = usePrimitiveArrays;
 
         // non-standard JSON.
@@ -661,13 +671,13 @@ public class JSONConfig implements Serializable, Cloneable
      * Return true if the given class is in the set of classes being
      * automatically reflected.
      *
-     * @param clazz The class.
+     * @param refClass The class.
      * @return true if the class is automatically reflected.
      * @since 1.9
      */
-    public boolean isReflectClass( Class<?> clazz )
+    public boolean isReflectClass( JSONReflectedClass refClass )
     {
-        return reflectClasses == null ? false : reflectClasses.contains(clazz);
+        return reflectClasses == null || refClass == null ? false : reflectClasses.containsKey(refClass.getObjClass());
     }
 
     /**
@@ -680,7 +690,42 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public boolean isReflectClass( Object obj )
     {
-        return obj == null ? false : isReflectClass(JSONConfigDefaults.getClass(obj));
+        return obj == null ? false : isReflectClass(JSONConfigDefaults.ensureReflectedClass(obj));
+    }
+
+    /**
+     * Get the {@link JSONReflectedClass} for the given object or create a dummy
+     * one if there isn't one.  Creating one does not affect the results of the
+     * isReflectClass() methods.  If you didn't add one then it isn't stored.
+     *
+     * @param obj The class to look up.
+     * @return the reflected class object.
+     */
+    public JSONReflectedClass ensureReflectedClass( Object obj )
+    {
+        JSONReflectedClass result = null;
+        if ( reflectClasses == null ){
+            result = JSONConfigDefaults.ensureReflectedClass(obj);
+        }else if ( obj instanceof JSONReflectedClass ){
+            result = (JSONReflectedClass)obj;
+        }else{
+            result = reflectClasses.get(JSONConfigDefaults.getClass(obj));
+            if ( result == null ){
+                result = JSONConfigDefaults.ensureReflectedClass(obj);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Get the {@link JSONReflectedClass} for the given object if it is stored.
+     *
+     * @param obj the class being reflected.
+     * @return The JSONReflectedClass object or null if one is not stored.
+     */
+    public JSONReflectedClass getReflectedClass( Object obj )
+    {
+        return reflectClasses.get(JSONConfigDefaults.getClass(obj));
     }
 
     /**
@@ -864,7 +909,9 @@ public class JSONConfig implements Serializable, Cloneable
 
     /**
      * If true, then strings will be checked for number patterns and if they
-     * look like numbers, then they won't be quoted.  Default is false.
+     * look like numbers, then they won't be quoted.  In {@link JSONParser},
+     * strings will examined and if they look like numbers, then they will be
+     * parsed as numbers in the output.  Default is false.
      *
      * @param encodeNumericStringsAsNumbers the encodeNumericStringsAsNumbers to set
      */
@@ -1031,54 +1078,54 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * Get the preciseIntegers policy.
+     * Get the preciseNumbers policy.
      *
-     * @return The preciseIntegers policy.
+     * @return The preciseNumbers policy.
      * @since 1.9
      */
-    public boolean isPreciseIntegers()
+    public boolean isPreciseNumbers()
     {
-        return preciseIntegers;
+        return preciseNumbers;
     }
 
     /**
      * If true then integer numbers which are not exactly representable by a 64
      * bit double precision floating point number will be quoted in the output.
-     * If false, then they will be unquoted, as numbers and precision will
+     * If false, then they will be unquoted, and precision will
      * likely be lost in the interpreter.
      *
-     * @param preciseIntegers If true then quote integer numbers that lose precision in 64-bit floating point.
+     * @param preciseNumbers If true then quote integer numbers that lose precision in 64-bit floating point.
      * @since 1.9
      */
-    public void setPreciseIntegers( boolean preciseIntegers )
+    public void setPreciseNumbers( boolean preciseNumbers )
     {
-        this.preciseIntegers = preciseIntegers;
+        this.preciseNumbers = preciseNumbers;
     }
 
     /**
-     * Get the preciseFloatingPoint policy.
+     * Get the smallNumbers policy.
      *
-     * @return The preciseFloatingPoint policy.
+     * @return The smallNumbers policy.
      * @since 1.9
      */
-    public boolean isPreciseFloatingPoint()
+    public boolean isSmallNumbers()
     {
-        return preciseFloatingPoint;
+        return smallNumbers;
     }
 
     /**
-     * If true then floating point numbers which are not exactly representable
-     * by a 64 bit double precision floating point number will be quoted in the
-     * output.  If false, then they will be unquoted, as numbers and precision
-     * will likely be lost in the interpreter.
+     * If true then {@link JSONParser} will attempt to minimize the
+     * storage used for all numbers.  Decimal numbers will be reduced
+     * to floats instead of doubles if it can done without losing
+     * precision.  Integer numbers will be reduced from long to int
+     * or short or byte if they fit.
      *
-     * @param preciseFloatingPoint If true then quote floating point numbers
-     * that lose precision in 64-bit floating point.
+     * @param smallNumbers If true then numbers will be made to use as little memory as possible.
      * @since 1.9
      */
-    public void setPreciseFloatingPoint( boolean preciseFloatingPoint )
+    public void setSmallNumbers( boolean smallNumbers )
     {
-        this.preciseFloatingPoint = preciseFloatingPoint;
+        this.smallNumbers = smallNumbers;
     }
 
     /**
@@ -1226,16 +1273,6 @@ public class JSONConfig implements Serializable, Cloneable
     public boolean isFormatDates()
     {
         return encodeDatesAsStrings || encodeDatesAsObjects;
-    }
-
-    /**
-     * Return true if any precision options are enabled.
-     *
-     * @return true if either preciseIntegers or preciseFloatingPoint is true.
-     */
-    public boolean havePrecisionOpts()
-    {
-        return preciseIntegers || preciseFloatingPoint;
     }
 
     private static final long serialVersionUID = 1L;

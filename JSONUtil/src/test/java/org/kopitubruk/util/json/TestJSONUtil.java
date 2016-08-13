@@ -45,10 +45,12 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.Vector;
 
+import javax.naming.Context;
 import javax.naming.NamingException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -92,14 +94,14 @@ public class TestJSONUtil
         try{
             String pkgName = JSONUtil.class.getPackage().getName();
 
-            //Context ctx =
-            JNDIUtil.createContext(JNDIUtil.ENV_CONTEXT+"/"+pkgName.replaceAll("\\.", "/"));
+            Context ctx = JNDIUtil.createContext(JNDIUtil.ENV_CONTEXT+"/"+pkgName.replaceAll("\\.", "/"));
 
-            // not needed -- just used to test that the context was usable.
-            //ctx.bind("registerMBean", Boolean.FALSE);
-        }catch ( NamingException ex ){
-            // not fatal but will cause annoying log messages.
-            s_log.error("Couldn't create context", ex);
+            ctx.bind("appName", "TestJSONUtil");
+            ctx.bind("maxReflectIndex", 0);
+            ctx.bind("reflectClass0", "org.kopitubruk.util.json.ReflectTestClass,a,e");
+        }catch ( NamingException e ){
+            s_log.fatal("Couldn't create context", e);
+            System.exit(-1);
         }
 
         /*
@@ -107,8 +109,15 @@ public class TestJSONUtil
          * English, so it's forced during the tests.
          */
         JSONConfigDefaults.setLocale(Locale.US);
+    }
 
-        //s_sdf = new SimpleDateFormat("YYYY-MM-dd hh:mm:ss.SSS");
+    /**
+     * Cleanup resources.
+     */
+    @AfterClass
+    public static void cleanUpResources()
+    {
+        JSONConfigDefaults.clearMBean();
     }
 
     /**
@@ -1258,10 +1267,16 @@ public class TestJSONUtil
         Map<Object,Object> jsonObj = new HashMap<Object,Object>();
         jsonObj.put("f", new ReflectTestClass());
         JSONConfig cfg = new JSONConfig();
-        cfg.setReflectUnknownObjects(true);
+
+        // JNDI set up to only show fields a and e.
+        String json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"f\":{\"a\":1,\"e\":25.0}}"));
+
+        cfg.clearReflectClasses();
+        cfg.addReflectClass(ReflectTestClass.class);
 
         cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
-        String json = JSONUtil.toJSON(jsonObj, cfg);
+        json = JSONUtil.toJSON(jsonObj, cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[],\"d\":null}}"));
 
         cfg.setReflectionPrivacy(ReflectUtil.PACKAGE);
@@ -1275,5 +1290,9 @@ public class TestJSONUtil
         cfg.setReflectionPrivacy(ReflectUtil.PUBLIC);
         json = JSONUtil.toJSON(jsonObj, cfg);
         assertThat(json, is("{\"f\":{\"a\":1}}"));
+
+        cfg = new JSONConfig(); // reload defaults.
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"f\":{\"a\":1,\"e\":25.0}}"));
     }
 }

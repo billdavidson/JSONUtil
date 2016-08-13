@@ -347,7 +347,7 @@ public interface JSONConfigDefaultsMBean
     /**
      * If true then integer numbers which are not exactly representable
      * by a 64 bit double precision floating point number will be quoted in the
-     * output.  If false, then they will be unquoted, as numbers and precision
+     * output.  If false, then they will be unquoted, and precision
      * will likely be lost in the interpreter.
      *
      * @param dflt If true then quote integer numbers
@@ -357,23 +357,24 @@ public interface JSONConfigDefaultsMBean
     public void setPreciseIntegers( boolean dflt );
 
     /**
-     * Get the preciseFloatingPoint policy.
+     * Get the smallNumbers policy.
      *
-     * @return The preciseFloatingPoint policy.
+     * @return The smallNumbers policy.
      * @since 1.9
      */
-    public boolean isPreciseFloatingPoint();
+    public boolean isSmallNumbers();
 
     /**
-     * If true then floating point numbers which are not exactly representable
-     * by a 64 bit double precision floating point number will be quoted in the
-     * output.  If false, then they will be unquoted, as numbers and precision
-     * will likely be lost in the interpreter.
+     * If true then {@link JSONParser} will attempt to minimize the
+     * storage used for all numbers.  Decimal numbers will be reduced
+     * to floats instead of doubles if it can done without losing
+     * precision.  Integer numbers will be reduced from long to int
+     * or short or byte if they fit.
      *
-     * @param dflt If true then quote floating point numbers
-     * that lose precision in 64-bit floating point.
+     * @param dflt If true then numbers will be made to use as little memory as possible.
+     * @since 1.9
      */
-    public void setPreciseFloatingPoint( boolean dflt );
+    public void setSmallNumbers( boolean dflt );
 
     /**
      * The primitive arrays policy.

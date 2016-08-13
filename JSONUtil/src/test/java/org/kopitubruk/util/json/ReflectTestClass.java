@@ -40,4 +40,10 @@ class ReflectTestClass
     {
         return c;
     }
+
+    @SuppressWarnings("unused")
+    private Double getE()
+    {
+        return new Double(25);
+    }
 }
