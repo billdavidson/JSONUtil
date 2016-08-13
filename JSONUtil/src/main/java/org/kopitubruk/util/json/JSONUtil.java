@@ -110,7 +110,7 @@ import java.util.regex.Pattern;
  *   <dt>Reflected Objects</dt>
  *   <dd>
  *     Any object that has been added to the JSONConfig as an object to use
- *     reflection on to encode.  See {@link JSONConfig#addReflectClass(Object)}
+ *     reflection for encoding.  See {@link JSONConfig#addReflectClass(Object)}
  *     and {@link JSONConfig#addReflectClasses(Collection)}.  If
  *     {@link JSONConfig#isReflectUnknownObjects()} returns true, then any
  *     unrecognized object will become a reflected object.
@@ -131,7 +131,7 @@ import java.util.regex.Pattern;
  *     gives.  It is possible to set number formats for any number type in the
  *     JSONConfig. If those are set then they will be used instead of toString().
  *   </dd>
- *   <dt>Boolean's</dt>
+ *   <dt>{@link Boolean}s</dt>
  *   <dd>
  *     Encoded as boolean literals.
  *   </dd>
@@ -799,21 +799,19 @@ public class JSONUtil
         // All valid JSON numbers must be representable as finite 64-bit floating point.
         boolean isSafeJavascriptNumber = Double.isFinite(d);
 
-        if ( isSafeJavascriptNumber && cfg.havePrecisionOpts() ){
-            // check for precision flags.
+        if ( isSafeJavascriptNumber && cfg.isPreciseNumbers() ){
+            // precise numbers requested.  return false if it loses precision in double.
             if ( JSON_INTEGER_PAT.matcher(numericString).matches() ){
-                if ( cfg.isPreciseIntegers() ){
-                    // make sure that it stays the same when converted to double and back.
-                    try{
-                        long x = new BigInteger(numericString).longValueExact();
-                        // check if any precision was lost.
-                        isSafeJavascriptNumber = x == new Double(x).longValue();
-                    }catch ( ArithmeticException e ){
-                        // overflowed a long.
-                        isSafeJavascriptNumber = false;
-                    }
+                // make sure that it stays the same when converted to double and back.
+                try{
+                    long x = new BigInteger(numericString).longValueExact();
+                    // check if any precision was lost.
+                    isSafeJavascriptNumber = x == d.longValue();
+                }catch ( ArithmeticException e ){
+                    // overflowed a long.
+                    isSafeJavascriptNumber = false;
                 }
-            }else if ( cfg.isPreciseFloatingPoint() ){
+            }else{
                 // if they don't compare equal then precision was lost.
                 isSafeJavascriptNumber = b.compareTo(new BigDecimal(d.toString())) == 0;
             }

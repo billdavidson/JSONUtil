@@ -117,27 +117,58 @@ public class ReflectUtil
 
         String name = "getGetterMethods";
         try {
-            Class<?> clazz = JSONConfigDefaults.getClass(propertyValue);
-            int privacyLevel = cfg.getReflectionPrivacy();
-            Map<String,Method> getterMethods = getGetterMethods(clazz, privacyLevel);
-            for ( Field field : getFields(clazz) ){
-                int modifiers = field.getModifiers();
-                if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
-                    continue;       // ignore static and transient fields.
-                }
-                name = field.getName();
-                Method getter = getGetter(field, getterMethods);
-                if ( getter != null ){
-                    // prefer the argumentless getter over direct access.
-                    if ( ! getter.isAccessible() ){
-                        getter.setAccessible(true);
+            JSONReflectedClass refClass = cfg.ensureReflectedClass(propertyValue);
+            Set<String> fieldNames = refClass.getFieldNames();
+
+            if ( fieldNames == null || fieldNames.size() < 1 ){
+                // no field names specified
+                int privacyLevel = cfg.getReflectionPrivacy();
+                Map<String,Method> getterMethods = getGetterMethods(refClass.getObjClass(), privacyLevel);
+                for ( Field field : getFields(refClass.getObjClass()) ){
+                    int modifiers = field.getModifiers();
+                    if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
+                        continue;       // ignore static and transient fields.
                     }
-                    obj.put(name, getter.invoke(propertyValue));
-                }else{
-                    // no getter -> direct access.
-                    int fieldLevel = getLevel(modifiers);
-                    if ( fieldLevel >= privacyLevel ){
-                        if ( ! field.isAccessible() ){
+                    name = field.getName();
+                    Method getter = getGetter(field, name, getterMethods);
+                    if ( getter != null ){
+                        // prefer the argumentless getter over direct access.
+                        if ( ! getter.isAccessible() ){
+                            getter.setAccessible(true);
+                        }
+                        obj.put(name, getter.invoke(propertyValue));
+                    }else{
+                        // no getter -> direct access.
+                        int fieldLevel = getLevel(modifiers);
+                        if ( fieldLevel >= privacyLevel ){
+                            if ( ! field.isAccessible() ){
+                                field.setAccessible(true);
+                            }
+                            obj.put(name, field.get(propertyValue));
+                        }
+                    }
+                }
+            }else{
+                // field names specified -- privacy out the window
+                int privacyLevel = PRIVATE;
+                Map<String,Method> getterMethods = getGetterMethods(refClass.getObjClass(), privacyLevel);
+                Map<String,Field> fields = new HashMap<>();
+                for ( Field field : getFields(refClass.getObjClass()) ){
+                    fields.put(field.getName(), field);
+                }
+                for ( String fieldName : fieldNames ){
+                    Field field = fields.get(fieldName);
+                    name = fieldName;
+                    Method getter = getGetter(field, name, getterMethods);
+                    if ( getter != null ){
+                        // prefer the argumentless getter over direct access.
+                        if ( ! getter.isAccessible() ){
+                            getter.setAccessible(true);
+                        }
+                        obj.put(name, getter.invoke(propertyValue));
+                    }else if ( field != null ){
+                        // no getter -> direct access.
+                        if ( !field.isAccessible() ){
                             field.setAccessible(true);
                         }
                         obj.put(name, field.get(propertyValue));
@@ -211,8 +242,9 @@ public class ReflectUtil
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
             for ( Method method : tmpClass.getDeclaredMethods() ){
+                int modifiers = method.getModifiers();
                 String name = method.getName();
-                int getterLevel = getLevel(method.getModifiers());
+                int getterLevel = getLevel(modifiers);
                 if ( method.getParameterCount() == 0 && getterLevel >= privacyLevel &&
                                 name.startsWith("get") && ! getterMethods.containsKey(name) ){
                     getterMethods.put(name, method);
@@ -231,17 +263,16 @@ public class ReflectUtil
      * @param getterMethods The methods.
      * @return The parameterless getter for the field or null if there isn't one.
      */
-    private static Method getGetter( Field field, Map<String,Method> getterMethods )
+    private static Method getGetter( Field field, String fieldName, Map<String,Method> getterMethods )
     {
         // looking for a getter with no parameters.  uses bean naming convention.
-        String fieldName = field.getName();
         String getterName = "get" +
                             fieldName.substring(0,1).toUpperCase() +
                             (fieldName.length() > 1 ? fieldName.substring(1) : "");
 
         Method getter = getterMethods.get(getterName);
 
-        if ( getter != null && isCompatible(field.getType(), getter.getReturnType()) ){
+        if ( getter != null && (field == null || (isCompatible(field.getType(), getter.getReturnType()))) ){
             return getter;
         }
 

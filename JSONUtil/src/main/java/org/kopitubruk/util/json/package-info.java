@@ -68,18 +68,15 @@
  * of characters in identifiers as per the ECMAScript 6 standard.
  * <p>
  * There is some support for arbitrary precision numbers.  All Javascript numbers
- * are internally 64-bit double precision floating point and all numbers get
- * converted to that format by default.  If you set
- * {@code JSONConfig.setPreciseFloatingPoint(boolean)} to true then decimal numbers
+ * are internally 64-bit double precision floating point and all numbers eventually
+ * get converted to that format by default by whatever parses the JSON.  If you set
+ * {@code JSONConfig.setPreciseNumbers(boolean)} to true then numbers
  * which cannot be accurately represented by 64-bit double precision floating point
- * will be quoted in the output.  Likewise, if you set
- * {@code JSONConfig.setPreciseIntegers(boolean)} to true then integers which
- * cannot be accurately represented by 64-bit double precision floating point
  * will be quoted in the output.  This allows those string representations of those
  * numbers to be fed to an arbitrary precision package constructor to maintain the
  * original precision.  There are several arbitrary precision math packages available
  * for Javascript.  {@code JSONParser} creates {@code BigInteger} and
- * {@code BigDecimal} whenever it has numbers that lose precision in {@code Long}
+ * {@code BigDecimal} whenever it encounters numbers that lose precision in {@code Long}
  * or {@code Double} respectively.
  * <p>
  * This package uses Apache Commons Logging facade in a few places so it should work
