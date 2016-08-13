@@ -67,10 +67,13 @@ import java.util.regex.Pattern;
  * in order to retain all of the precision of the original number depicted by
  * the string.  Likewise, if an integer number is too big to fit in a
  * {@link Long}, then a {@link BigInteger} will be used in order to retain the
- * original number depicted by the string.
+ * original number depicted by the string.  If
+ * {@link JSONConfig#isSmallNumbers()} returns true then the parser will attempt
+ * to use smaller types if they don't lose information including bytes for
+ * small magnitude integers.
  * <p>
  * If {@link JSONConfig#isEncodeNumericStringsAsNumbers()} returns true, then
- * strings which look like numbers will be converted to numbers in the result.
+ * strings which look like numbers will be encoded as numbers in the result.
  * <p>
  * If the {@link JSONConfig#isEncodeDatesAsObjects()} or
  * {@link JSONConfig#isEncodeDatesAsStrings()} returns true, then strings that
@@ -138,6 +141,11 @@ public class JSONParser
      * Maximum possible significant digits in a 64 bit floating point number.
      */
     private static final int MAX_PRECISION_FOR_DOUBLE = 17;
+
+    /**
+     * Maximum possible significant digits in a 64 bit integer
+     */
+    private static final int MAX_PRECISION_FOR_LONG = 19;
 
     /**
      * Types of tokens in a JSON input string.
@@ -342,13 +350,65 @@ public class JSONParser
 
         if ( tokens.cfg.isUsePrimitiveArrays() ){
             // try to make it an array of primitives if possible.
-            Object array = getArrayOfPrimitives(list);
+            Object array = getArrayOfPrimitives(list, tokens.cfg.isSmallNumbers());
             if ( array != null ){
                 return array;
             }
         }
 
         return list;
+    }
+
+    /**
+     * The the value of the given token.
+     *
+     * @param token the token to get the value of.
+     * @param tokens the token reader.
+     * @return A JSON value in Java form.
+     * @throws ParseException if there's a problem with date parsing.
+     * @throws IOException If there's an IO problem.
+     */
+    private static Object getValue( Token token, TokenReader tokens ) throws ParseException, IOException
+    {
+        JSONConfig cfg = tokens.cfg;
+        switch ( token.tokenType ){
+            case STRING:
+                String unesc = CodePointData.unEscape(token.value, cfg);
+                if ( cfg.isFormatDates() ){
+                    try{
+                        return parseDate(unesc, cfg);
+                    }catch ( ParseException e ){
+                    }
+                }
+                if ( cfg.isEncodeNumericStringsAsNumbers() ){
+                    Matcher matcher = JAVASCRIPT_FLOATING_POINT_PAT.matcher(unesc);
+                    if ( matcher.matches() ){
+                        return getDecimal(matcher.group(1), cfg.isSmallNumbers());
+                    }
+                    matcher = JAVASCRIPT_INTEGER_PAT.matcher(unesc);
+                    if ( matcher.matches() ){
+                        return getInteger(matcher.group(1), cfg.isSmallNumbers());
+                    }
+                }
+                return unesc;
+            case FLOATING_POINT_NUMBER:
+                return getDecimal(token.value, cfg.isSmallNumbers());
+            case INTEGER_NUMBER:
+                return getInteger(token.value, cfg.isSmallNumbers());
+            case LITERAL:
+                if ( token.value.equals("null") ){
+                    return null;
+                }else{
+                    return Boolean.valueOf(token.value);
+                }
+            case DATE:
+                return parseDate(CodePointData.unEscape(token.value, tokens.cfg), tokens.cfg);
+            case START_OBJECT:
+            case START_ARRAY:
+                return parseTokens(token, tokens);
+            default:
+                throw new JSONParserException(TokenType.STRING, token.tokenType, tokens.cfg);
+        }
     }
 
     /**
@@ -363,16 +423,18 @@ public class JSONParser
      * references to each wrapper object which could be up to 8 bytes per
      * primitive. For numbers that can be bytes, this could be saving up to 15
      * bytes per number vs. making everything Long in a list as the code did
-     * before.  Arrays also have slightly less memory overhead than an ArrayList
+     * before. Arrays also have slightly less memory overhead than an ArrayList
      * which maintains additional size and modCount ints as well as a reference
      * to its own internal array for up to 16 bytes of additional space required
      * by an ArrayList than an array.
      *
      * @param list The list.
+     * @param smallNumbers if true, then try to use the smallest number size
+     *            that doesn't lose information.
      * @return The array or null if one could not be made.
      * @since 1.9
      */
-    private static Object getArrayOfPrimitives( ArrayList<Object> list )
+    private static Object getArrayOfPrimitives( ArrayList<Object> list, boolean smallNumbers )
     {
         if ( list.size() < 1 ){
             return null;
@@ -406,7 +468,6 @@ public class JSONParser
             boolean[] booleans = new boolean[list.size()];
             for ( int i = 0; i < booleans.length; i++ ){
                 booleans[i] = (Boolean)list.get(i);
-                list.set(i, null);
             }
             return booleans;
         }
@@ -419,7 +480,6 @@ public class JSONParser
             char[] chars = new char[list.size()];
             for ( int i = 0; i < chars.length; i++ ){
                 chars[i] = ((String)list.get(i)).charAt(0);
-                list.set(i, null);
             }
             return chars;
         }
@@ -431,182 +491,187 @@ public class JSONParser
         boolean haveLong = false;
         boolean haveInt = false;
         boolean haveShort = false;
+        ArrayList<Number> workList = new ArrayList<>(list.size());
+        for ( Object num : list ){
+            workList.add((Number)num);
+        }
 
-        // make everything as small as possible without losing information.
-        for ( int i = 0, len = list.size(); i < len; i++ ){
-            Number num = (Number)list.get(i);
-            if ( num instanceof Double ){
-                Double d = (Double)num;
-                boolean gotFloat = false;
-                if ( d.isInfinite() || d.isNaN() ){
-                    list.set(i, Float.valueOf(d.toString()));
-                    gotFloat = true;
-                }else{
-                    BigDecimal bigDec = new BigDecimal(d.toString());
-                    if ( bigDec.precision() <= MAX_PRECISION_FOR_FLOAT ){
-                        Float f = Float.valueOf(bigDec.floatValue());
-                        if ( Float.isFinite(f) && bigDec.compareTo(new BigDecimal(f.toString())) == 0 ){
-                            list.set(i, f);
-                            gotFloat = true;
-                        }
+        if ( smallNumbers ){
+            // numbers are already reduced in size.  find out what's there.
+            for ( Number num : workList ){
+                haveDouble = haveDouble || num instanceof Double;
+                haveFloat  = haveFloat  || num instanceof Float;
+                haveLong   = haveLong   || num instanceof Long;
+                haveInt    = haveInt    || num instanceof Integer;
+                haveShort  = haveShort  || num instanceof Short;
+            }
+        }else{
+            // make everything as small as possible without losing information.
+            smallNumbers = true;
+            for ( int i = 0, len = workList.size(); i < len; i++ ){
+                Number num = workList.get(i);
+                Number x = getDecimal(num.toString(), smallNumbers);
+                if ( ! num.getClass().equals(x.getClass()) && !(x instanceof BigDecimal || x instanceof BigInteger) ){
+                    num = x;
+                    workList.set(i, num);
+                }
+                haveDouble = haveDouble || num instanceof Double;
+                haveFloat  = haveFloat  || num instanceof Float;
+                haveLong   = haveLong   || num instanceof Long;
+                haveInt    = haveInt    || num instanceof Integer;
+                haveShort  = haveShort  || num instanceof Short;
+            }
+        }
+
+        if ( haveLong && (haveFloat || haveDouble) ){
+            haveFloat = false;
+            haveDouble = false;
+            for ( int i = 0, len = workList.size(); i < len && ! haveDouble; i++ ){
+                Number num = workList.get(i);
+                if ( num instanceof Float || num instanceof Double ){
+                    // try to convert floats to all longs if possible
+                    try{
+                        num = Long.valueOf(new BigDecimal(num.toString()).longValueExact());
+                        workList.set(i, num);
+                    }catch ( ArithmeticException e ){
+                        haveDouble = true;
                     }
                 }
-                haveFloat = haveFloat || gotFloat;
-                haveDouble = haveDouble || ! gotFloat;
-            }else{
-                long ln = num.longValue();
-                BigInteger bigInt = BigInteger.valueOf(ln);
-                try{
-                    list.set(i, Byte.valueOf(bigInt.byteValueExact()));
-                }catch ( ArithmeticException e ){
-                    try{
-                        list.set(i, Short.valueOf(bigInt.shortValueExact()));
-                        haveShort = true;
-                    }catch ( ArithmeticException ex ){
-                        try{
-                            list.set(i, Integer.valueOf(bigInt.intValueExact()));
-                            haveInt = true;
-                        }catch ( ArithmeticException ey ){
-                            haveLong = true;
+            }
+            if ( haveDouble ){
+                // conversion to long failed.  check conversion to double.
+                for ( int i = 0, len = workList.size(); i < len; i++ ){
+                    Number num = workList.get(i);
+                    if ( num instanceof Long ){
+                        BigDecimal bigDec = new BigDecimal(num.toString());
+                        Double d = bigDec.doubleValue();
+                        if ( bigDec.compareTo(new BigDecimal(d.toString())) != 0 ){
+                            return null;    // data loss.  can't do it.
                         }
                     }
                 }
             }
         }
+        if ( haveInt && haveFloat && ! haveDouble ){
+            // if floats would hurt int precision then go double.
+            for ( int i = 0, len = workList.size(); i < len && ! haveDouble; i++ ){
+                Number num = workList.get(i);
+                if ( num instanceof Integer ){
+                    BigDecimal bigDec = new BigDecimal(num.toString());
+                    Float f = bigDec.floatValue();
+                    haveDouble = bigDec.compareTo(new BigDecimal(f.toString())) != 0;
+                }
+            }
+        }
 
-        // make an array of the most complex type in the list and return it.
+        // make an array of the most complex type in the workList and return it.
 
         if ( haveDouble ){
-            double[] doubles = new double[list.size()];
+            double[] doubles = new double[workList.size()];
             for ( int i = 0; i < doubles.length; i++ ){
-                Number num = (Number)list.get(i);
+                Number num = workList.get(i);
                 if ( num instanceof Float ){
                     doubles[i] = Double.parseDouble(num.toString());    // avoid cast rounding errors.
                 }else{
                     doubles[i] = num.doubleValue();
                 }
-                list.set(i, null);
             }
             return doubles;
         }else if ( haveFloat ){
-            float[] floats = new float[list.size()];
+            float[] floats = new float[workList.size()];
             for ( int i = 0; i < floats.length; i++ ){
-                floats[i] = ((Number)list.get(i)).floatValue();
-                list.set(i, null);
+                floats[i] = workList.get(i).floatValue();
             }
             return floats;
         }else if ( haveLong ){
-            long[] longs = new long[list.size()];
+            long[] longs = new long[workList.size()];
             for ( int i = 0; i < longs.length; i++ ){
-                longs[i] = ((Number)list.get(i)).longValue();
-                list.set(i, null);
+                longs[i] = workList.get(i).longValue();
             }
             return longs;
         }else if ( haveInt ){
-            int[] ints = new int[list.size()];
+            int[] ints = new int[workList.size()];
             for ( int i = 0; i < ints.length; i++ ){
-                ints[i] = ((Number)list.get(i)).intValue();
-                list.set(i, null);
+                ints[i] = workList.get(i).intValue();
             }
             return ints;
         }else if ( haveShort ){
-            short[] shorts = new short[list.size()];
+            short[] shorts = new short[workList.size()];
             for ( int i = 0; i < shorts.length; i++ ){
-                shorts[i] = ((Number)list.get(i)).shortValue();
-                list.set(i, null);
+                shorts[i] = workList.get(i).shortValue();
             }
             return shorts;
         }else{
-            byte[] bytes = new byte[list.size()];
+            byte[] bytes = new byte[workList.size()];
             for ( int i = 0; i < bytes.length; i++ ){
-                bytes[i] = ((Number)list.get(i)).byteValue();
-                list.set(i, null);
+                bytes[i] = workList.get(i).byteValue();
             }
             return bytes;
         }
     }
 
     /**
-     * The the value of the given token.
-     *
-     * @param token the token to get the value of.
-     * @param tokens the token reader.
-     * @return A JSON value in Java form.
-     * @throws ParseException if there's a problem with date parsing.
-     * @throws IOException If there's an IO problem.
-     */
-    private static Object getValue( Token token, TokenReader tokens ) throws ParseException, IOException
-    {
-        switch ( token.tokenType ){
-            case STRING:
-                JSONConfig cfg = tokens.cfg;
-                String unesc = CodePointData.unEscape(token.value, cfg);
-                if ( cfg.isFormatDates() ){
-                    try{
-                        return parseDate(unesc, cfg);
-                    }catch ( ParseException e ){
-                    }
-                }
-                if ( cfg.isEncodeNumericStringsAsNumbers() ){
-                    Matcher matcher = JAVASCRIPT_FLOATING_POINT_PAT.matcher(unesc);
-                    if ( matcher.matches() ){
-                        return getDecimal(matcher.group(1));
-                    }
-                    matcher = JAVASCRIPT_INTEGER_PAT.matcher(unesc);
-                    if ( matcher.matches() ){
-                        return getInteger(matcher.group(1));
-                    }
-                }
-                return unesc;
-            case FLOATING_POINT_NUMBER:
-                return getDecimal(token.value);
-            case INTEGER_NUMBER:
-                return getInteger(token.value);
-            case LITERAL:
-                if ( token.value.equals("null") ){
-                    return null;
-                }else{
-                    return Boolean.valueOf(token.value);
-                }
-            case DATE:
-                return parseDate(CodePointData.unEscape(token.value, tokens.cfg), tokens.cfg);
-            case START_OBJECT:
-            case START_ARRAY:
-                return parseTokens(token, tokens);
-            default:
-                throw new JSONParserException(TokenType.STRING, token.tokenType, tokens.cfg);
-        }
-    }
-
-    /**
      * Convert a decimal string into a {@link Double} or if it doesn't fit in a
      * {@link Double} without losing information, then convert it to a
-     * {@link BigDecimal}.
+     * {@link BigDecimal}.  If it doesn't fit in a {@link Double} but it has nothing
+     * to the right of the decimal point, then this will try to see if it fits in
+     * a {@link Long}.
      *
      * @param decimalString A string representing a decimal/floating point number.
-     * @return A {@link Double} or {@link BigDecimal} as needed to accurately represent the number.
+     * @param smallNumbers if true, then try to use the smallest number size
+     *            that doesn't lose information.
+     * @return A {@link Number} needed to accurately represent the number.
      * @since 1.9
      */
-    private static Number getDecimal( String decimalString )
+    private static Number getDecimal( String decimalString, boolean smallNumbers )
     {
         try{
             // this will work except for NaN and Infinity
             BigDecimal bigDec = new BigDecimal(decimalString);
-            // check significant digit count.
-            if ( bigDec.precision() <= MAX_PRECISION_FOR_DOUBLE ){
-                int scale = bigDec.scale();
-                String fmt = '%' + (scale > 0 ? "." + scale : "") + 'e';
-                double d = bigDec.doubleValue();
-                if ( Double.isFinite(d) && bigDec.compareTo(new BigDecimal(String.format(fmt, d))) == 0 ){
-                    // no precision loss going to double
-                    return Double.valueOf(d);
+            Long longVal = null;
+            int scale = bigDec.scale();
+            int precision = bigDec.precision();
+            if ( smallNumbers && scale <= 0 && (precision-scale) <= MAX_PRECISION_FOR_LONG ){
+                try{
+                    Number num = getInteger(Long.toString(bigDec.longValueExact()), smallNumbers);
+                    if ( num instanceof Long ){
+                        longVal = (Long)num;    // float might still work and be smaller.
+                    }else{
+                        return num;
+                    }
+                }catch ( ArithmeticException e ){
                 }
             }
-            // precision loss, maintain precision using BigDecimal
+            // check significant digit count.
+            if ( smallNumbers && precision <= MAX_PRECISION_FOR_FLOAT ){
+                Float f = bigDec.floatValue();
+                if ( Float.isFinite(f) && bigDec.compareTo(new BigDecimal(f.toString())) == 0 ){
+                    return f;                // no precision loss going to float
+                }
+            }
+            if ( longVal != null ){
+                return longVal;             // float didn't work. double's no smaller.
+            }
+            if ( precision <= MAX_PRECISION_FOR_DOUBLE ){
+                Double d = bigDec.doubleValue();
+                if ( Double.isFinite(d) && bigDec.compareTo(new BigDecimal(d.toString())) == 0 ){
+                    return d;                    // no precision loss going to double
+                }
+            }
+            // precision loss, maintain precision
+            if ( !smallNumbers && scale <= 0 && (precision-scale) <= MAX_PRECISION_FOR_LONG ){
+                try{
+                    return Long.valueOf(bigDec.longValueExact());   // long too much for double
+                }catch ( ArithmeticException e ){
+                }
+            }
+            if ( smallNumbers && scale == 0 ){
+                return bigDec.toBigIntegerExact();
+            }
             return bigDec;
         }catch ( NumberFormatException e ){
             // BigDecimal doesn't do NaN or Infinity
-            return Double.valueOf(decimalString);
+            return smallNumbers ? Float.valueOf(decimalString) : Double.valueOf(decimalString);
         }
     }
 
@@ -616,11 +681,13 @@ public class JSONParser
      * {@link BigInteger}.
      *
      * @param integerString A string representing an integer number.
+     * @param smallNumbers if true, then try to use the smallest number size
+     *            that doesn't lose information.
      * @return A {@link Long} or {@link BigInteger} as needed to accurately
      *         represent the number.
      * @since 1.9
      */
-    private static Number getInteger( String integerString )
+    private static Number getInteger( String integerString, boolean smallNumbers )
     {
         // parse with BigInteger because that will always work at this point.
         BigInteger bigInt;
@@ -630,6 +697,22 @@ public class JSONParser
             bigInt = new BigInteger(integerString, 8);
         }else{
             bigInt = new BigInteger(integerString);
+        }
+
+        if ( smallNumbers ){
+            // try for smaller types.
+            try{
+                return Byte.valueOf(bigInt.byteValueExact());
+            }catch ( ArithmeticException e ){
+            }
+            try{
+                return Short.valueOf(bigInt.shortValueExact());
+            }catch ( ArithmeticException e ){
+            }
+            try{
+                return Integer.valueOf(bigInt.intValueExact());
+            }catch ( ArithmeticException e ){
+            }
         }
 
         try{
