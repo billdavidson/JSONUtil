@@ -579,53 +579,64 @@ public class ReflectUtil
      * Return true if the type returned by the method is compatible in JSON
      * with the type of the field.
      *
+     * @param clazz The class.
      * @param field The field.
      * @param method The method to check the return type of.
-     * @return True if they are compatible in JSON.
+     * @param cfg The config object.
+     * @return true if they are compatible in JSON.
      */
     private static boolean isCompatible( Class<?> clazz, Field field, Method method, JSONConfig cfg )
     {
         if ( field == null ){
             return true;    // pseudo field with getter.
         }
-        boolean cacheCompat = cfg.isCacheReflectionData();
-        Map<Class<?>,Map<Field,Method>> compatCache = null;
-        Map<Class<?>,Map<Field,Method>> incompatCache = null;
-        Map<Field,Method> compat = null;
-        Map<Field,Method> incompat = null;
-
-        if ( cacheCompat ){
-            compatCache = getFieldMethodCompat();
-            compat = compatCache.get(clazz);
-            if ( compat != null && compat.get(field) == method ){
-                return true;
+        if ( cfg.isCacheReflectionData() ){
+            Map<Field,Method> compat;
+            Map<Class<?>,Map<Field,Method>> compatCache = getFieldMethodCompat();
+            synchronized ( compatCache ){
+                compat = compatCache.get(clazz);
+                if ( compat != null && compat.get(field) == method ){
+                    return true;
+                }
             }
-            incompatCache = getFieldMethodIncompat();
-            incompat = incompatCache.get(clazz);
-            if ( incompat != null && incompat.get(field) == method ){
-                return false;
+            Map<Field,Method> incompat;
+            Map<Class<?>,Map<Field,Method>> incompatCache = getFieldMethodIncompat();
+            synchronized ( incompatCache ){
+                incompat = incompatCache.get(clazz);
+                if ( incompat != null && incompat.get(field) == method ){
+                    return false;
+                }
             }
-        }
 
-        boolean result = isCompatible(field, method);
+            boolean result = isCompatible(field, method);
 
-        if ( cacheCompat ){
             if ( result ){
-                if ( compat == null ){
-                    compat = new Hashtable<>(0);
-                    compatCache.put(clazz, compat);
+                synchronized ( compatCache ){
+                    if ( compat == null ){
+                        compat = compatCache.get(clazz);
+                        if ( compat == null ){
+                            compat = new HashMap<>(0);
+                            compatCache.put(clazz, compat);
+                        }
+                    }
+                    compat.put(field, method);
                 }
-                compat.put(field, method);
             }else{
-                if ( incompat == null ){
-                    incompat = new Hashtable<>(0);
-                    incompatCache.put(clazz, incompat);
+                synchronized ( incompatCache ){
+                    if ( incompat == null ){
+                        incompat = incompatCache.get(clazz);
+                        if ( incompat == null ){
+                            incompat = new HashMap<>(0);
+                            incompatCache.put(clazz, incompat);
+                        }
+                    }
+                    incompat.put(field, method);
                 }
-                incompat.put(field, method);
             }
+            return result;
+        }else{
+            return isCompatible(field, method);
         }
-
-        return result;
     }
 
     /**
@@ -634,7 +645,7 @@ public class ReflectUtil
      *
      * @param field The field.
      * @param method The method to check the return type of.
-     * @return True if they are compatible in JSON.
+     * @return true if they are compatible in JSON.
      */
     private static boolean isCompatible( Field field, Method method )
     {
