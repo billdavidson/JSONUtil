@@ -1,5 +1,6 @@
 package org.kopitubruk.util.json;
 
+import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -9,12 +10,18 @@ import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
+
+import javax.management.MBeanException;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /**
  * Some reflection utility constants to be used with
@@ -26,6 +33,10 @@ import java.util.Set;
  */
 public class ReflectUtil
 {
+    private static Log s_log = null;
+
+    private static ClassLoader classLoader;
+
     /**
      * Reflection will attempt to serialize all fields including private.
      *
@@ -98,6 +109,136 @@ public class ReflectUtil
     }
 
     /**
+     * Cache for fields.
+     */
+    private static Map<Class<?>,Map<String,Field>> FIELDS;
+
+    /**
+     * Cache for getter methods.
+     */
+    private static Map<Class<?>,Map<String,Method>> GETTER_METHODS;
+
+    static {
+        // needed for loading classes for reflection.
+        classLoader = ReflectUtil.class.getClassLoader();
+        clearReflectionCache();
+    }
+
+    /**
+     * Clear the reflection cache.
+     */
+    static synchronized void clearReflectionCache()
+    {
+        FIELDS = null;
+        GETTER_METHODS = null;
+    }
+
+    /**
+     * Get the field cache.
+     *
+     * @return The field cache.
+     */
+    private static synchronized Map<Class<?>,Map<String,Field>> getFieldCache()
+    {
+        if ( FIELDS == null ){
+            FIELDS = new Hashtable<>(0);
+        }
+        return FIELDS;
+    }
+
+    /**
+     * Get the method cache.
+     *
+     * @return The method cache.
+     */
+    private static synchronized Map<Class<?>,Map<String,Method>> getMethodCache()
+    {
+        if ( GETTER_METHODS == null ){
+            GETTER_METHODS = new Hashtable<>(0);
+        }
+        return GETTER_METHODS;
+    }
+
+    /**
+     * Make sure that the logger is initialized.
+     */
+    private static synchronized void ensureLogger()
+    {
+        if ( s_log == null ){
+            s_log = LogFactory.getLog(ReflectUtil.class);
+        }
+    }
+
+    /**
+     * Get the class of the given object or the object if it's a class object.
+     *
+     * @param obj The object
+     * @return The object's class.
+     * @since 1.9
+     */
+    static Class<?> getClass( Object obj )
+    {
+        if ( obj == null ){
+            throw new JSONReflectionException();
+        }
+        Class<?> result = null;
+        if ( obj instanceof Class ){
+            result = (Class<?>)obj;
+        }else if ( obj instanceof JSONReflectedClass ){
+            result = ((JSONReflectedClass)obj).getObjClass();
+        }else{
+            result = obj.getClass();
+        }
+        return result;
+    }
+
+    /**
+     * Get the {@link JSONReflectedClass} version of this object class.
+     *
+     * @param obj The object.
+     * @return the {@link JSONReflectedClass} version of this object class.
+     */
+    static JSONReflectedClass ensureReflectedClass( Object obj )
+    {
+        if ( obj instanceof JSONReflectedClass ){
+            if ( ((JSONReflectedClass)obj).getObjClass() != null  ){
+                return (JSONReflectedClass)obj;
+            }else{
+                return null;
+            }
+        }else if ( obj != null ){
+            return new JSONReflectedClass(getClass(obj), null);
+        }else{
+            return null;
+        }
+    }
+
+    /**
+     * Get the class object for the given class name.
+     *
+     * @param className The name of the class.
+     * @return The class object for that class.
+     * @throws MBeanException If there's an error loading the class.
+     * @since 1.9
+     */
+    static Class<?> getClassByName( String className ) throws MBeanException
+    {
+        try{
+            return classLoader.loadClass(className);
+        }catch ( ClassNotFoundException e ){
+            ResourceBundle bundle = JSONUtil.getBundle(JSONConfigDefaults.getLocale());
+            String msg = String.format(bundle.getString("couldntLoadClass"), className);
+            if ( JSONConfigDefaults.isLogging() ){
+                ensureLogger();
+                if ( s_log.isErrorEnabled() ){
+                    s_log.error(msg, e);
+                }
+            }
+            throw new MBeanException(e, msg);   // MBeans should only throw MBeanExceptions.
+        }
+    }
+
+    /**
      * Check that the given privacy level is valid.
      *
      * @param privacyLevel The privacy level to check.
@@ -130,64 +271,58 @@ public class ReflectUtil
         try {
             JSONReflectedClass refClass = cfg.ensureReflectedClass(propertyValue);
             Set<String> fieldNames = refClass.getFieldNames();
+            Class<?> clazz = refClass.getObjClass();
 
             if ( fieldNames == null || fieldNames.size() < 1 ){
                 // no field names specified
                 int privacyLevel = cfg.getReflectionPrivacy();
-                Map<String,Method> getterMethods = getGetterMethods(refClass.getObjClass(), privacyLevel);
-                for ( Field field : getFields(refClass.getObjClass()) ){
+                Map<String,Method> getterMethods = getGetterMethods(clazz, privacyLevel, cfg);
+                for ( Field field : getFields(clazz, cfg).values() ){
                     int modifiers = field.getModifiers();
                     if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
                         continue;       // ignore static and transient fields.
                     }
                     name = field.getName();
-                    Method getter = getGetter(field, name, getterMethods);
-                    if ( getter != null ){
+                    Method getter = getterMethods.get(makeGetterName(name));
+                    if ( getter != null && isCompatible(field, getter) ){
                         // prefer the argumentless getter over direct access.
-                        if ( ! getter.isAccessible() ){
-                            getter.setAccessible(true);
-                        }
+                        ensureAccessible(getter);
                         obj.put(name, getter.invoke(propertyValue));
                     }else{
                         // no getter -> direct access.
-                        int fieldLevel = getLevel(modifiers);
-                        if ( fieldLevel >= privacyLevel ){
-                            if ( ! field.isAccessible() ){
-                                field.setAccessible(true);
-                            }
+                        if ( getLevel(modifiers) >= privacyLevel ){
+                            ensureAccessible(field);
                             obj.put(name, field.get(propertyValue));
                         }
                     }
                 }
             }else{
                 // field names specified -- privacy out the window
-                int privacyLevel = PRIVATE;
-                Map<String,Method> getterMethods = getGetterMethods(refClass.getObjClass(), privacyLevel);
-                Map<String,Field> fields = new HashMap<>();
-                for ( Field field : getFields(refClass.getObjClass()) ){
-                    fields.put(field.getName(), field);
-                }
+                Map<String,Method> getterMethods = getGetterMethods(clazz, PRIVATE, cfg);
+                Map<String,Field> fields = getFields(clazz, cfg);
                 for ( String fieldName : fieldNames ){
-                    Field field = fields.get(fieldName);
                     name = fieldName;
-                    Method getter = getGetter(field, name, getterMethods);
-                    if ( getter != null ){
+                    Field field = fields.get(name);
+                    Method getter = getterMethods.get(makeGetterName(name));
+                    if ( getter != null && isCompatible(field, getter) ){
                         // prefer the argumentless getter over direct access.
-                        if ( ! getter.isAccessible() ){
-                            getter.setAccessible(true);
-                        }
+                        ensureAccessible(getter);
                         obj.put(name, getter.invoke(propertyValue));
                     }else if ( field != null ){
                         // no getter -> direct access.
-                        if ( !field.isAccessible() ){
-                            field.setAccessible(true);
-                        }
+                        ensureAccessible(field);
                         obj.put(name, field.get(propertyValue));
+                    }else{
+                        throw new JSONReflectionException(propertyValue, name, cfg);
                     }
                 }
             }
         }catch ( Exception e ){
-            throw new JSONReflectionException(propertyValue, name, e, cfg);
+            if ( e instanceof JSONReflectionException ){
+                throw (JSONReflectionException)e;
+            }else{
+                throw new JSONReflectionException(propertyValue, name, e, cfg);
+            }
         }
 
         return new LinkedHashMap<>(obj);
@@ -216,13 +351,24 @@ public class ReflectUtil
      * Get all of the fields for a given class.
      *
      * @param clazz The class.
+     * @param cfg The config object.
      * @return The fields.
      */
-    private static Collection<Field> getFields( Class<?> clazz )
+    private static Map<String,Field> getFields( Class<?> clazz, JSONConfig cfg )
     {
-        // build a map of the object's properties.
-        Map<String,Field> fields = new LinkedHashMap<>();
+        boolean cacheFields = cfg.isCacheReflectionData();
+        Map<String,Field> fields;
+        Map<Class<?>,Map<String,Field>> theCache = null;
 
+        if ( cacheFields ){
+            theCache = getFieldCache();
+            fields = theCache.get(clazz);
+            if ( fields != null ){
+                return fields;
+            }
+        }
+
+        fields = new LinkedHashMap<>();
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
             for ( Field field : tmpClass.getDeclaredFields() ){
@@ -234,7 +380,73 @@ public class ReflectUtil
             tmpClass = tmpClass.getSuperclass();
         }
 
+        fields = new LinkedHashMap<>(fields);
+        if ( cacheFields ){
+            theCache.put(clazz, fields);
+        }
+
+        return fields;
+    }
+
+    /**
+     * Get all of the instance fields for a given class that match the given
+     * type.
+     *
+     * @param clazz The class.
+     * @param type The type to match.
+     * @return The fields.
+     */
+    static Collection<Field> getFields( Class<?> clazz, Class<?> type )
+    {
+        // build a map of the object's properties.
+        Map<String,Field> fields = new LinkedHashMap<>();
+
+        Class<?> tmpClass = clazz;
+        while ( tmpClass != null ){
+            for ( Field field : tmpClass.getDeclaredFields() ){
+                int modifiers = field.getModifiers();
+                if ( Modifier.isTransient(modifiers) ){
+                    continue;       // ignore transient fields.
+                }
+                if ( type.equals(field.getType()) ){
+                    String name = field.getName();
+                    if ( ! fields.containsKey(name) ){
+                        fields.put(name, field);
+                    }
+                }
+            }
+            tmpClass = tmpClass.getSuperclass();
+        }
+
         return fields.values();
+    }
+
+    /**
+     * Get the name of the setter for the given field of the given
+     * class.
+     *
+     * @param clazz The class.
+     * @param field The field.
+     * @return The setter or null if there isn't one.
+     */
+    static Method getSetter( Class<?> clazz, Field field )
+    {
+        String fieldName = field.getName();
+        String setterName = "set" +
+                fieldName.substring(0,1).toUpperCase() +
+                (fieldName.length() > 1 ? fieldName.substring(1) : "");
+
+        Class<?> tmpClass = clazz;
+        while ( tmpClass != null ){
+            for ( Method method : tmpClass.getDeclaredMethods() ){
+                if ( setterName.equals(method.getName()) ){
+                    return method;
+                }
+            }
+            tmpClass = tmpClass.getSuperclass();
+        }
+
+        return null;
     }
 
     /**
@@ -242,69 +454,105 @@ public class ReflectUtil
      * are visible with the given privacy level.
      *
      * @param clazz The class.
-     * @param privacyLevel the minimum class privacy level
+     * @param privacyLevel The minimum class privacy level
+     * @param cfg The config object.
      * @return The methods.
      */
-    private static Map<String,Method> getGetterMethods( Class<?> clazz, int privacyLevel )
+    private static Map<String,Method> getGetterMethods( Class<?> clazz, int privacyLevel, JSONConfig cfg )
     {
-        // build a map of the object's properties.
-        Map<String,Method> getterMethods = new HashMap<>();
+        boolean cacheMethods = cfg.isCacheReflectionData();
+        Map<String,Method> getterMethods = null;
+        Map<String,Method> methodCache = null;
+        Map<Class<?>,Map<String,Method>> theCache = null;
+        boolean isPrivate = privacyLevel == PRIVATE;
 
+        if ( cacheMethods ){
+            theCache = getMethodCache();
+            methodCache = theCache.get(clazz);
+            if ( methodCache == null ){
+                if ( ! isPrivate ){
+                    methodCache = new HashMap<>();
+                }
+            }else{
+                if ( isPrivate ){
+                    return methodCache;
+                }else{
+                    // filter by privacy level.
+                    getterMethods = new HashMap<>();
+                    for ( Method method : methodCache.values() ){
+                        if ( getLevel(method.getModifiers()) >= privacyLevel ){
+                            getterMethods.put(method.getName(), method);
+                        }
+                    }
+                    return new HashMap<>(getterMethods);
+                }
+            }
+        }
+
+        getterMethods = new HashMap<>();
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
             for ( Method method : tmpClass.getDeclaredMethods() ){
-                int modifiers = method.getModifiers();
                 String name = method.getName();
-                int getterLevel = getLevel(modifiers);
-                Class<?>[] parameterTypes = method.getParameterTypes();
-                if ( parameterTypes.length == 0 && getterLevel >= privacyLevel &&
-                                name.startsWith("get") && ! getterMethods.containsKey(name) &&
-                                ! Void.TYPE.equals(method.getReturnType()) ){
-                    getterMethods.put(name, method);
+                if ( method.getParameterTypes().length == 0 && name.startsWith("get") &&
+                        ! getterMethods.containsKey(name) && ! Void.TYPE.equals(method.getReturnType()) ){
+                    if ( isPrivate ){
+                        getterMethods.put(name, method);
+                    }else{
+                        if ( getLevel(method.getModifiers()) >= privacyLevel ){
+                            getterMethods.put(name, method);
+                        }
+                        if ( cacheMethods ){
+                            methodCache.put(name, method);
+                        }
+                    }
                 }
             }
             tmpClass = tmpClass.getSuperclass();
         }
+        getterMethods = new HashMap<>(getterMethods);
 
-        return new HashMap<>(getterMethods);
-    }
-
-    /**
-     * Get the parameterless getter for the given field.
-     *
-     * @param fieldName The name of the field.
-     * @param getterMethods The methods.
-     * @return The parameterless getter for the field or null if there isn't one.
-     */
-    private static Method getGetter( Field field, String fieldName, Map<String,Method> getterMethods )
-    {
-        // looking for a getter with no parameters.  uses bean naming convention.
-        String getterName = "get" +
-                            fieldName.substring(0,1).toUpperCase() +
-                            (fieldName.length() > 1 ? fieldName.substring(1) : "");
-
-        Method getter = getterMethods.get(getterName);
-
-        if ( getter != null ){
-            if ( field == null || (isCompatible(field.getType(), getter.getReturnType())) ){
-                return getter;
+        if ( cacheMethods ){
+            if ( isPrivate ){
+                theCache.put(clazz, getterMethods);
+            }else{
+                methodCache = new HashMap<>(methodCache);
+                theCache.put(clazz, methodCache);
             }
         }
 
-        // no getter method or types not compatible for JSON
-        return null;
+        return getterMethods;
     }
 
     /**
-     * Return true of the type returned by the method is compatible in JSON
+     * Make a getter name from a field name.
+     *
+     * @param fieldName the field name.
+     * @return the getter name.
+     */
+    private static String makeGetterName( String fieldName )
+    {
+        return "get" +
+                fieldName.substring(0,1).toUpperCase() +
+                (fieldName.length() > 1 ? fieldName.substring(1) : "");
+    }
+
+    /**
+     * Return true if the type returned by the method is compatible in JSON
      * with the type of the field.
      *
-     * @param fieldType The type of the field.
-     * @param retType The return type of the method.
+     * @param field The field.
+     * @param method The method to check the return type of.
      * @return True if they are compatible in JSON.
      */
-    private static boolean isCompatible( Class<?> fieldType, Class<?> retType )
+    private static boolean isCompatible( Field field, Method method )
     {
+        if ( field == null ){
+            return true;    // pseudo field with getter.
+        }
+        Class<?> fieldType = field.getType();
+        Class<?> retType = method.getReturnType();
+
         if ( isType(retType, fieldType) ){
             return true;
         }else if ( isNumber(fieldType) && isNumber(retType) ){
@@ -467,6 +715,18 @@ public class ReflectUtil
         }
 
         return new LinkedHashSet<>(interfaces);
+    }
+
+    /**
+     * Make sure that the given object is accessible.
+     *
+     * @param obj the object
+     */
+    static void ensureAccessible( AccessibleObject obj )
+    {
+        if ( ! obj.isAccessible() ){
+            obj.setAccessible(true);
+        }
     }
 
     /**
