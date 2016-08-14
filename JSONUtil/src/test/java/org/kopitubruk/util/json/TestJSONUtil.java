@@ -1482,7 +1482,7 @@ public class TestJSONUtil
         json = JSONUtil.toJSON(jsonObj, cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"e\":25.0}}"));
 
-/*
+
         JSONConfigDefaults.getInstance().clearReflectClasses();
         ReflectUtil.clearReflectionCache();
         cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
@@ -1502,6 +1502,6 @@ public class TestJSONUtil
         }
         end = System.currentTimeMillis();
         s_log.debug("cached: "+(end-start));
-        */
+
     }
 }
