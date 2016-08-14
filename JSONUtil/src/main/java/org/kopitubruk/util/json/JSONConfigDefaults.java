@@ -1664,6 +1664,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public void setCacheReflectionData( boolean dflt )
     {
         cacheReflectionData = dflt;
+        if ( cacheReflectionData == false ){
+            ReflectUtil.clearReflectionCache();
+        }
     }
 
     /**

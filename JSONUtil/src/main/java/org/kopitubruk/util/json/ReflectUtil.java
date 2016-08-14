@@ -118,6 +118,16 @@ public class ReflectUtil
      */
     private static Map<Class<?>,Map<String,Method>> GETTER_METHODS;
 
+    /**
+     * The field-method compatibility cache.
+     */
+    private static Map<Class<?>,Map<Field,Method>> FIELD_METHOD_COMPAT;
+
+    /**
+     * The field-method incompatibility cache.
+     */
+    private static Map<Class<?>,Map<Field,Method>> FIELD_METHOD_INCOMPAT;
+
     static {
         // needed for loading classes for reflection.
         classLoader = ReflectUtil.class.getClassLoader();
@@ -131,6 +141,8 @@ public class ReflectUtil
     {
         FIELDS = null;
         GETTER_METHODS = null;
+        FIELD_METHOD_COMPAT = null;
+        FIELD_METHOD_INCOMPAT = null;
     }
 
     /**
@@ -157,6 +169,32 @@ public class ReflectUtil
             GETTER_METHODS = new Hashtable<>(0);
         }
         return GETTER_METHODS;
+    }
+
+    /**
+     * Get the compat cache.
+     *
+     * @return The compat cache.
+     */
+    private static synchronized Map<Class<?>,Map<Field,Method>> getFieldMethodCompat()
+    {
+        if ( FIELD_METHOD_COMPAT == null ){
+            FIELD_METHOD_COMPAT = new HashMap<>();
+        }
+        return FIELD_METHOD_COMPAT;
+    }
+
+    /**
+     * Get the incompat cache.
+     *
+     * @return The incompat cache.
+     */
+    private static synchronized Map<Class<?>,Map<Field,Method>> getFieldMethodIncompat()
+    {
+        if ( FIELD_METHOD_INCOMPAT == null ){
+            FIELD_METHOD_INCOMPAT = new HashMap<>();
+        }
+        return FIELD_METHOD_INCOMPAT;
     }
 
     /**
@@ -284,7 +322,7 @@ public class ReflectUtil
                     }
                     name = field.getName();
                     Method getter = getterMethods.get(makeGetterName(name));
-                    if ( getter != null && isCompatible(field, getter) ){
+                    if ( getter != null && isCompatible(clazz, field, getter, cfg) ){
                         // prefer the argumentless getter over direct access.
                         ensureAccessible(getter);
                         obj.put(name, getter.invoke(propertyValue));
@@ -304,7 +342,7 @@ public class ReflectUtil
                     name = fieldName;
                     Field field = fields.get(name);
                     Method getter = getterMethods.get(makeGetterName(name));
-                    if ( getter != null && isCompatible(field, getter) ){
+                    if ( getter != null && isCompatible(clazz, field, getter, cfg) ){
                         // prefer the argumentless getter over direct access.
                         ensureAccessible(getter);
                         obj.put(name, getter.invoke(propertyValue));
@@ -545,11 +583,61 @@ public class ReflectUtil
      * @param method The method to check the return type of.
      * @return True if they are compatible in JSON.
      */
-    private static boolean isCompatible( Field field, Method method )
+    private static boolean isCompatible( Class<?> clazz, Field field, Method method, JSONConfig cfg )
     {
         if ( field == null ){
             return true;    // pseudo field with getter.
         }
+        boolean cacheCompat = cfg.isCacheReflectionData();
+        Map<Class<?>,Map<Field,Method>> compatCache = null;
+        Map<Class<?>,Map<Field,Method>> incompatCache = null;
+        Map<Field,Method> compat = null;
+        Map<Field,Method> incompat = null;
+
+        if ( cacheCompat ){
+            compatCache = getFieldMethodCompat();
+            compat = compatCache.get(clazz);
+            if ( compat != null && compat.get(field) == method ){
+                return true;
+            }
+            incompatCache = getFieldMethodIncompat();
+            incompat = incompatCache.get(clazz);
+            if ( incompat != null && incompat.get(field) == method ){
+                return false;
+            }
+        }
+
+        boolean result = isCompatible(field, method);
+
+        if ( cacheCompat ){
+            if ( result ){
+                if ( compat == null ){
+                    compat = new Hashtable<>(0);
+                    compatCache.put(clazz, compat);
+                }
+                compat.put(field, method);
+            }else{
+                if ( incompat == null ){
+                    incompat = new Hashtable<>(0);
+                    incompatCache.put(clazz, incompat);
+                }
+                incompat.put(field, method);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Return true if the type returned by the method is compatible in JSON
+     * with the type of the field.
+     *
+     * @param field The field.
+     * @param method The method to check the return type of.
+     * @return True if they are compatible in JSON.
+     */
+    private static boolean isCompatible( Field field, Method method )
+    {
         Class<?> fieldType = field.getType();
         Class<?> retType = method.getReturnType();
 
