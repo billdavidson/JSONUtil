@@ -180,7 +180,7 @@ public class ReflectUtil
     private static synchronized Map<Class<?>,Map<Field,Method>> getFieldMethodCompat()
     {
         if ( FIELD_METHOD_COMPAT == null ){
-            FIELD_METHOD_COMPAT = new HashMap<Class<?>,Map<Field,Method>>();
+            FIELD_METHOD_COMPAT = new HashMap<Class<?>,Map<Field,Method>>(0);
         }
         return FIELD_METHOD_COMPAT;
     }
@@ -193,7 +193,7 @@ public class ReflectUtil
     private static synchronized Map<Class<?>,Map<Field,Method>> getFieldMethodIncompat()
     {
         if ( FIELD_METHOD_INCOMPAT == null ){
-            FIELD_METHOD_INCOMPAT = new HashMap<Class<?>,Map<Field,Method>>();
+            FIELD_METHOD_INCOMPAT = new HashMap<Class<?>,Map<Field,Method>>(0);
         }
         return FIELD_METHOD_INCOMPAT;
     }
