@@ -1509,7 +1509,7 @@ public class TestJSONUtil
         ReflectTestClass r = new ReflectTestClass();
         start = System.currentTimeMillis();
         for ( int i = 0; i < interations; i++ ){
-            Map<String,Object> mapObj = new LinkedHashMap<>();
+            Map<String,Object> mapObj = new LinkedHashMap<String,Object>();
             mapObj.put("a", r.getA());
             mapObj.put("b", r.getB());
             mapObj.put("c", r.getC());
@@ -1542,7 +1542,7 @@ public class TestJSONUtil
         r = new ReflectTestClass();
         start = System.currentTimeMillis();
         for ( int i = 0; i < interations; i++ ){
-            Map<String,Object> mapObj = new LinkedHashMap<>();
+            Map<String,Object> mapObj = new LinkedHashMap<String,Object>();
             mapObj.put("a", r.getA());
             mapObj.put("b", r.getB());
             mapObj.put("c", r.getC());
