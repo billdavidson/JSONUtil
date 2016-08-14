@@ -1180,12 +1180,12 @@ public class JSONConfig implements Serializable, Cloneable
      * will be cached to improve performance on subsequent reflections
      * of objects of its class.
      *
-     * @param dflt if true, then cache reflection data.
+     * @param cacheReflectionData if true, then cache reflection data.
      * @since 1.9
      */
-    public void setCacheReflectionData( boolean dflt )
+    public void setCacheReflectionData( boolean cacheReflectionData )
     {
-        cacheReflectionData = dflt;
+        this.cacheReflectionData = cacheReflectionData;
     }
 
     /**
