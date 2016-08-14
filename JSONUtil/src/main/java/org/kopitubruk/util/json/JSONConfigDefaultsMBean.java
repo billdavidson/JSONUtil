@@ -129,6 +129,11 @@ public interface JSONConfigDefaultsMBean
     public void clearReflectClasses();
 
     /**
+     * Clear the reflection cache.
+     */
+    public void clearReflectionCache();
+
+    /**
      * Add the given class to the set of classes to be reflected.
      *
      * @param className The name of the class suitable for
@@ -147,6 +152,24 @@ public interface JSONConfigDefaultsMBean
      * @since 1.9
      */
     public void removeReflectClassByName( String className ) throws MBeanException;
+
+    /**
+     * Get the the cacheReflectionData policy.
+     *
+     * @return the cacheReflectionData policy.
+     * @since 1.9
+     */
+    public boolean isCacheReflectionData();
+
+    /**
+     * If true, then when an object is reflected its reflection data
+     * will be cached to improve performance on subsequent reflections
+     * of objects of its class.
+     *
+     * @param dflt if true, then cache reflection data.
+     * @since 1.9
+     */
+    public void setCacheReflectionData( boolean dflt );
 
     /**
      * Get a string with newline separated list of classes that get reflected.
@@ -342,19 +365,18 @@ public interface JSONConfigDefaultsMBean
      * @return The preciseFloatingPoint policy.
      * @since 1.9
      */
-    public boolean isPreciseIntegers();
+    public boolean isPreciseNumbers();
 
     /**
-     * If true then integer numbers which are not exactly representable
-     * by a 64 bit double precision floating point number will be quoted in the
-     * output.  If false, then they will be unquoted, and precision
-     * will likely be lost in the interpreter.
+     * If true then numbers which are not exactly representable by a 64 bit
+     * double precision floating point number will be quoted in the output. If
+     * false, then they will be unquoted, and precision in such will likely be
+     * lost in the interpreter.
      *
-     * @param dflt If true then quote integer numbers
-     * that lose precision in 64-bit floating point.
+     * @param dflt If true then quote numbers that lose precision in 64-bit floating point.
      * @since 1.9
      */
-    public void setPreciseIntegers( boolean dflt );
+    public void setPreciseNumbers( boolean dflt );
 
     /**
      * Get the smallNumbers policy.
