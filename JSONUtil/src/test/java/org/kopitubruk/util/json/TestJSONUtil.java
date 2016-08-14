@@ -1489,26 +1489,87 @@ public class TestJSONUtil
         json = JSONUtil.toJSON(jsonObj, cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"e\":25.0}}"));
 
-
         JSONConfigDefaults.getInstance().clearReflectClasses();
         ReflectUtil.clearReflectionCache();
+        cfg.setReflectUnknownObjects(false);
+
         cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
         cfg.addReflectClass(ReflectTestClass.class);
-        cfg.setCacheReflectionData(false);
-        long start = System.currentTimeMillis();
-        for ( int i = 0; i < 100000; i++ ){
-            json = JSONUtil.toJSON(jsonObj, cfg);
-        }
-        long end = System.currentTimeMillis();
-        s_log.debug("uncached: "+(end-start));
 
-        cfg.setCacheReflectionData(true);
+        int interations = 100000;
+        long start, end;
+
+        /*
+         * These timings get a little funky due to the way that the JVM cache's
+         * things and improves its performance after doing the same thing
+         * repeatedly.  Initially, it seems like maps are slow but eventually, as
+         * the JVM does its optimization thing, they are faster.
+         */
+
+        ReflectTestClass r = new ReflectTestClass();
         start = System.currentTimeMillis();
-        for ( int i = 0; i < 100000; i++ ){
+        for ( int i = 0; i < interations; i++ ){
+            Map<String,Object> mapObj = new LinkedHashMap<>();
+            mapObj.put("a", r.getA());
+            mapObj.put("b", r.getB());
+            mapObj.put("c", r.getC());
+            mapObj.put("d", null);  // no getter and private
+            jsonObj.put("f", mapObj);
             json = JSONUtil.toJSON(jsonObj, cfg);
         }
         end = System.currentTimeMillis();
-        s_log.debug("cached: "+(end-start));
+        s_log.debug("map: "+((end-start)/1000.0)+"s");
 
+        cfg.setCacheReflectionData(false);
+        start = System.currentTimeMillis();
+        for ( int i = 0; i < interations; i++ ){
+            jsonObj.put("f", new ReflectTestClass());
+            json = JSONUtil.toJSON(jsonObj, cfg);
+        }
+        end = System.currentTimeMillis();
+        s_log.debug("uncached: "+((end-start)/1000.0)+"s");
+
+        cfg.setCacheReflectionData(true);
+        start = System.currentTimeMillis();
+        for ( int i = 0; i < interations; i++ ){
+            jsonObj.put("f", new ReflectTestClass());
+            json = JSONUtil.toJSON(jsonObj, cfg);
+        }
+        end = System.currentTimeMillis();
+        s_log.debug("cached: "+((end-start)/1000.0)+"s");
+        ReflectUtil.clearReflectionCache();
+
+        r = new ReflectTestClass();
+        start = System.currentTimeMillis();
+        for ( int i = 0; i < interations; i++ ){
+            Map<String,Object> mapObj = new LinkedHashMap<>();
+            mapObj.put("a", r.getA());
+            mapObj.put("b", r.getB());
+            mapObj.put("c", r.getC());
+            mapObj.put("d", null);  // no getter and private
+            jsonObj.put("f", mapObj);
+            json = JSONUtil.toJSON(jsonObj, cfg);
+        }
+        end = System.currentTimeMillis();
+        s_log.debug("map: "+((end-start)/1000.0)+"s");
+
+        cfg.setCacheReflectionData(false);
+        start = System.currentTimeMillis();
+        for ( int i = 0; i < interations; i++ ){
+            jsonObj.put("f", new ReflectTestClass());
+            json = JSONUtil.toJSON(jsonObj, cfg);
+        }
+        end = System.currentTimeMillis();
+        s_log.debug("uncached: "+((end-start)/1000.0)+"s");
+
+        cfg.setCacheReflectionData(true);
+        start = System.currentTimeMillis();
+        for ( int i = 0; i < interations; i++ ){
+            jsonObj.put("f", new ReflectTestClass());
+            json = JSONUtil.toJSON(jsonObj, cfg);
+        }
+        end = System.currentTimeMillis();
+        s_log.debug("cached: "+((end-start)/1000.0)+"s");
+        ReflectUtil.clearReflectionCache();
     }
 }
