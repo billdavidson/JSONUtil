@@ -37,7 +37,7 @@ import java.util.Set;
  *     all others.  Privacy settings are ignored.
  *   </li>
  *   <li>
- *     You can specify to include static or volatile fields, which normally
+ *     You can specify to include static or transient fields, which normally
  *     are not allowed.
  *   </li>
  *   <li>
@@ -64,11 +64,8 @@ public class JSONReflectedClass implements Cloneable
      */
     public JSONReflectedClass( Object obj, Set<String> fieldNames )
     {
-        if ( obj == null || obj instanceof JSONReflectedClass ){
-            throw new JSONReflectionException();
-        }
-        objClass = JSONConfigDefaults.getClass(obj);
-        this.fieldNames = fieldNames;
+        setObjClass(obj);
+        setFieldNames(fieldNames);
     }
 
     /**
@@ -88,7 +85,7 @@ public class JSONReflectedClass implements Cloneable
      */
     public void setObjClass( Object obj )
     {
-        objClass = JSONConfigDefaults.getClass(obj);
+        objClass = ReflectUtil.getClass(obj);
     }
 
     /**

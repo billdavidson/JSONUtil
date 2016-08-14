@@ -32,7 +32,7 @@ public final class JSONReflectionException extends JSONException
     private boolean badObject = false;
 
     /**
-     * Constructor.
+     * Wraps another exception.
      *
      * @param offender The offending object.
      * @param field The field name for which access caused the exception.
@@ -68,6 +68,20 @@ public final class JSONReflectionException extends JSONException
     }
 
     /**
+     * No such field.
+     *
+     * @param offender The offending object.
+     * @param field The field name for which access caused the exception.
+     * @param cfg the config object
+     */
+    JSONReflectionException( Object offender, String field, JSONConfig cfg )
+    {
+        super(cfg);
+        this.offender = offender;
+        this.field = field;
+    }
+
+    /**
      * Create and return the loop error message.
      *
      * @param locale the locale.
@@ -79,8 +93,13 @@ public final class JSONReflectionException extends JSONException
         ResourceBundle bundle = JSONUtil.getBundle(locale);
 
         if ( offender != null ){
-            String fmt = bundle.getString("reflectionException");
-            return String.format(fmt, getClassName(offender), field, getClassName(this.getCause()));
+            if ( this.getCause() != null ){
+                String fmt = bundle.getString("reflectionException");
+                return String.format(fmt, getClassName(offender), field, getClassName(this.getCause()));
+            }else{
+                String fmt = bundle.getString("noSuchField");
+                return String.format(fmt, getClassName(offender), field);
+            }
         }else if ( badObject ){
             return bundle.getString("recursiveReflection");
         }else{

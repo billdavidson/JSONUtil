@@ -435,14 +435,14 @@ public class JSONUtil
         }else if ( jsonType.isArrayType() ){
             appendArrayPropertyValue(propertyValue, json, cfg);
         }else{
-            Map<?,?> map;
+            Map<?,?> map = null;
             if ( jsonType.isResourceBundle() ){
                 ResourceBundle bundle = (ResourceBundle)propertyValue;
                 map = resourceBundleToMap(bundle);
+            }else if ( jsonType.isMapType() ){
+                map = (Map<?,?>)propertyValue;
             }else if ( jsonType.isReflectType() ){
                 map = ReflectUtil.getReflectedObject(propertyValue, cfg);
-            }else{
-                map = (Map<?,?>)propertyValue;
             }
             appendObjectPropertyValue(map, json, cfg);
         }

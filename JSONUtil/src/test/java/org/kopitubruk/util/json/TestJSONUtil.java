@@ -92,9 +92,7 @@ public class TestJSONUtil
     public static void setUpClass()
     {
         try{
-            String pkgName = JSONUtil.class.getPackage().getName();
-
-            Context ctx = JNDIUtil.createContext(JNDIUtil.ENV_CONTEXT+"/"+pkgName.replaceAll("\\.", "/"));
+            Context ctx = JNDIUtil.createEnvContext(JSONUtil.class.getPackage().getName().replaceAll("\\.", "/"));
 
             ctx.bind("appName", "TestJSONUtil");
             ctx.bind("maxReflectIndex", 0);
@@ -1294,5 +1292,27 @@ public class TestJSONUtil
         cfg = new JSONConfig(); // reload defaults.
         json = JSONUtil.toJSON(jsonObj, cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"e\":25.0}}"));
+
+
+        JSONConfigDefaults.getInstance().clearReflectClasses();
+        ReflectUtil.clearReflectionCache();
+        cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
+        cfg.addReflectClass(ReflectTestClass.class);
+        cfg.setCacheReflectionData(false);
+        long start = System.currentTimeMillis();
+        for ( int i = 0; i < 100000; i++ ){
+            json = JSONUtil.toJSON(jsonObj, cfg);
+        }
+        long end = System.currentTimeMillis();
+        s_log.debug("uncached: "+(end-start));
+
+        cfg.setCacheReflectionData(true);
+        start = System.currentTimeMillis();
+        for ( int i = 0; i < 100000; i++ ){
+            json = JSONUtil.toJSON(jsonObj, cfg);
+        }
+        end = System.currentTimeMillis();
+        s_log.debug("cached: "+(end-start));
+
     }
 }

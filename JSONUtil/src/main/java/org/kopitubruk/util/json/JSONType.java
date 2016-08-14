@@ -91,6 +91,16 @@ class JSONType
     }
 
     /**
+     * Return true if the type is {@link ResourceBundle} or {@link Map}.
+     *
+     * @return true if the type is {@link ResourceBundle} or {@link Map}.
+     */
+    boolean isMapType()
+    {
+        return isMapType;
+    }
+
+    /**
      * Return true if {@link JSONConfig#isReflectClass(Object)} returns true on
      * this value and this value is not one of the other types.
      *

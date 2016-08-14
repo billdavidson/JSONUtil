@@ -31,20 +31,33 @@ import org.apache.commons.logging.LogFactory;
  */
 class JNDIUtil
 {
-    private static final Log s_log;
+    private static Log s_log = null;
 
-    private static final boolean logging;
+    private static boolean logging = true;
 
-    static String ENV_CONTEXT = "java:/comp/env";
+    private static final String ENV_CONTEXT = "java:/comp/env";
 
     private static final String TOMCAT_URL_PREFIXES = "org.apache.naming";
     private static final String TOMCAT_CONTEXT_FACTORY = ".java.javaURLContextFactory";
 
-    static{
-        String pkgName = JNDIUtil.class.getPackage().getName();
+    /**
+     * Make sure that the logger is initialized.
+     */
+    private static synchronized void ensureLogger()
+    {
+        if ( s_log == null ){
+            s_log = LogFactory.getLog(JNDIUtil.class);
+        }
+    }
 
-        logging = Boolean.parseBoolean(System.getProperty(pkgName+".logging", Boolean.TRUE.toString()));
-        s_log = logging ? LogFactory.getLog(JNDIUtil.class) : null;
+    /**
+     * Set the logging flag.
+     *
+     * @param logging if true, then generate debug logging for JNDI reads.
+     */
+    static synchronized void setLogging( boolean logging )
+    {
+        JNDIUtil.logging = logging;
     }
 
     /**
@@ -129,9 +142,11 @@ class JNDIUtil
 
         try{
             obj = ctx.lookup(name);
-
-            if ( logging && obj != null && s_log.isDebugEnabled() ){
-                s_log.debug(name+" = "+obj);
+            if ( logging && obj != null ){
+                ensureLogger();
+                if ( s_log.isDebugEnabled() ){
+                    s_log.debug(name+" = "+obj);
+                }
             }
         }catch ( NamingException e ){
             obj = null;
@@ -203,5 +218,20 @@ class JNDIUtil
     static Context createContext( String contextName ) throws NamingException
     {
         return createContext(contextName, TOMCAT_URL_PREFIXES + TOMCAT_CONTEXT_FACTORY, TOMCAT_URL_PREFIXES);
+    }
+
+    /**
+     * Create the given context under java:/comp/env/. This is primarily meant
+     * for use by JUnit tests which don't have a JNDI context available. If you
+     * use this, you will need Tomcat's catalina.jar in your runtime class path
+     * because it uses Tomcat's javaURLContextFactory.
+     *
+     * @param contextName The name relative to "java:/comp/env/"
+     * @return The final subcontext.
+     * @throws NamingException If there's a problem.
+     */
+    static Context createEnvContext( String contextName ) throws NamingException
+    {
+        return createContext(ENV_CONTEXT+'/'+contextName);
     }
 }
