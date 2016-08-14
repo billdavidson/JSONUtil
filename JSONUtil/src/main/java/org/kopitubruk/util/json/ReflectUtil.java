@@ -312,6 +312,8 @@ public class ReflectUtil
             if ( fieldNames == null || fieldNames.size() < 1 ){
                 // no field names specified
                 int privacyLevel = cfg.getReflectionPrivacy();
+                boolean isNotPrivate = privacyLevel != PRIVATE;
+
                 Map<String,Method> getterMethods = getGetterMethods(clazz, privacyLevel, cfg);
                 for ( Field field : getFields(clazz, cfg).values() ){
                     int modifiers = field.getModifiers();
@@ -325,11 +327,12 @@ public class ReflectUtil
                         ensureAccessible(getter);
                         obj.put(name, getter.invoke(propertyValue));
                     }else{
-                        // no getter -> direct access.
-                        if ( getLevel(modifiers) >= privacyLevel ){
-                            ensureAccessible(field);
-                            obj.put(name, field.get(propertyValue));
+                        if ( isNotPrivate && getLevel(modifiers) < privacyLevel ){
+                            continue;
                         }
+                        // no getter -> direct access.
+                        ensureAccessible(field);
+                        obj.put(name, field.get(propertyValue));
                     }
                 }
             }else{
