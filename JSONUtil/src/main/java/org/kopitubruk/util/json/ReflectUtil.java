@@ -604,7 +604,7 @@ public class ReflectUtil
                     if ( compat == null ){
                         compat = compatCache.get(clazz);
                         if ( compat == null ){
-                            compat = new Hashtable<>(0);
+                            compat = new HashMap<>(0);
                             compatCache.put(clazz, compat);
                         }
                     }
@@ -615,7 +615,7 @@ public class ReflectUtil
                     if ( incompat == null ){
                         incompat = incompatCache.get(clazz);
                         if ( incompat == null ){
-                            incompat = new Hashtable<>(0);
+                            incompat = new HashMap<>(0);
                             incompatCache.put(clazz, incompat);
                         }
                     }
