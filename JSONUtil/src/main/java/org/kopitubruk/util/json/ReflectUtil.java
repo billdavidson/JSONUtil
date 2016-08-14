@@ -98,16 +98,6 @@ public class ReflectUtil
     private static final Set<Class<?>> MAP_TYPES =
             new HashSet<>(Arrays.asList(Map.class,ResourceBundle.class));
 
-    static {
-        // Java 7 doesn't handle this as well as Java 8
-        List<?> list1 = Arrays.asList(Double.TYPE, Float.TYPE, Long.TYPE, Integer.TYPE, Short.TYPE, Byte.TYPE);
-        List<Class<?>> list2 = new ArrayList<>(list1.size());
-        for ( Object type : list1 ){
-            list2.add((Class<?>)type);
-        }
-        PRIMITIVE_NUMBERS = new HashSet<>(list2);
-    }
-
     /**
      * Cache for fields.
      */
@@ -132,6 +122,14 @@ public class ReflectUtil
         // needed for loading classes for reflection.
         classLoader = ReflectUtil.class.getClassLoader();
         clearReflectionCache();
+
+        // Java 7 doesn't handle this as well as Java 8
+        List<?> list1 = Arrays.asList(Double.TYPE, Float.TYPE, Long.TYPE, Integer.TYPE, Short.TYPE, Byte.TYPE);
+        List<Class<?>> list2 = new ArrayList<>(list1.size());
+        for ( Object type : list1 ){
+            list2.add((Class<?>)type);
+        }
+        PRIMITIVE_NUMBERS = new HashSet<>(list2);
     }
 
     /**
