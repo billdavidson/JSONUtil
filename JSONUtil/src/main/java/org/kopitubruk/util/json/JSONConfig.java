@@ -58,6 +58,7 @@ import java.util.TimeZone;
  *   <li>preciseNumbers = false</li>
  *   <li>smallNumbers = false</li>
  *   <li>usePrimitiveArrays = false</li>
+ *   <li>cacheReflectionData = false</li>
  * </ul>
  * <h3>
  *   Allow generation of certain types of non-standard JSON.
@@ -163,6 +164,7 @@ public class JSONConfig implements Serializable, Cloneable
     private boolean preciseNumbers;
     private boolean smallNumbers;
     private boolean usePrimitiveArrays;
+    private boolean cacheReflectionData;
 
     private boolean quoteIdentifier;
     private boolean useECMA6;
@@ -273,6 +275,7 @@ public class JSONConfig implements Serializable, Cloneable
         result.preciseNumbers = preciseNumbers;
         result.smallNumbers = smallNumbers;
         result.usePrimitiveArrays = usePrimitiveArrays;
+        result.cacheReflectionData = cacheReflectionData;
 
         // non-standard JSON.
         result.quoteIdentifier = quoteIdentifier;
@@ -1159,6 +1162,30 @@ public class JSONConfig implements Serializable, Cloneable
     public void setUsePrimitiveArrays( boolean usePrimitiveArrays )
     {
         this.usePrimitiveArrays = usePrimitiveArrays;
+    }
+
+    /**
+     * Get the the cacheReflectionData policy.
+     *
+     * @return the cacheReflectionData policy.
+     * @since 1.9
+     */
+    public boolean isCacheReflectionData()
+    {
+        return cacheReflectionData;
+    }
+
+    /**
+     * If true, then when an object is reflected its reflection data
+     * will be cached to improve performance on subsequent reflections
+     * of objects of its class.
+     *
+     * @param dflt if true, then cache reflection data.
+     * @since 1.9
+     */
+    public void setCacheReflectionData( boolean dflt )
+    {
+        cacheReflectionData = dflt;
     }
 
     /**
