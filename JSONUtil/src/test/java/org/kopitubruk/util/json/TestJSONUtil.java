@@ -1529,14 +1529,32 @@ public class TestJSONUtil
 
         JSONConfigDefaults.getInstance().clearReflectClasses();
         ReflectUtil.clearReflectionCache();
-        cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
-        cfg.addReflectClass(ReflectTestClass.class);
-        cfg.setCacheReflectionData(false);
+        cfg.setReflectUnknownObjects(false);
+
+        ReflectTestClass r = new ReflectTestClass();
         long start = System.currentTimeMillis();
         for ( int i = 0; i < 100000; i++ ){
+            Map<String,Object> mapObj = new HashMap<>();
+            mapObj.put("a", r.getA());
+            mapObj.put("b", r.getB());
+            mapObj.put("c", r.getC());
+            mapObj.put("d", null);  // no getter and private
+            jsonObj.put("f", mapObj);
             json = JSONUtil.toJSON(jsonObj, cfg);
         }
         long end = System.currentTimeMillis();
+        s_log.debug("map: "+(end-start));
+
+        jsonObj.put("f", new ReflectTestClass());
+        cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
+        cfg.addReflectClass(ReflectTestClass.class);
+
+        cfg.setCacheReflectionData(false);
+        start = System.currentTimeMillis();
+        for ( int i = 0; i < 100000; i++ ){
+            json = JSONUtil.toJSON(jsonObj, cfg);
+        }
+        end = System.currentTimeMillis();
         s_log.debug("uncached: "+(end-start));
 
         cfg.setCacheReflectionData(true);
