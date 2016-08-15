@@ -25,14 +25,11 @@ import java.io.Writer;
  * as one of its property values, it will call this method in those objects to
  * convert them to JSON.
  * <p>
- * This interface includes some default methods, which were introduced in Java
- * 8. If you want to make this library work with Java 7, then change those to
- * regular public interface signatures and comment out the rest of the code for
- * the default methods.
- * <p>
- * Given the default methods and the fact that you only have to implement one
- * method, this interface can be used to create JSONAble's with Lambda
- * expressions if you find that convenient.
+ * The Java 8 version of this interface includes default versions of 3 of the
+ * 4 methods and is a functional interface allowing its use in Java 8 Lambda
+ * expressions.  Java 7 and earlier do not support default methods in interfaces
+ * or functional interfaces so those features have been removed from the Java 7
+ * and earlier versions of this interface.
  *
  * @author Bill Davidson
  */
