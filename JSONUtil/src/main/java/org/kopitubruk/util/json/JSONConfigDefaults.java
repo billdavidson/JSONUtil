@@ -374,9 +374,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 String[] parts = className.split(",");
                 try{
                     Class<?> clazz = ReflectUtil.getClassByName(parts[0]);
-                    Set<String> fields = null;
+                    List<String> fields = null;
                     if ( parts.length > 1 ){
-                        fields = new LinkedHashSet<>();
+                        fields = new ArrayList<>(parts.length-1);
                         for ( int i = 1; i < parts.length; i++ ){
                             String fieldName = parts[i].trim();
                             if ( fieldName.length() > 0 ){
@@ -385,8 +385,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                         }
                         if ( fields.size() < 1 ){
                             fields = null;
-                        }else{
-                            fields = new LinkedHashSet<>(fields);
                         }
                     }
                     classes.add(new JSONReflectedClass(clazz, fields));
