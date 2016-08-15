@@ -637,17 +637,11 @@ public class JSONParser
         try{
             // this will work except for NaN and Infinity
             BigDecimal bigDec = new BigDecimal(decimalString);
-            Long longVal = null;
             int scale = bigDec.scale();
             int precision = bigDec.precision();
             if ( smallNumbers && scale <= 0 && (precision-scale) <= MAX_PRECISION_FOR_LONG ){
                 try{
-                    Number num = getInteger(Long.toString(bigDec.longValueExact()), smallNumbers);
-                    if ( num instanceof Long && precision <= MAX_PRECISION_FOR_FLOAT ){
-                        longVal = (Long)num;    // float might still work and be smaller.
-                    }else{
-                        return num;
-                    }
+                    return getInteger(Long.toString(bigDec.longValueExact()), smallNumbers);
                 }catch ( ArithmeticException e ){
                 }
             }
@@ -656,9 +650,6 @@ public class JSONParser
                 if ( !Float.isInfinite(f) && bigDec.compareTo(new BigDecimal(f.toString())) == 0 ){
                     return f;                // no precision loss going to float
                 }
-            }
-            if ( longVal != null ){
-                return longVal;             // float didn't work. double's no smaller.
             }
             if ( precision <= MAX_PRECISION_FOR_DOUBLE ){
                 Double d = bigDec.doubleValue();
