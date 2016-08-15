@@ -6,6 +6,7 @@ and controlling the way that the JSON is generated.
 #### Features
 * Recursive traversal of Maps, Iterables (Collection, List, Set etc.), Enumerations, arrays and ResourceBundles
 * Data structure loop detection
+* Reflection of objects is supported allowing lazy encoding of objects.
 * Property name validation (can use ECMAScript or JSON rules)
 * Output to String or java.io.Writer
 * JSON parsing to Java objects from Strings or java.io.Reader
