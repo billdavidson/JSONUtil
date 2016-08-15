@@ -29,12 +29,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
-import java.util.Set;
 
 import javax.management.MBeanException;
 import javax.management.MBeanServer;
@@ -136,10 +134,10 @@ import org.apache.commons.logging.LogFactory;
  * until the number at the end up the name reaches maxReflectIndex.  The
  * class names need to load with {@link ClassLoader#loadClass(String)} or
  * they will not be added to the list of reflected classes.  If the class
- * names are followed by a commas and strings separated by commas, those
+ * names are followed by a comma and strings separated by commas, those
  * strings will be taken as field names to use for {@link JSONReflectedClass}
  * These classes will be added to all JSONConfig objects that are created
- * in this class loader.
+ * in the same class loader.
  * <p>
  * Number formats and date formats are cloned when they are added because they
  * are not thread safe.  They are cloned again when applied to a new
