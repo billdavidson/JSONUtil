@@ -15,37 +15,38 @@
  */
 package org.kopitubruk.util.json;
 
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * This class wraps a class to be explicitly reflected and allows you to
- * choose the names of the fields to be reflected, regardless of privacy.
- * This gives you more precise control over what is shown.  It should be
- * created and then sent to {@link JSONConfig#addReflectClass(Object)}
- * or {@link JSONConfig#addReflectClasses(java.util.Collection)} just
- * like any other object for which you wish to use selective reflection.
+ * This class wraps a class to be explicitly reflected and allows you to choose
+ * the names of the fields to be reflected, regardless of privacy. This gives
+ * you more precise control over what is shown. It should be created and then
+ * sent to {@link JSONConfig#addReflectClass(Object)} or
+ * {@link JSONConfig#addReflectClasses(java.util.Collection)} just like any
+ * other object for which you wish to use selective reflection.
  * <p>
- * If you do not specify field names (fieldNames is null or empty) then
- * normal reflection will be done.
+ * If you do not specify field names (fieldNames is null or empty) then normal
+ * reflection will be done.
  * <p>
- * Using this object with explicit field names allows you a few abilities
- * that normal reflection does not.
+ * Using this object with explicit field names allows you a few abilities that
+ * normal reflection does not.
  * <ul>
  *   <li>
  *     You can specify exactly the fields that you wish to show and exclude
- *     all others.  Privacy settings are ignored.
+ *     all others. Privacy settings are ignored.
  *   </li>
  *   <li>
  *     You can specify to include static or transient fields, which normally
  *     are not allowed.
  *   </li>
  *   <li>
- *     You can use getters that don't have an actual field in the object
- *     but do have zero arguments and have names that look like JavaBeans
- *     compliant getter names.  Just specify a name as if it's the name
- *     of a field in your fieldNames and it will look for the getter that
- *     matches that pseudo field name.
+ *     You can use getters that don't have an actual field in the object but
+ *     do have zero arguments and have names that look like JavaBeans
+ *     compliant getter names. Just specify a name as if it's the name of a
+ *     field in your fieldNames and it will look for the getter that matches
+ *     that pseudo field name.
  *   </li>
  * </ul>
  *
@@ -61,8 +62,10 @@ public class JSONReflectedClass implements Cloneable
      *
      * @param obj An object of the type to be reflect or its class.
      * @param fieldNames The names of the fields to include in the reflection.
+     *            Internally, this gets converted to a {@link Set} which you can
+     *            access via {@link #getFieldNames()}.
      */
-    public JSONReflectedClass( Object obj, Set<String> fieldNames )
+    public JSONReflectedClass( Object obj, Collection<String> fieldNames )
     {
         setObjClass(obj);
         setFieldNames(fieldNames);
@@ -101,14 +104,22 @@ public class JSONReflectedClass implements Cloneable
     /**
      * Set the set of field names to reflect.
      *
-     * @param fieldNames the set of field names to include in output.
+     * @param fieldNames The list of field names to include in output.
+     *            Internally, this gets converted to a {@link Set} which you can
+     *            access via {@link #getFieldNames()}.
      */
-    public void setFieldNames( Set<String> fieldNames )
+    public void setFieldNames( Collection<String> fieldNames )
     {
-        this.fieldNames = fieldNames;
+        if ( fieldNames == null ){
+            this.fieldNames = null;
+        }else{
+            this.fieldNames = new LinkedHashSet<String>(fieldNames);
+        }
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     *
      * @see java.lang.Object#clone()
      */
     @Override
@@ -119,7 +130,9 @@ public class JSONReflectedClass implements Cloneable
         return result;
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     *
      * @see java.lang.Object#hashCode()
      */
     @Override
@@ -131,7 +144,9 @@ public class JSONReflectedClass implements Cloneable
         return result;
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     *
      * @see java.lang.Object#equals(java.lang.Object)
      */
     @Override
