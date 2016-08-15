@@ -68,9 +68,10 @@ import org.apache.commons.logging.LogFactory;
  * Example for Tomcat, assuming your app is named "MyApp", and your host
  * is named "host", put this into your
  * <code>$CATALINA_BASE/conf/Catalina/<i>host</i>/MyApp.xml</code> file in
- * order to disable property name validation and enable using full JSON
- * identifier code points by default:
+ * order to set the appName to "myApp", disable property name validation
+ * and enable using full JSON identifier code points by default:
  * <pre>{@code <Context path="/MyApp">
+ *   <Environment name="org/kopitubruk/util/json/appName" type="java.lang.String" value="MyApp" override="false" />
  *   <Environment name="org/kopitubruk/util/json/validatePropertyNames" type="java.lang.Boolean" value="false" override="false" />
  *   <Environment name="org/kopitubruk/util/json/fullJSONIdentifierCodePoints" type="java.lang.Boolean" value="true" override="false" />
  * </Context>}</pre>
@@ -167,10 +168,12 @@ import org.apache.commons.logging.LogFactory;
  * is not set via a system property at all, then JDNI can also be used to
  * disable logging by setting the boolean named "org/kopitubruk/util/json/logging".
  * <p>
- * You can also set the appName as in "-DappName=MyApp".  The appName is used
+ * You can also set the appName on the command line if you didn't set it in
+ * JNDI as in "-Dorg.kopitubruk.util.json.appName=MyApp".  The appName is used
  * in the MBean ObjectName and is recommended when this library is used with
- * multiple apps in the same web tier container.  The appName may also be set
- * via JNDI as a String in same json context as the other JNDI variables.
+ * multiple apps in the same web tier container because it allows you to have
+ * different MBeans for different apps at the same time.  The appName may also
+ * be set via JNDI as a String and that's probably a better way to do it.
  *
  * @see JSONConfig
  * @author Bill Davidson
