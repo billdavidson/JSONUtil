@@ -116,6 +116,11 @@ public class ReflectUtil
      */
     private static Map<Class<?>,Map<Field,Method>> FIELD_METHOD_INCOMPAT;
 
+    /**
+     * Minimum getter privacy level
+     */
+    private static Map<Class<?>,Integer> MIN_GETTER_PRIVACY;
+
     static {
         // needed for loading classes for reflection.
         classLoader = ReflectUtil.class.getClassLoader();
@@ -131,6 +136,7 @@ public class ReflectUtil
         GETTER_METHODS = null;
         FIELD_METHOD_COMPAT = null;
         FIELD_METHOD_INCOMPAT = null;
+        MIN_GETTER_PRIVACY = null;
     }
 
     /**
@@ -157,6 +163,19 @@ public class ReflectUtil
             GETTER_METHODS = new Hashtable<>(0);
         }
         return GETTER_METHODS;
+    }
+
+    /**
+     * Get the method cache.
+     *
+     * @return The method cache.
+     */
+    private static synchronized Map<Class<?>,Integer> getMinGetterCache()
+    {
+        if ( MIN_GETTER_PRIVACY == null ){
+            MIN_GETTER_PRIVACY = new Hashtable<>(0);
+        }
+        return MIN_GETTER_PRIVACY;
     }
 
     /**
@@ -506,18 +525,38 @@ public class ReflectUtil
                 if ( isPrivate ){
                     return methodCache;
                 }else{
+                    Map<Class<?>,Integer> minGetterCache = getMinGetterCache();
+                    Integer minGetter = minGetterCache.get(clazz);
+                    boolean noGetterPrivacy = minGetter == null;
+                    if ( !noGetterPrivacy && privacyLevel <= minGetter ){
+                        return methodCache;
+                    }
+                    int g = 0;
+                    int m = methodCache.size();
+                    int minPrivacy = PUBLIC;
                     // filter by privacy level.
                     getterMethods = new HashMap<>(methodCache.size());
                     for ( Method method : methodCache.values() ){
-                        if ( getLevel(method.getModifiers()) >= privacyLevel ){
+                        int getterLevel = getLevel(method.getModifiers());
+                        if ( getterLevel >= privacyLevel ){
                             getterMethods.put(method.getName(), method);
+                            ++g;
+                        }
+                        if ( noGetterPrivacy && getterLevel < minPrivacy ){
+                            minPrivacy = getterLevel;
                         }
                     }
-                    return new HashMap<>(getterMethods);
+                    if ( noGetterPrivacy ){
+                        minGetterCache.put(clazz, minPrivacy);
+                    }
+                    return g == m ? methodCache : new HashMap<>(getterMethods);
                 }
             }
         }
 
+        int g = 0;
+        int m = 0;
+        int minPrivacy = PUBLIC;
         getterMethods = new HashMap<>();
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
@@ -525,14 +564,20 @@ public class ReflectUtil
                 String name = method.getName();
                 if ( method.getParameterCount() == 0 && name.startsWith("get") &&
                         ! getterMethods.containsKey(name) && ! Void.TYPE.equals(method.getReturnType()) ){
+                    int getterLevel =  getLevel(method.getModifiers());
+                    if ( cacheMethods && getterLevel < minPrivacy ){
+                        minPrivacy = getterLevel;
+                    }
                     if ( isPrivate ){
                         getterMethods.put(name, method);
                     }else{
-                        if ( getLevel(method.getModifiers()) >= privacyLevel ){
+                        if ( getterLevel >= privacyLevel ){
                             getterMethods.put(name, method);
+                            ++g;
                         }
                         if ( cacheMethods ){
                             methodCache.put(name, method);
+                            ++m;
                         }
                     }
                 }
@@ -542,11 +587,8 @@ public class ReflectUtil
         getterMethods = new HashMap<>(getterMethods);
 
         if ( cacheMethods ){
-            if ( isPrivate ){
-                theCache.put(clazz, getterMethods);
-            }else{
-                theCache.put(clazz, new HashMap<>(methodCache));
-            }
+            theCache.put(clazz, g == m ? getterMethods : new HashMap<>(methodCache));
+            getMinGetterCache().put(clazz, minPrivacy);
         }
 
         return getterMethods;
