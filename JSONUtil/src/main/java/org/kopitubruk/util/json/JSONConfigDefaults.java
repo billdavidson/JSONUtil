@@ -447,7 +447,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             if ( field != null ){
                 // it's a field.  check if it changed from default.
                 ReflectUtil.ensureAccessible(field);
-                boolean currentValue = (Boolean)field.get(jsonConfigDefaults);
+                boolean currentValue = field.getBoolean(jsonConfigDefaults);
                 boolean jndiValue = (Boolean)entry.getValue();
                 if ( jndiValue != currentValue ){
                     // it's changed.  check if there is a setter.

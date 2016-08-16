@@ -108,6 +108,7 @@ public class TestJSONUtil
 
             ctx.bind("appName", "TestJSONUtil");
             ctx.bind("reflectClass0", "org.kopitubruk.util.json.ReflectTestClass,a,e");
+            ctx.bind("preciseNumbers", true);
         }catch ( NamingException e ){
             s_log.fatal("Couldn't create context", e);
             System.exit(-1);

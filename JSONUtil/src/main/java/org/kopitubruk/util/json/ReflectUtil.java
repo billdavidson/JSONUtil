@@ -487,7 +487,7 @@ public class ReflectUtil
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
             for ( Method method : tmpClass.getDeclaredMethods() ){
-                if ( setterName.equals(method.getName()) ){
+                if ( setterName.equals(method.getName()) && method.getParameterCount() == 1 ){
                     return method;
                 }
             }

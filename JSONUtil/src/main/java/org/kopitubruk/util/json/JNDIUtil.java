@@ -170,6 +170,8 @@ class JNDIUtil
     {
         Map<String,Object> jndiVariables = new HashMap<>();
         NamingEnumeration<Binding> bindings = ctx.listBindings("");
+        boolean needLogger = true;
+        boolean debug = false;
 
         while ( bindings.hasMore() ){
             Binding binding = bindings.next();
@@ -177,8 +179,12 @@ class JNDIUtil
             Object obj = binding.getObject();
             if ( obj != null ){
                 if ( logging ){
-                    ensureLogger();
-                    if ( s_log.isDebugEnabled() ){
+                    if ( needLogger ){
+                        ensureLogger();
+                        needLogger = false;
+                        debug = s_log.isDebugEnabled();
+                    }
+                    if ( debug ){
                         s_log.debug(name+" = "+obj);
                     }
                 }
