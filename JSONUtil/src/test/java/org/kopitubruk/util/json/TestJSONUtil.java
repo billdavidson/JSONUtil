@@ -1454,7 +1454,8 @@ public class TestJSONUtil
         Map<Object,Object> jsonObj = new HashMap<>();
         jsonObj.put("f", new ReflectTestClass());
         JSONConfig cfg = new JSONConfig();
-        cfg.setCacheReflectionData(true);
+        cfg.setCacheReflectionData(false);
+        ReflectUtil.clearReflectionCache();
 
         // JNDI set up to only show fields a and e.
         String json = JSONUtil.toJSON(jsonObj, cfg);

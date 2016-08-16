@@ -87,9 +87,14 @@ public class ReflectUtil
     /**
      * Primitive number type names.
      */
-    private static final Set<Class<?>> PRIMITIVE_NUMBERS =
-            new HashSet<>(Arrays.asList(Double.TYPE, Float.TYPE, Long.TYPE, Integer.TYPE, Short.TYPE, Byte.TYPE));
+    private static final Set<Class<?>> NUMBERS =
+            new HashSet<>(Arrays.asList(Double.TYPE, Float.TYPE, Long.TYPE, Integer.TYPE, Short.TYPE, Byte.TYPE, Number.class));
 
+    private static final Set<Class<?>> BOOLEANS =
+            new HashSet<>(Arrays.asList(Boolean.class, Boolean.TYPE));
+
+    private static final Set<Class<?>> STRINGS =
+            new HashSet<>(Arrays.asList(CharSequence.class, Character.class, Character.TYPE));
     /**
      * Types that become arrays in JSON.
      */
@@ -720,10 +725,15 @@ public class ReflectUtil
     {
         int len = fieldName.length();
         StringBuilder buf = new StringBuilder(len+prefix.length());
-        buf.append(prefix)
-           .append(fieldName.substring(0,1).toUpperCase());
-        if ( len > 1 ){
-            buf.append(fieldName.substring(1));
+        buf.append(prefix);
+        int codePoint = fieldName.codePointAt(0);
+        int charCount = Character.charCount(codePoint);
+        if ( Character.isLowerCase(codePoint) ){
+            codePoint = Character.toUpperCase(codePoint);
+        }
+        buf.appendCodePoint(codePoint);
+        if ( len > charCount ){
+            buf.append(fieldName.substring(charCount));
         }
         return buf.toString();
     }
@@ -739,20 +749,24 @@ public class ReflectUtil
     private static boolean isCompatible( Field field, Method method )
     {
         Class<?> fieldType = field.getType();
-        Class<?> retType = method.getReturnType();
+        Set<Class<?>> methodTypes = getTypes(method.getReturnType());
 
-        if ( isType(retType, fieldType) ){
+        if ( isType(methodTypes, fieldType) ){
             return true;
-        }else if ( isNumber(fieldType) && isNumber(retType) ){
-            return true;
-        }else if ( isCharSequence(fieldType) && isCharSequence(retType) ){
-            return true;
-        }else if ( isBoolean(fieldType) && isBoolean(retType) ){
-            return true;
-        }else if ( isJSONArray(fieldType) && isJSONArray(fieldType) ){
-            return true;
-        }else if ( isJSONMap(fieldType) && isJSONMap(fieldType) ){
-            return true;
+        }else{
+            Set<Class<?>> fieldTypes = getTypes(fieldType);
+
+            if ( isNumber(fieldTypes) && isNumber(methodTypes) ){
+                return true;
+            }else if ( isString(fieldTypes) && isString(methodTypes) ){
+                return true;
+            }else if ( isBoolean(fieldTypes) && isBoolean(methodTypes) ){
+                return true;
+            }else if ( isJSONArray(fieldTypes) && isJSONArray(methodTypes) ){
+                return true;
+            }else if ( isJSONMap(fieldTypes) && isJSONMap(methodTypes) ){
+                return true;
+            }
         }
 
         return false;
@@ -764,9 +778,9 @@ public class ReflectUtil
      * @param type the type to check.
      * @return true if the given type is a {@link Number} type.
      */
-    private static boolean isNumber( Class<?> type )
+    private static boolean isNumber( Set<Class<?>> objTypes )
     {
-        return PRIMITIVE_NUMBERS.contains(type) || isType(type, Number.class);
+        return isType(objTypes, NUMBERS);
     }
 
     /**
@@ -775,20 +789,9 @@ public class ReflectUtil
      * @param type the type to check.
      * @return true if the given type is a {@link Boolean} type.
      */
-    private static boolean isBoolean( Class<?> type )
+    private static boolean isBoolean( Set<Class<?>> objTypes )
     {
-        return Boolean.class.equals(type) || Boolean.TYPE.equals(type);
-    }
-
-    /**
-     * Return true if the given type is a {@link Character} type.
-     *
-     * @param type the type to check.
-     * @return true if the given type is a {@link Character} type.
-     */
-    private static boolean isCharacter( Class<?> type )
-    {
-        return Character.class.equals(type) || Character.TYPE.equals(type);
+        return isType(objTypes, BOOLEANS);
     }
 
     /**
@@ -797,9 +800,9 @@ public class ReflectUtil
      * @param type the type to check.
      * @return true if the given type is a {@link CharSequence} type.
      */
-    private static boolean isCharSequence( Class<?> type )
+    private static boolean isString( Set<Class<?>> objTypes )
     {
-        return isType(type, CharSequence.class) || isCharacter(type);
+        return isType(objTypes, STRINGS);
     }
 
     /**
@@ -808,9 +811,16 @@ public class ReflectUtil
      * @param type the type to check.
      * @return true if the given type is a JSON array type.
      */
-    private static boolean isJSONArray( Class<?> type )
+    private static boolean isJSONArray( Set<Class<?>> objTypes )
     {
-        return type.isArray() || isType(type, ARRAY_TYPES);
+        for ( Class<?> clazz : objTypes ){
+            if ( clazz.isArray() ){
+                return true;
+            }else{
+                break;
+            }
+        }
+        return isType(objTypes, ARRAY_TYPES);
     }
 
     /**
@@ -819,9 +829,9 @@ public class ReflectUtil
      * @param type the type to check.
      * @return true if the given type is a JSON map type.
      */
-    private static boolean isJSONMap( Class<?> type )
+    private static boolean isJSONMap( Set<Class<?>> objTypes )
     {
-        return isType(type, MAP_TYPES);
+        return isType(objTypes, MAP_TYPES);
     }
 
     /**
@@ -832,73 +842,73 @@ public class ReflectUtil
      * @param type The type to check against.
      * @return true if there's a match.
      */
-    private static boolean isType( Class<?> objType, Class<?> type )
+    private static boolean isType( Set<Class<?>> objTypes, Class<?> type )
     {
-        return isType(objType, new HashSet<>(Arrays.asList(type)));
+        return isType(objTypes, new HashSet<>(Arrays.asList(type)));
     }
 
     /**
-     * Return true if the given type or any of its super types or interfaces is
-     * included in the given list of types.
-     *
-     * @param objType The type to check.
-     * @param types The types to check against.
-     * @return true if there's a match.
+     * @param objTypes
+     * @param types
+     * @return
      */
-    private static boolean isType( Class<?> objType, Set<Class<?>> types )
+    private static boolean isType( Set<Class<?>> objTypes, Set<Class<?>> types )
     {
-        Class<?> tmpClass = objType;
-        while ( tmpClass != null ){
-            if ( types.contains(tmpClass) ){
-                return true;
+        if ( objTypes.size() >= types.size() ){
+            for ( Class<?> type : types ){
+                if ( objTypes.contains(type) ){
+                    return true;
+                }
             }
-            tmpClass = tmpClass.getSuperclass();
-        }
-
-        for ( Class<?> itfc : getInterfaces(objType) ){
-            if ( types.contains(itfc) ){
-                return true;
+        }else{
+            for ( Class<?> type : objTypes ){
+                if ( types.contains(type) ){
+                    return true;
+                }
             }
         }
-
         return false;
     }
 
     /**
+     * Get a collection of types represented by the given type including
+     * all super types and interfaces.
+     *
+     * @param objType the original type.
+     * @return the type and all its super types and interfaces.
+     */
+    private static Set<Class<?>> getTypes( Class<?> objType )
+    {
+        Set<Class<?>> types = new LinkedHashSet<>();
+        Class<?> tmpClass = objType;
+        while ( tmpClass != null ){
+            if ( ! "java.lang.Object".equals(tmpClass.getClass().getCanonicalName()) ){
+                types.add(tmpClass);
+            }
+            tmpClass = tmpClass.getSuperclass();
+        }
+        getInterfaces(objType, types);
+        return types;
+    }
+
+    /**
      * Get a complete list of interfaces for a given class including
-     * all super interfaces and interfaces of super classes and their
-     * super interfaces.
+     * all super interfaces.
      *
      * @param clazz The class.
-     * @return The set of interfaces.
+     * @param The set of interfaces.
      */
-    private static Set<Class<?>> getInterfaces( Class<?> clazz )
+    private static void getInterfaces( Class<?> clazz, Set<Class<?>> interfaces )
     {
-        // build a map of the object's properties.
-        Set<Class<?>> interfaces = new LinkedHashSet<>();
-
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
-            boolean doInterfaces = true;
-            if ( tmpClass.isInterface() ){
-                if ( interfaces.contains(tmpClass) ){
-                    doInterfaces = false;
-                }else{
-                    interfaces.add(tmpClass);
-                }
-            }
-            if ( doInterfaces ){
-                for ( Class<?> itfc : tmpClass.getInterfaces() ){
-                    if ( ! interfaces.contains(itfc) ){
-                        interfaces.add(itfc);
-                        interfaces.addAll(getInterfaces(itfc));
-                    }
+            for ( Class<?> itfc : clazz.getInterfaces() ){
+                if ( interfaces.add(itfc) ){
+                    getInterfaces(itfc, interfaces);
                 }
             }
             tmpClass = tmpClass.getSuperclass();
         }
-
-        return new LinkedHashSet<>(interfaces);
     }
 
     /**
