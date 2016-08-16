@@ -691,7 +691,7 @@ public class ReflectUtil
      * Make a JavaBeans "is" getter name from a field name.
      *
      * @param fieldName the field name.
-     * @return the getter name.
+     * @return the "is" getter name.
      */
     private static String makeIsName( String fieldName )
     {
@@ -702,7 +702,7 @@ public class ReflectUtil
      * Make a JavaBeans setter name from a field name.
      *
      * @param fieldName the field name.
-     * @return the getter name.
+     * @return the setter name.
      */
     private static String makeSetterName( String fieldName )
     {
