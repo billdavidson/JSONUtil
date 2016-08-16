@@ -1074,7 +1074,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      */
     public static synchronized boolean isReflectClass( JSONReflectedClass refClass )
     {
-        return reflectClasses == null ? false : reflectClasses.containsKey(refClass.getObjClass());
+        return reflectClasses == null || refClass == null ? false : reflectClasses.containsKey(refClass.getObjClass());
     }
 
     /**
@@ -1087,7 +1087,29 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      */
     public static boolean isReflectClass( Object obj )
     {
-        return obj == null ? false : isReflectClass(ReflectUtil.ensureReflectedClass(obj));
+        return obj == null ? false : isReflectClass(ensureReflectedClass(obj));
+    }
+
+    /**
+     * Get the {@link JSONReflectedClass} for the given object or create a dummy
+     * one if there isn't one.  Creating one does not affect the results of the
+     * isReflectClass() methods.  If you didn't add one then it isn't stored.
+     *
+     * @param obj The class to look up.
+     * @return the reflected class object.
+     */
+    public static JSONReflectedClass ensureReflectedClass( Object obj )
+    {
+        JSONReflectedClass result = null;
+        if ( obj instanceof JSONReflectedClass ){
+            result = (JSONReflectedClass)obj;
+        }else{
+            result = getReflectedClass(obj);
+            if ( result == null ){
+                result = ReflectUtil.ensureReflectedClass(obj);
+            }
+        }
+        return result;
     }
 
     /**
@@ -1096,9 +1118,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @param obj The class to look up.
      * @return the reflected class object or null if not found.
      */
-    public static JSONReflectedClass getReflectedClass( Object obj )
+    public static synchronized JSONReflectedClass getReflectedClass( Object obj )
     {
-        return reflectClasses.get(ReflectUtil.getClass(obj));
+        return reflectClasses == null || obj == null ? null : reflectClasses.get(ReflectUtil.getClass(obj));
     }
 
     /**

@@ -252,11 +252,7 @@ public class ReflectUtil
     static JSONReflectedClass ensureReflectedClass( Object obj )
     {
         if ( obj instanceof JSONReflectedClass ){
-            if ( ((JSONReflectedClass)obj).getObjClass() != null  ){
-                return (JSONReflectedClass)obj;
-            }else{
-                return null;
-            }
+             return (JSONReflectedClass)obj;
         }else if ( obj != null ){
             return new JSONReflectedClass(getClass(obj), null);
         }else{

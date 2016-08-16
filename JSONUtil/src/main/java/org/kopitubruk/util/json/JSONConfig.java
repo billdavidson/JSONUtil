@@ -692,7 +692,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public boolean isReflectClass( Object obj )
     {
-        return obj == null ? false : isReflectClass(ReflectUtil.ensureReflectedClass(obj));
+        return obj == null ? false : isReflectClass(ensureReflectedClass(obj));
     }
 
     /**
@@ -706,12 +706,10 @@ public class JSONConfig implements Serializable, Cloneable
     public JSONReflectedClass ensureReflectedClass( Object obj )
     {
         JSONReflectedClass result = null;
-        if ( reflectClasses == null ){
-            result = ReflectUtil.ensureReflectedClass(obj);
-        }else if ( obj instanceof JSONReflectedClass ){
+        if ( obj instanceof JSONReflectedClass ){
             result = (JSONReflectedClass)obj;
         }else{
-            result = reflectClasses.get(ReflectUtil.getClass(obj));
+            result = getReflectedClass(obj);
             if ( result == null ){
                 result = ReflectUtil.ensureReflectedClass(obj);
             }
@@ -727,7 +725,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public JSONReflectedClass getReflectedClass( Object obj )
     {
-        return reflectClasses.get(ReflectUtil.getClass(obj));
+        return reflectClasses == null || obj == null ? null : reflectClasses.get(ReflectUtil.getClass(obj));
     }
 
     /**
