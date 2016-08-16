@@ -107,7 +107,6 @@ public class TestJSONUtil
             Context ctx = JNDIUtil.createEnvContext(JSONUtil.class.getPackage().getName().replaceAll("\\.", "/"));
 
             ctx.bind("appName", "TestJSONUtil");
-            ctx.bind("maxReflectIndex", 0);
             ctx.bind("reflectClass0", "org.kopitubruk.util.json.ReflectTestClass,a,e");
         }catch ( NamingException e ){
             s_log.fatal("Couldn't create context", e);
@@ -1454,6 +1453,7 @@ public class TestJSONUtil
         Map<Object,Object> jsonObj = new HashMap<>();
         jsonObj.put("f", new ReflectTestClass());
         JSONConfig cfg = new JSONConfig();
+        cfg.setCacheReflectionData(true);
 
         // JNDI set up to only show fields a and e.
         String json = JSONUtil.toJSON(jsonObj, cfg);
@@ -1464,19 +1464,19 @@ public class TestJSONUtil
 
         cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
         json = JSONUtil.toJSON(jsonObj, cfg);
-        assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[],\"d\":null}}"));
+        assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[],\"d\":null,\"f\":true}}"));
 
         cfg.setReflectionPrivacy(ReflectUtil.PACKAGE);
         json = JSONUtil.toJSON(jsonObj, cfg);
-        assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[]}}"));
+        assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[],\"f\":true}}"));
 
         cfg.setReflectionPrivacy(ReflectUtil.PROTECTED);
         json = JSONUtil.toJSON(jsonObj, cfg);
-        assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\"}}"));
+        assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"f\":true}}"));
 
         cfg.setReflectionPrivacy(ReflectUtil.PUBLIC);
         json = JSONUtil.toJSON(jsonObj, cfg);
-        assertThat(json, is("{\"f\":{\"a\":1}}"));
+        assertThat(json, is("{\"f\":{\"a\":1,\"f\":true}}"));
 
         cfg = new JSONConfig(); // reload defaults.
         json = JSONUtil.toJSON(jsonObj, cfg);

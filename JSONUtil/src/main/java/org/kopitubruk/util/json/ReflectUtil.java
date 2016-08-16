@@ -14,6 +14,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import javax.management.MBeanException;
 
@@ -71,6 +72,11 @@ public class ReflectUtil
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
      */
     public static final int PUBLIC = 3;
+
+    /**
+     * Getter name pattern.
+     */
+    private static final Pattern GETTER = Pattern.compile("^(get|is)\\p{Lu}.*$");
 
     /**
      * A set of permissible levels for reflection privacy.
@@ -312,7 +318,7 @@ public class ReflectUtil
         // add the fields to the object map.
         Map<Object,Object> obj = new LinkedHashMap<>();
 
-        String name = "getGetterMethods";
+        String name = "getReflectedObject";
         try {
             JSONReflectedClass refClass = cfg.ensureReflectedClass(propertyValue);
             Set<String> fieldNames = refClass.getFieldNames();
@@ -330,8 +336,8 @@ public class ReflectUtil
                         continue;       // ignore static and transient fields.
                     }
                     name = field.getName();
-                    Method getter = getterMethods.get(makeGetterName(name));
-                    if ( getter != null && isCompatible(clazz, field, getter, cfg) ){
+                    Method getter = getGetter(clazz, getterMethods, field, name, cfg);
+                    if ( getter != null ){
                         // prefer the argumentless getter over direct access.
                         ensureAccessible(getter);
                         obj.put(name, getter.invoke(propertyValue));
@@ -351,8 +357,8 @@ public class ReflectUtil
                 for ( String fieldName : fieldNames ){
                     name = fieldName;
                     Field field = fields.get(name);
-                    Method getter = getterMethods.get(makeGetterName(name));
-                    if ( getter != null && isCompatible(clazz, field, getter, cfg) ){
+                    Method getter = getGetter(clazz, getterMethods, field, name, cfg);
+                    if ( getter != null ){
                         // prefer the argumentless getter over direct access.
                         ensureAccessible(getter);
                         obj.put(name, getter.invoke(propertyValue));
@@ -480,9 +486,7 @@ public class ReflectUtil
     static Method getSetter( Class<?> clazz, Field field )
     {
         String fieldName = field.getName();
-        String setterName = "set" +
-                fieldName.substring(0,1).toUpperCase() +
-                (fieldName.length() > 1 ? fieldName.substring(1) : "");
+        String setterName = makeSetterName(fieldName);
 
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
@@ -562,15 +566,22 @@ public class ReflectUtil
         while ( tmpClass != null ){
             for ( Method method : tmpClass.getDeclaredMethods() ){
                 String name = method.getName();
-                if ( method.getParameterCount() == 0 && name.startsWith("get") &&
-                        ! getterMethods.containsKey(name) && ! Void.TYPE.equals(method.getReturnType()) ){
-                    int getterLevel =  getLevel(method.getModifiers());
-                    if ( cacheMethods && getterLevel < minPrivacy ){
-                        minPrivacy = getterLevel;
+                Class<?> retType = method.getReturnType();
+                if ( method.getParameterCount() == 0 && ! getterMethods.containsKey(name) &&
+                        ! Void.TYPE.equals(retType) && GETTER.matcher(name).matches() ){
+                    if ( name.startsWith("is") && ! (Boolean.class.equals(retType) || Boolean.TYPE.equals(retType)) ){
+                        continue;   // "is" prefix only valid getter for booleans.
                     }
                     if ( isPrivate ){
                         getterMethods.put(name, method);
+                        if ( cacheMethods ){
+                            int getterLevel = getLevel(method.getModifiers());
+                            if ( getterLevel < minPrivacy ){
+                                minPrivacy = getterLevel;
+                            }
+                        }
                     }else{
+                        int getterLevel = getLevel(method.getModifiers());
                         if ( getterLevel >= privacyLevel ){
                             getterMethods.put(name, method);
                             ++g;
@@ -578,6 +589,9 @@ public class ReflectUtil
                         if ( cacheMethods ){
                             methodCache.put(name, method);
                             ++m;
+                            if ( getterLevel < minPrivacy ){
+                                minPrivacy = getterLevel;
+                            }
                         }
                     }
                 }
@@ -595,6 +609,78 @@ public class ReflectUtil
     }
 
     /**
+     * Get the getter for the given field.
+     *
+     * @param clazz The class for this field and getter.
+     * @param getterMethods The available getter methods.
+     * @param field The field
+     * @param name The field name.
+     * @param cfg The config object.
+     * @return The getter or null if one cannot be found.
+     */
+    private static Method getGetter( Class<?> clazz, Map<String,Method> getterMethods, Field field, String name, JSONConfig cfg )
+    {
+        boolean cacheReflectionData = cfg.isCacheReflectionData();
+
+        if ( cacheReflectionData && field != null ){
+            // check the cache for previous validations.
+            Method getter;
+            Map<Class<?>,Map<Field,Method>> compatCache = getFieldMethodCompat();
+            synchronized ( compatCache ){
+                Map<Field,Method> compat = compatCache.get(clazz);
+                getter = compat != null ? compat.get(field) : null;
+            }
+            if ( getter != null && getterMethods.containsKey(getter.getName()) ){
+                return getter;
+            }
+            Map<Class<?>,Map<Field,Method>> incompatCache = getFieldMethodIncompat();
+            synchronized ( incompatCache ){
+                Map<Field,Method> incompat = incompatCache.get(clazz);
+                getter = incompat != null ? incompat.get(field) : null;
+            }
+            if ( getter != null ){
+                return null;
+            }
+        }
+
+        Method getter = getterMethods.get(makeGetterName(name));
+        if ( getter == null ){
+            getter = getterMethods.get(makeIsName(name));
+        }
+        if ( field == null || getter == null ){
+            return getter;
+        }
+
+        boolean isCompatible = isCompatible(field, getter);
+
+        if ( cacheReflectionData ){
+            if ( isCompatible ){
+                Map<Class<?>,Map<Field,Method>> compatCache = getFieldMethodCompat();
+                synchronized ( compatCache ){
+                    Map<Field,Method> compat = compatCache.get(clazz);
+                    if ( compat == null ){
+                        compat = new HashMap<>(0);
+                        compatCache.put(clazz, compat);
+                    }
+                    compat.put(field, getter);
+                }
+            }else{
+                Map<Class<?>,Map<Field,Method>> incompatCache = getFieldMethodIncompat();
+                synchronized ( incompatCache ){
+                    Map<Field,Method> incompat = incompatCache.get(clazz);
+                    if ( incompat == null ){
+                        incompat = new HashMap<>(0);
+                        incompatCache.put(clazz, incompat);
+                    }
+                    incompat.put(field, getter);
+                }
+            }
+        }
+
+        return isCompatible ? getter : null;
+    }
+
+    /**
      * Make a JavaBeans getter name from a field name.
      *
      * @param fieldName the field name.
@@ -602,78 +688,48 @@ public class ReflectUtil
      */
     private static String makeGetterName( String fieldName )
     {
+        return makeBeanMethodName(fieldName, "get");
+    }
+
+    /**
+     * Make a JavaBeans "is" getter name from a field name.
+     *
+     * @param fieldName the field name.
+     * @return the getter name.
+     */
+    private static String makeIsName( String fieldName )
+    {
+        return makeBeanMethodName(fieldName, "is");
+    }
+
+    /**
+     * Make a JavaBeans setter name from a field name.
+     *
+     * @param fieldName the field name.
+     * @return the getter name.
+     */
+    private static String makeSetterName( String fieldName )
+    {
+        return makeBeanMethodName(fieldName, "set");
+    }
+
+    /**
+     * Make a bean method name.
+     *
+     * @param fieldName the name of the field.
+     * @param prefix The prefix for the bean method name.
+     * @return The bean method name.
+     */
+    private static String makeBeanMethodName( String fieldName, String prefix )
+    {
         int len = fieldName.length();
-        StringBuilder buf = new StringBuilder(len+3);
-        buf.append("get")
+        StringBuilder buf = new StringBuilder(len+prefix.length());
+        buf.append(prefix)
            .append(fieldName.substring(0,1).toUpperCase());
         if ( len > 1 ){
             buf.append(fieldName.substring(1));
         }
         return buf.toString();
-    }
-
-    /**
-     * Return true if the type returned by the method is compatible in JSON
-     * with the type of the field.
-     *
-     * @param clazz The class.
-     * @param field The field.
-     * @param method The method to check the return type of.
-     * @param cfg The config object.
-     * @return true if they are compatible in JSON.
-     */
-    private static boolean isCompatible( Class<?> clazz, Field field, Method method, JSONConfig cfg )
-    {
-        if ( field == null ){
-            return true;    // pseudo field with getter.
-        }
-        if ( cfg.isCacheReflectionData() ){
-            Map<Field,Method> compat;
-            Map<Class<?>,Map<Field,Method>> compatCache = getFieldMethodCompat();
-            synchronized ( compatCache ){
-                compat = compatCache.get(clazz);
-                if ( compat != null && compat.get(field) == method ){
-                    return true;
-                }
-            }
-            Map<Field,Method> incompat;
-            Map<Class<?>,Map<Field,Method>> incompatCache = getFieldMethodIncompat();
-            synchronized ( incompatCache ){
-                incompat = incompatCache.get(clazz);
-                if ( incompat != null && incompat.get(field) == method ){
-                    return false;
-                }
-            }
-
-            boolean result = isCompatible(field, method);
-
-            if ( result ){
-                synchronized ( compatCache ){
-                    if ( compat == null ){
-                        compat = compatCache.get(clazz);
-                        if ( compat == null ){
-                            compat = new HashMap<>(0);
-                            compatCache.put(clazz, compat);
-                        }
-                    }
-                    compat.put(field, method);
-                }
-            }else{
-                synchronized ( incompatCache ){
-                    if ( incompat == null ){
-                        incompat = incompatCache.get(clazz);
-                        if ( incompat == null ){
-                            incompat = new HashMap<>(0);
-                            incompatCache.put(clazz, incompat);
-                        }
-                    }
-                    incompat.put(field, method);
-                }
-            }
-            return result;
-        }else{
-            return isCompatible(field, method);
-        }
     }
 
     /**
