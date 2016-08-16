@@ -27,12 +27,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.ResourceBundle;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.management.MBeanException;
 import javax.management.MBeanServer;
@@ -123,17 +128,16 @@ import org.apache.commons.logging.LogFactory;
  * {@link SimpleDateFormat#SimpleDateFormat(String, Locale)} using the locale
  * from {@link #getLocale()}.
  * <p>
- * You can set up to 16 default date parsing formats using the names
- * "dateParseFormat0" through "dateParseFormat15" using String values as with
- * "dateGenFormat" described above.  They will be added in numeric order of
- * the name.
+ * You can set any number of default date parsing formats using names that start
+ * with "dateParseFormat" followed by some positive base 10 integer (as in
+ * "dateParseFormat7") using String values as with "dateGenFormat" described
+ * above.  They will be added in numeric order of the name.
  * <p>
- * Classes to use for automatic reflection can be set up via JNDI.
- * You must define an integer "maxReflectIndex" which will be the index of
- * the last reflected class name to be searched for.  This class will then
- * look for String variables named "reflectClass0", "reflectClass1" and so on
- * until the number at the end up the name reaches maxReflectIndex.  The
- * class names need to load with {@link ClassLoader#loadClass(String)} or
+ * Classes to use for automatic reflection can be set up via JNDI. This class
+ * will look for String variables named "reflectClass" followed by some positive
+ * base 10 integer (like "reflectClass5").  You can have any number of
+ * reflectClasses. The names merely need to be unique and follow that pattern.
+ * The class names need to load with {@link ClassLoader#loadClass(String)} or
  * they will not be added to the list of reflected classes.  If the class
  * names are followed by a comma and strings separated by commas, those
  * strings will be taken as field names to use for {@link JSONReflectedClass}
@@ -223,6 +227,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     // logging.
     private static boolean logging;
 
+    private static final Pattern DATE_PARSE_FORMAT_PAT = Pattern.compile("^dateParseFormat(\\d+)$");
+    private static final Pattern REFLECT_CLASS_PAT = Pattern.compile("^reflectClass\\d+$");
+
     /*
      * Initialize static data.
      */
@@ -282,30 +289,32 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         try{
             Context ctx = JNDIUtil.getEnvContext(jsonConfigDefaults.getClass().getPackage().getName().replaceAll("\\.", "/"));
 
+            Map<String,Object> jndiData = JNDIUtil.getJNDIVariables(ctx);
+
             if ( loggingProperty == null ){
                 // logging was not set by a system property. allow JNDI override.
-                logging = JNDIUtil.getBoolean(ctx, "logging", logging);
+                logging = JNDIUtil.getBoolean(jndiData, "logging", logging);
                 JNDIUtil.setLogging(logging);
             }
 
-            registerMBean = JNDIUtil.getBoolean(ctx, "registerMBean", registerMBean);
+            registerMBean = JNDIUtil.getBoolean(jndiData, "registerMBean", registerMBean);
 
             if ( registerMBean && appName == null ){
-                appName = JNDIUtil.getString(ctx, "appName", null);
+                appName = JNDIUtil.getString(jndiData, "appName", null);
                 results.put("appName", appName);
             }
 
             // locale.
-            String languageTag = JNDIUtil.getString(ctx, "locale", null);
+            String languageTag = JNDIUtil.getString(jndiData, "locale", null);
             if ( languageTag != null ){
                 jsonConfigDefaults.setLocale(languageTag);
             }
 
-            loadDateFormatsFromJNDI(ctx);
-            loadReflectClassesFromJNDI(ctx);
-            setFlagsFromJNDI(ctx);
+            loadDateFormatsFromJNDI(jndiData);
+            loadReflectClassesFromJNDI(jndiData);
+            setFlagsFromJNDI(jndiData);
 
-            reflectionPrivacy = JNDIUtil.getInt(ctx, "reflectionPrivacy", reflectionPrivacy);
+            reflectionPrivacy = JNDIUtil.getInt(jndiData, "reflectionPrivacy", reflectionPrivacy);
             try{
                 ReflectUtil.confirmPrivacyLevel(reflectionPrivacy, new JSONConfig());
             }catch ( JSONReflectionException ex ){
@@ -334,21 +343,42 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     /**
      * Load date formats from JNDI, if any.
      *
-     * @param ctx The context to use.
+     * @param jndiData A map of JNDI data.
      */
-    private static void loadDateFormatsFromJNDI( Context ctx )
+    private static void loadDateFormatsFromJNDI( Map<String,Object> jndiData )
     {
         // date generation format.
-        String dgf = JNDIUtil.getString(ctx, "dateGenFormat", null);
+        String dgf = JNDIUtil.getString(jndiData, "dateGenFormat", null);
         if ( dgf != null ){
             jsonConfigDefaults.setDateGenFormat(dgf);
         }
 
         // date parse formats.
-        for ( int i = 0; i < 16; i++ ){
-            String dpf = JNDIUtil.getString(ctx, "dateParseFormat" + i, null);
-            if ( dpf != null ){
-                jsonConfigDefaults.addDateParseFormat(dpf);
+        List<String> fmtNums = new ArrayList<String>();
+        for ( Entry<String,Object> entry : jndiData.entrySet() ){
+            if ( entry.getValue() instanceof String ){
+                Matcher matcher = DATE_PARSE_FORMAT_PAT.matcher(entry.getKey());
+                if ( matcher.matches() ){
+                    fmtNums.add(matcher.group(1));
+                }
+            }
+        }
+        if ( fmtNums.size() > 0 ){
+            // using the strings so that people can use "001", "002" etc if they wish.
+            Collections.sort(fmtNums,
+                             new Comparator<String>()
+                             {
+                                 @Override
+                                 public int compare( String o1, String o2 )
+                                 {
+                                     return new Integer(o1).compareTo(new Integer(o2));
+                                 }
+                             });
+            for ( String num : fmtNums ){
+                String dpf = JNDIUtil.getString(jndiData, "dateParseFormat" + num, null);
+                if ( dpf != null ){
+                    jsonConfigDefaults.addDateParseFormat(dpf);
+                }
             }
         }
     }
@@ -356,36 +386,22 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     /**
      * Load reflection classes from JNDI, if any.
      *
-     * @param ctx The context to use.
+     * @param jndiData A map of JNDI data.
      */
-    private static void loadReflectClassesFromJNDI( Context ctx )
+    private static void loadReflectClassesFromJNDI( Map<String,Object> jndiData )
     {
-        // default reflection classes.
-        int maxReflectIndex = JNDIUtil.getInt(ctx, "maxReflectIndex", -1);
-        if ( maxReflectIndex >= 0 ){
-            List<String> classNames = new ArrayList<String>();
-            for ( int i = 0; i <= maxReflectIndex; i++ ){
-                String className = JNDIUtil.getString(ctx, "reflectClass" + i, null);
-                if ( className != null ){
-                    classNames.add(className);
-                }
-            }
-            List<JSONReflectedClass> classes = new ArrayList<JSONReflectedClass>(classNames.size());
-            for ( String className : classNames ){
-                String[] parts = className.split(",");
+        List<JSONReflectedClass> classes = new ArrayList<JSONReflectedClass>();
+        for ( Entry<String,Object> entry : jndiData.entrySet() ){
+            Object value = entry.getValue();
+            if ( value instanceof String && REFLECT_CLASS_PAT.matcher(entry.getKey()).matches() ){
+                String[] parts = ((String)value).split(",");
                 try{
                     Class<?> clazz = ReflectUtil.getClassByName(parts[0]);
                     List<String> fields = null;
                     if ( parts.length > 1 ){
                         fields = new ArrayList<String>(parts.length-1);
                         for ( int i = 1; i < parts.length; i++ ){
-                            String fieldName = parts[i].trim();
-                            if ( fieldName.length() > 0 ){
-                                fields.add(fieldName);
-                            }
-                        }
-                        if ( fields.size() < 1 ){
-                            fields = null;
+                            fields.add(parts[i]);
                         }
                     }
                     classes.add(new JSONReflectedClass(clazz, fields));
@@ -393,8 +409,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                     // Not actually an MBean operation at this point.
                 }
             }
-            addReflectClasses(classes);
         }
+        addReflectClasses(classes);
     }
 
     /**
@@ -404,24 +420,44 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * it's not that many things really so performance is not really a big issue
      * in this case.
      *
-     * @param ctx The context to use.
+     * @param jndiData A map of JNDI data.
      * @throws IllegalAccessException reflection problem.
      * @throws IllegalArgumentException reflection problem.
      * @throws InvocationTargetException reflection problem.
      */
-    private static void setFlagsFromJNDI( Context ctx ) throws IllegalArgumentException, IllegalAccessException, InvocationTargetException
+    private static void setFlagsFromJNDI( Map<String,Object> jndiData ) throws IllegalArgumentException, IllegalAccessException, InvocationTargetException
     {
-        Class<?> clazz = jsonConfigDefaults.getClass();
+        // get list of booleans from JNDI
+        List<Entry<String,Object>> booleans = new ArrayList<Entry<String,Object>>();
+        for ( Entry<String,Object> entry : jndiData.entrySet() ){
+            if ( entry.getValue() instanceof Boolean ){
+                booleans.add(entry);
+            }
+        }
+        if ( booleans.size() < 1 ){
+            return;     // nothing to do.
+        }
 
-        for ( Field field : ReflectUtil.getFields(clazz, Boolean.TYPE) ){
-            ReflectUtil.ensureAccessible(field);
-            boolean currentValue = (Boolean)field.get(jsonConfigDefaults);
-            boolean jndiValue = JNDIUtil.getBoolean(ctx, field.getName(), currentValue);
-            if ( jndiValue != currentValue ){
-                Method setter = ReflectUtil.getSetter(clazz, field);
-                if ( setter != null ){
-                    ReflectUtil.ensureAccessible(setter);
-                    setter.invoke(jsonConfigDefaults, jndiValue);
+        // going to need to check against fields.
+        Class<?> clazz = jsonConfigDefaults.getClass();
+        Map<String,Field> fields = ReflectUtil.getFields(clazz, Boolean.TYPE);
+
+        for ( Entry<String,Object> entry : booleans ){
+            Field field = fields.get(entry.getKey());
+            if ( field != null ){
+                // it's a field.  check if it changed from default.
+                ReflectUtil.ensureAccessible(field);
+                boolean currentValue = field.getBoolean(jsonConfigDefaults);
+                boolean jndiValue = (Boolean)entry.getValue();
+                if ( jndiValue != currentValue ){
+                    // it's changed.  check if there is a setter.
+                    Method setter = ReflectUtil.getSetter(clazz, field);
+                    if ( setter != null ){
+                        // there's a setter.  use it.
+                        ReflectUtil.ensureAccessible(setter);
+                        setter.invoke(jsonConfigDefaults, jndiValue);
+                    }
+                    // no setter means I didn't intend for this to be used with JNDI.
                 }
             }
         }
@@ -1043,7 +1079,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      */
     public static synchronized boolean isReflectClass( JSONReflectedClass refClass )
     {
-        return reflectClasses == null ? false : reflectClasses.containsKey(refClass.getObjClass());
+        return reflectClasses == null || refClass == null ? false : reflectClasses.containsKey(refClass.getObjClass());
     }
 
     /**
@@ -1056,7 +1092,29 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      */
     public static boolean isReflectClass( Object obj )
     {
-        return obj == null ? false : isReflectClass(ReflectUtil.ensureReflectedClass(obj));
+        return obj == null ? false : isReflectClass(ensureReflectedClass(obj));
+    }
+
+    /**
+     * Get the {@link JSONReflectedClass} for the given object or create a dummy
+     * one if there isn't one.  Creating one does not affect the results of the
+     * isReflectClass() methods.  If you didn't add one then it isn't stored.
+     *
+     * @param obj The class to look up.
+     * @return the reflected class object.
+     */
+    public static JSONReflectedClass ensureReflectedClass( Object obj )
+    {
+        JSONReflectedClass result = null;
+        if ( obj instanceof JSONReflectedClass ){
+            result = (JSONReflectedClass)obj;
+        }else{
+            result = getReflectedClass(obj);
+            if ( result == null ){
+                result = ReflectUtil.ensureReflectedClass(obj);
+            }
+        }
+        return result;
     }
 
     /**
@@ -1065,9 +1123,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @param obj The class to look up.
      * @return the reflected class object or null if not found.
      */
-    public static JSONReflectedClass getReflectedClass( Object obj )
+    public static synchronized JSONReflectedClass getReflectedClass( Object obj )
     {
-        return reflectClasses.get(ReflectUtil.getClass(obj));
+        return reflectClasses == null || obj == null ? null : reflectClasses.get(ReflectUtil.getClass(obj));
     }
 
     /**
@@ -1193,7 +1251,14 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             List<String> classes = new ArrayList<String>(refClasses.size());
             for ( JSONReflectedClass refClass : refClasses ){
                 Class<?> clazz = refClass.getObjClass();
-                classes.add(clazz.getCanonicalName());
+                StringBuilder buf = new StringBuilder(clazz.getCanonicalName());
+                Set<String> fields = refClass.getFieldNames();
+                if ( fields != null && fields.size() > 0 ){
+                    for ( String field : fields ){
+                        buf.append(',').append(field);
+                    }
+                }
+                classes.add(buf.toString());
             }
             Collections.sort(classes);
             for ( String className : classes ){

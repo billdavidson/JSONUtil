@@ -6,6 +6,7 @@ and controlling the way that the JSON is generated.
 #### Features
 * Recursive traversal of Maps, Iterables (Collection, List, Set etc.), Enumerations, arrays and ResourceBundles
 * Data structure loop detection
+* [Reflection of objects is supported allowing lazy encoding of objects](https://github.com/billdavidson/JSONUtil/wiki/Using-Reflection-to-Encode-Objects-as-JSON)
 * Property name validation (can use ECMAScript or JSON rules)
 * Output to String or java.io.Writer
 * JSON parsing to Java objects from Strings or java.io.Reader
@@ -15,8 +16,8 @@ and controlling the way that the JSON is generated.
 * Option to format dates on output and handle different formats when parsing
 * ECMAScript 6 code point escapes are supported for reading and optionally for writing
 * The default values for most configuration options can be changed.
-* Most defaults can be set via JNDI (See the JSONConfigDefaults class)
-* Most defaults can be read or modified via a JMX MBean client
+* [Most defaults can be set via JNDI](https://github.com/billdavidson/JSONUtil/wiki/Setting-Configuration-Defaults-Using-JNDI) (See the JSONConfigDefaults class)
+* [Most defaults can be read or modified via a JMX MBean client](https://github.com/billdavidson/JSONUtil/wiki/Viewing-and-Modifying-Configuration-Defaults-Using-a-JMX-MBean-Client)
 * Option to format output for debugging.
 
 The trunk branch requires Java 8, but there are branches for Java 5,

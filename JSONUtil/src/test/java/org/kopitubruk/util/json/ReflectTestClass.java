@@ -15,6 +15,7 @@ class ReflectTestClass
     private ArrayList<Long> c = new ArrayList<Long>();
     @SuppressWarnings("unused")
     private List<Short> d = null;
+    private boolean f = true;
 
     /**
      * Get a
@@ -45,5 +46,10 @@ class ReflectTestClass
     private Double getE()
     {
         return new Double(25);
+    }
+
+    public boolean isF()
+    {
+        return f;
     }
 }
