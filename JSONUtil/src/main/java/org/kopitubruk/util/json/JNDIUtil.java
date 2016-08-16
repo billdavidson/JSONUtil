@@ -15,8 +15,13 @@
  */
 package org.kopitubruk.util.json;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.naming.Binding;
 import javax.naming.Context;
 import javax.naming.InitialContext;
+import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 
 import org.apache.commons.logging.Log;
@@ -152,6 +157,96 @@ class JNDIUtil
             obj = null;
         }
         return obj;
+    }
+
+    /**
+     * Get all JNDI data for the given context.
+     *
+     * @param ctx The context.
+     * @return A map of names to values.
+     * @throws NamingException If there's a problem.
+     */
+    static Map<String,Object> getJNDIVariables( Context ctx ) throws NamingException
+    {
+        Map<String,Object> jndiVariables = new HashMap<String,Object>();
+        NamingEnumeration<Binding> bindings = ctx.listBindings("");
+        boolean needLogger = true;
+        boolean debug = false;
+
+        while ( bindings.hasMore() ){
+            Binding binding = bindings.next();
+            String name = binding.getName();
+            Object obj = binding.getObject();
+            if ( obj != null ){
+                if ( logging ){
+                    if ( needLogger ){
+                        ensureLogger();
+                        needLogger = false;
+                        debug = s_log.isDebugEnabled();
+                    }
+                    if ( debug ){
+                        s_log.debug(name+" = "+obj);
+                    }
+                }
+                jndiVariables.put(name, obj);
+            }
+        }
+        return jndiVariables;
+    }
+
+    /**
+     * Get a boolean from a map or return the default value if it's not there.
+     *
+     * @param jndiVariables A map of JNDI variables to look things up.
+     * @param name The name to look up.
+     * @param defaultValue A default to return if it doesn't exist.
+     * @return The value or the default if the value isn't in the map.
+     */
+    static boolean getBoolean( Map<String,Object> jndiVariables, String name, boolean defaultValue )
+    {
+        Object value = jndiVariables.get(name);
+        return value instanceof Boolean ? (Boolean)value : defaultValue;
+    }
+
+    /**
+     * Get a boolean from a map or null if it's not there.
+     *
+     * @param jndiVariables A map of JNDI variables to look things up.
+     * @param name The name to look up.
+     * @return The value or the default if the value isn't in the map.
+     */
+    static Boolean getBoolean( Map<String,Object> jndiVariables, String name )
+    {
+        Object value = jndiVariables.get(name);
+        return value instanceof Boolean ? (Boolean)value : null;
+    }
+
+    /**
+     * Get a String from a map or return the default value if it's not there.
+     *
+     * @param jndiVariables A map of JNDI variables to look things up.
+     * @param name The name to look up.
+     * @param defaultValue A default to return if it doesn't exist.
+     * @return The value or the default if the value isn't in the map.
+     */
+    static String getString( Map<String,Object> jndiVariables, String name, String defaultValue )
+    {
+        Object value = jndiVariables.get(name);
+        return value instanceof String ? (String)value : defaultValue;
+    }
+
+    /**
+     * Get a String from a map or return the default value if it's not there.
+     *
+     * @param jndiVariables A map of JNDI variables to look things up.
+     * @param name The name to look up.
+     * @param defaultValue A default to return if it doesn't exist.
+     * @return The value or the default if the value isn't in the map.
+     */
+    static int getInt( Map<String,Object> jndiVariables, String name, int defaultValue )
+    {
+        Object value = jndiVariables.get(name);
+        return value instanceof String ? (Integer)value : defaultValue;
     }
 
     /**

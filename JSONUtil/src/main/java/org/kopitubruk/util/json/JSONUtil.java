@@ -488,7 +488,8 @@ public class JSONUtil
             if ( cfg.isEncodeDatesAsObjects() ){
                 json.write(')');
             }
-        }else if ( propertyValue instanceof CharSequence || propertyValue.getClass().isEnum() || ! cfg.isReflectUnknownObjects() ){
+        }else if ( propertyValue instanceof CharSequence || propertyValue instanceof Character ||
+                   propertyValue.getClass().isEnum() || ! cfg.isReflectUnknownObjects() ){
             // Use the toString() method for the value and write it out as a string.
             writeString(propertyValue.toString(), json, cfg);
         }else{

@@ -15,8 +15,10 @@
  */
 package org.kopitubruk.util.json;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -102,7 +104,8 @@ public class JSONReflectedClass implements Cloneable
     }
 
     /**
-     * Set the set of field names to reflect.
+     * Set the set of field names to reflect.  This silently discards
+     * any names that are not valid Java identifiers.
      *
      * @param fieldNames The list of field names to include in output.
      *            Internally, this gets converted to a {@link Set} which you can
@@ -113,8 +116,45 @@ public class JSONReflectedClass implements Cloneable
         if ( fieldNames == null ){
             this.fieldNames = null;
         }else{
-            this.fieldNames = new LinkedHashSet<String>(fieldNames);
+            List<String> ids = new ArrayList<String>(fieldNames.size());
+            for ( String id : fieldNames ){
+                if ( id != null ){
+                    String tid = id.trim();
+                    if ( isValidJavaIdentifier(tid) ){
+                        ids.add(tid);
+                    }
+                }
+            }
+            if ( ids.size() > 0 ){
+                this.fieldNames = new LinkedHashSet<String>(ids);
+            }else{
+                this.fieldNames = null;
+            }
         }
+    }
+
+    /**
+     * Return true if the given string is a valid Java identifier.
+     *
+     * @param id The identifier.
+     * @return true if the given string is a valid Java identifier.
+     */
+    private boolean isValidJavaIdentifier( String id )
+    {
+        int i = 0;
+        int len = id.length();
+        while ( i < len ){
+            int codePoint = id.codePointAt(i);
+            if ( i > 0 && Character.isJavaIdentifierPart(codePoint) ){
+                // OK
+            }else if ( i == 0 && Character.isJavaIdentifierStart(codePoint) ){
+                // OK
+            }else{
+                return false;
+            }
+            i += Character.charCount(codePoint);
+        }
+        return i > 0;
     }
 
     /*
