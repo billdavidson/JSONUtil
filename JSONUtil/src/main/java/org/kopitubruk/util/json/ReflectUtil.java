@@ -835,7 +835,7 @@ public class ReflectUtil
     }
 
     /**
-     * Return true if the given type or any of its super types or interfaces is
+     * Return true if the objTypes or any of its super types or interfaces is
      * the same as the given type.
      *
      * @param objType The type to check.
@@ -848,9 +848,12 @@ public class ReflectUtil
     }
 
     /**
-     * @param objTypes
-     * @param types
-     * @return
+     * Return true if the objTypes or any of its super types or interfaces is
+     * the same as the given types.
+     *
+     * @param objType The type to check.
+     * @param type The type to check against.
+     * @return true if there's a match.
      */
     private static boolean isType( Set<Class<?>> objTypes, Set<Class<?>> types )
     {
