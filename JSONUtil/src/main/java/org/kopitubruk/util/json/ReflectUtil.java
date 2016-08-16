@@ -105,27 +105,27 @@ public class ReflectUtil
     /**
      * Cache for fields.
      */
-    private static Map<Class<?>,Map<String,Field>> FIELDS;
+    private static volatile Map<Class<?>,Map<String,Field>> FIELDS;
 
     /**
      * Cache for getter methods.
      */
-    private static Map<Class<?>,Map<String,Method>> GETTER_METHODS;
+    private static volatile Map<Class<?>,Map<String,Method>> GETTER_METHODS;
 
     /**
      * The field-method compatibility cache.
      */
-    private static Map<Class<?>,Map<Field,Method>> FIELD_METHOD_COMPAT;
+    private static volatile Map<Class<?>,Map<Field,Method>> FIELD_METHOD_COMPAT;
 
     /**
      * The field-method incompatibility cache.
      */
-    private static Map<Class<?>,Map<Field,Method>> FIELD_METHOD_INCOMPAT;
+    private static volatile Map<Class<?>,Map<Field,Method>> FIELD_METHOD_INCOMPAT;
 
     /**
      * Minimum getter privacy level
      */
-    private static Map<Class<?>,Integer> MIN_GETTER_PRIVACY;
+    private static volatile Map<Class<?>,Integer> MIN_GETTER_PRIVACY;
 
     static {
         // needed for loading classes for reflection.
@@ -757,8 +757,6 @@ public class ReflectUtil
             return true;
         }else if ( isJSONMap(fieldType) && isJSONMap(fieldType) ){
             return true;
-        }else if ( isCharacter(fieldType) && isCharacter(retType) ){
-            return true;
         }
 
         return false;
@@ -805,7 +803,7 @@ public class ReflectUtil
      */
     private static boolean isCharSequence( Class<?> type )
     {
-        return isType(type, CharSequence.class);
+        return isType(type, CharSequence.class) || isCharacter(type);
     }
 
     /**

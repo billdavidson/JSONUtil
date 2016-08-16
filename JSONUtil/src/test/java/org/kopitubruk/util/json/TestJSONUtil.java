@@ -1522,6 +1522,7 @@ public class TestJSONUtil
         end = System.currentTimeMillis();
         s_log.debug("uncached: "+((end-start)/1000.0)+"s");
 
+        ReflectUtil.clearReflectionCache();
         cfg.setCacheReflectionData(true);
         start = System.currentTimeMillis();
         for ( int i = 0; i < interations; i++ ){
@@ -1555,6 +1556,7 @@ public class TestJSONUtil
         end = System.currentTimeMillis();
         s_log.debug("uncached: "+((end-start)/1000.0)+"s");
 
+        ReflectUtil.clearReflectionCache();
         cfg.setCacheReflectionData(true);
         start = System.currentTimeMillis();
         for ( int i = 0; i < interations; i++ ){
