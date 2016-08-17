@@ -35,7 +35,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.ResourceBundle;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,7 +44,6 @@ import javax.management.ObjectName;
 import javax.naming.Context;
 
 import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 /**
  * <p>
@@ -140,7 +138,9 @@ import org.apache.commons.logging.LogFactory;
  * The class names need to load with {@link ClassLoader#loadClass(String)} or
  * they will not be added to the list of reflected classes.  If the class
  * names are followed by a comma and strings separated by commas, those
- * strings will be taken as field names to use for {@link JSONReflectedClass}
+ * strings will be taken as field names to use for {@link JSONReflectedClass}.
+ * Field names which do not look like valid Java identifier names will be
+ * silently discarded.
  * These classes will be added to all JSONConfig objects that are created
  * in the same class loader.
  * <p>
@@ -184,8 +184,6 @@ import org.apache.commons.logging.LogFactory;
  */
 public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 {
-    private static Log s_log = null;
-
     // Default flag values.
     private static volatile boolean validatePropertyNames;
     private static volatile boolean detectDataStructureLoops;
@@ -227,6 +225,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     // logging.
     private static boolean logging;
 
+    // patterns for JNDI variable names.
     private static final Pattern DATE_PARSE_FORMAT_PAT = Pattern.compile("^dateParseFormat(\\d+)$");
     private static final Pattern REFLECT_CLASS_PAT = Pattern.compile("^reflectClass\\d+$");
 
@@ -319,9 +318,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 ReflectUtil.confirmPrivacyLevel(reflectionPrivacy, new JSONConfig());
             }catch ( JSONReflectionException ex ){
                 if ( logging ){
-                    ensureLogger();
-                    if ( s_log.isDebugEnabled() ){
-                        s_log.debug(ex.getLocalizedMessage(), ex);
+                    Log log = Logger.getLog();
+                    if ( log.isDebugEnabled() ){
+                        log.debug(ex.getLocalizedMessage(), ex);
                     }
                 }
                 reflectionPrivacy = ReflectUtil.PUBLIC;
@@ -329,10 +328,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         }catch ( Exception e ){
             // Nothing set in JNDI.  Use code defaults.  Not a problem.
             if ( logging ){
-                ensureLogger();
-                if ( s_log.isDebugEnabled() ){
+                Log log = Logger.getLog();
+                if ( log.isDebugEnabled() ){
                     ResourceBundle bundle = JSONUtil.getBundle(getLocale());
-                    s_log.debug(bundle.getString("badJNDIforConfig"), e);
+                    log.debug(bundle.getString("badJNDIforConfig"), e);
                 }
             }
         }
@@ -397,14 +396,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 String[] parts = ((String)value).split(",");
                 try{
                     Class<?> clazz = ReflectUtil.getClassByName(parts[0]);
-                    List<String> fields = null;
-                    if ( parts.length > 1 ){
-                        fields = new ArrayList<>(parts.length-1);
-                        for ( int i = 1; i < parts.length; i++ ){
-                            fields.add(parts[i]);
-                        }
-                    }
-                    classes.add(new JSONReflectedClass(clazz, fields));
+                    List<String> fieldNames = JSONConfigUtil.getFieldNames(parts);
+                    classes.add(new JSONReflectedClass(clazz, fieldNames));
                 }catch ( MBeanException e ){
                     // Not actually an MBean operation at this point.
                 }
@@ -477,31 +470,21 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             mBeanName = JMXUtil.getObjectName(jsonConfigDefaults, appName);
             mBeanServer.registerMBean(jsonConfigDefaults, mBeanName);
             if ( logging ){
-                ensureLogger();
-                if ( s_log.isDebugEnabled() ){
+                Log log = Logger.getLog();
+                if ( log.isDebugEnabled() ){
                     ResourceBundle bundle = JSONUtil.getBundle(getLocale());
-                    s_log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));
+                    log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));
                 }
             }
         }catch ( Exception e ){
             // No MBean server.  Not a problem.
             if ( logging ){
-                ensureLogger();
-                if ( s_log.isDebugEnabled() ){
+                Log log = Logger.getLog();
+                if ( log.isDebugEnabled() ){
                     ResourceBundle bundle = JSONUtil.getBundle(getLocale());
-                    s_log.debug(bundle.getString("couldntRegisterMBean"), e);
+                    log.debug(bundle.getString("couldntRegisterMBean"), e);
                 }
             }
-        }
-    }
-
-    /**
-     * Make sure that the logger is initialized.
-     */
-    private static synchronized void ensureLogger()
-    {
-        if ( s_log == null ){
-            s_log = LogFactory.getLog(JSONConfigDefaults.class);
         }
     }
 
@@ -651,18 +634,18 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
                 mBeanServer.unregisterMBean(mBeanName);
                 if ( logging ){
-                    ensureLogger();
-                    if ( s_log.isDebugEnabled() ){
+                    Log log = Logger.getLog();
+                    if ( log.isDebugEnabled() ){
                         ResourceBundle bundle = JSONUtil.getBundle(getLocale());
-                        s_log.debug(String.format(bundle.getString("unregistered"), mBeanName));
+                        log.debug(String.format(bundle.getString("unregistered"), mBeanName));
                     }
                 }
             }catch ( Exception e ){
                 if ( logging ){
-                    ensureLogger();
-                    if ( s_log.isErrorEnabled() ){
+                    Log log = Logger.getLog();
+                    if ( log.isErrorEnabled() ){
                         ResourceBundle bundle = JSONUtil.getBundle(getLocale());
-                        s_log.error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
+                        log.error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
                     }
                 }
             }finally{
@@ -1055,9 +1038,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             }
         }catch ( JSONReflectionException e ){
             if ( logging ){
-                ensureLogger();
-                if ( s_log.isErrorEnabled() ){
-                    s_log.error(e.getLocalizedMessage(), e);
+                Log log = Logger.getLog();
+                if ( log.isErrorEnabled() ){
+                    log.error(e.getLocalizedMessage(), e);
                 }
             }
             throw new MBeanException(e);   // MBeans should only throw MBeanExceptions.
@@ -1125,16 +1108,25 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Add the given class to the set of classes to be reflected.
+     * <p>
+     * Accessible via MBean server. This method primarily exists for JMX MBean
+     * use. If you wish to use reflection with fields, you can append the field
+     * names to the class name, separated by commas before each field name.
+     * Field names which do not look like valid Java identifier names will be
+     * silently discarded.
      *
-     * @param className The name of the class suitable for
-     * (@link {@link ClassLoader#loadClass(String)}}.
+     * @param className The name of the class suitable for {@link ClassLoader#loadClass(String)}
+     * followed optionally by a comma separated list of field names.
      * @throws MBeanException If there's a problem loading the class.
      * @since 1.9
      */
     @Override
     public void addReflectClassByName( String className ) throws MBeanException
     {
-        addReflectClass(ReflectUtil.getClassByName(className));
+        String[] parts = className.split(",");
+        Class<?> clazz = ReflectUtil.getClassByName(parts[0]);
+        List<String> fieldNames = JSONConfigUtil.getFieldNames(parts);
+        addReflectClass(new JSONReflectedClass(clazz, fieldNames));
     }
 
     /**
@@ -1247,10 +1239,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             for ( JSONReflectedClass refClass : refClasses ){
                 Class<?> clazz = refClass.getObjClass();
                 StringBuilder buf = new StringBuilder(clazz.getCanonicalName());
-                Set<String> fields = refClass.getFieldNames();
-                if ( fields != null && fields.size() > 0 ){
-                    for ( String field : fields ){
-                        buf.append(',').append(field);
+                String[] fieldNames = refClass.getFieldNamesRaw();
+                if ( fieldNames != null ){
+                    for ( String fieldName : fieldNames ){
+                        buf.append(',').append(fieldName);
                     }
                 }
                 classes.add(buf.toString());
