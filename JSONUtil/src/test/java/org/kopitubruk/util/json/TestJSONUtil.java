@@ -79,7 +79,7 @@ import jdk.nashorn.api.scripting.ScriptObjectMirror;
  */
 public class TestJSONUtil
 {
-    private static final Log s_log = Logger.getLog();
+    private static final Log s_log = Logger.getLog(TestJSONUtil.class);
 
     //private static SimpleDateFormat s_sdf;
 

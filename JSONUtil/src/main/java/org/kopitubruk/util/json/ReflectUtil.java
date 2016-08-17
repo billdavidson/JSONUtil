@@ -266,24 +266,12 @@ public class ReflectUtil
      *
      * @param className The name of the class.
      * @return The class object for that class.
-     * @throws MBeanException If there's an error loading the class.
+     * @throws ClassNotFoundException If there's an error loading the class.
      * @since 1.9
      */
-    static Class<?> getClassByName( String className ) throws MBeanException
+    static Class<?> getClassByName( String className ) throws ClassNotFoundException
     {
-        try{
-            return classLoader.loadClass(className);
-        }catch ( ClassNotFoundException e ){
-            ResourceBundle bundle = JSONUtil.getBundle(JSONConfigDefaults.getLocale());
-            String msg = String.format(bundle.getString("couldntLoadClass"), className);
-            if ( JSONConfigDefaults.isLogging() ){
-                Log log = Logger.getLog();
-                if ( log.isErrorEnabled() ){
-                    log.error(msg, e);
-                }
-            }
-            throw new MBeanException(e, msg);   // MBeans should only throw MBeanExceptions.
-        }
+        return classLoader.loadClass(className);
     }
 
     /**
