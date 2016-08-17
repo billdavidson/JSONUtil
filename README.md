@@ -15,6 +15,7 @@ and controlling the way that the JSON is generated.
 * Several different escaping options
 * Option to format dates on output and handle different formats when parsing
 * ECMAScript 6 code point escapes are supported for reading and optionally for writing
+* [Options to support arbitrary precision numbers](https://github.com/billdavidson/JSONUtil/wiki/Options-Which-Help-Support-Arbitrary-Precision-Arithmetic)
 * The default values for most configuration options can be changed.
 * [Most defaults can be set via JNDI](https://github.com/billdavidson/JSONUtil/wiki/Setting-Configuration-Defaults-Using-JNDI) (See the JSONConfigDefaults class)
 * [Most defaults can be read or modified via a JMX MBean client](https://github.com/billdavidson/JSONUtil/wiki/Viewing-and-Modifying-Configuration-Defaults-Using-a-JMX-MBean-Client)
