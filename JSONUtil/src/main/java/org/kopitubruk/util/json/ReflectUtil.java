@@ -21,7 +21,6 @@ import java.util.regex.Pattern;
 import javax.management.MBeanException;
 
 import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 /**
  * Some reflection utility constants to be used with
@@ -33,8 +32,10 @@ import org.apache.commons.logging.LogFactory;
  */
 public class ReflectUtil
 {
-    private static Log s_log = null;
-
+    /**
+     * This needs to be saved at class load time so that the correct class
+     * loader is used if someone tries to load a class via a JMX client.
+     */
     private static ClassLoader classLoader;
 
     /**
@@ -47,8 +48,8 @@ public class ReflectUtil
 
     /**
      * Reflection will attempt to serialize package private, protected and
-     * public fields or fields that have package private, protected or public get
-     * methods that conform to JavaBean naming conventions.
+     * public fields or fields that have package private, protected or public
+     * get methods that conform to JavaBean naming conventions.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -57,8 +58,8 @@ public class ReflectUtil
 
     /**
      * Reflection will attempt to serialize protected and public fields or
-     * fields that have protected or public get methods that conform to
-     * JavaBean naming conventions.
+     * fields that have protected or public get methods that conform to JavaBean
+     * naming conventions.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -66,9 +67,8 @@ public class ReflectUtil
     public static final int PROTECTED = 2;
 
     /**
-     * Reflection will attempt to serialize only fields that are public
-     * or have public get methods that conform to JavaBean naming
-     * conventions.
+     * Reflection will attempt to serialize only fields that are public or have
+     * public get methods that conform to JavaBean naming conventions.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -91,8 +91,14 @@ public class ReflectUtil
      */
     private static final Set<Class<?>> NUMBERS;
 
+    /**
+     * Boolean types.
+     */
     private static final Set<Class<?>> BOOLEANS;
 
+    /**
+     * String types.
+     */
     @SuppressWarnings("unchecked")
     private static final Set<Class<?>> STRINGS =
             new HashSet<Class<? extends Object>>(Arrays.asList(CharSequence.class, Character.class, Character.TYPE));
@@ -136,7 +142,7 @@ public class ReflectUtil
     private static volatile Map<Class<?>,Integer> MIN_GETTER_PRIVACY;
 
     static {
-        // needed for loading classes for reflection.
+        // needed for loading classes via JMX MBean client.
         classLoader = ReflectUtil.class.getClassLoader();
         clearReflectionCache();
 
@@ -236,16 +242,6 @@ public class ReflectUtil
     }
 
     /**
-     * Make sure that the logger is initialized.
-     */
-    private static synchronized void ensureLogger()
-    {
-        if ( s_log == null ){
-            s_log = LogFactory.getLog(ReflectUtil.class);
-        }
-    }
-
-    /**
      * Get the class of the given object or the object if it's a class object.
      *
      * @param obj The object
@@ -301,9 +297,9 @@ public class ReflectUtil
             ResourceBundle bundle = JSONUtil.getBundle(JSONConfigDefaults.getLocale());
             String msg = String.format(bundle.getString("couldntLoadClass"), className);
             if ( JSONConfigDefaults.isLogging() ){
-                ensureLogger();
-                if ( s_log.isErrorEnabled() ){
-                    s_log.error(msg, e);
+                Log log = Logger.getLog();
+                if ( log.isErrorEnabled() ){
+                    log.error(msg, e);
                 }
             }
             throw new MBeanException(e, msg);   // MBeans should only throw MBeanExceptions.
@@ -342,10 +338,10 @@ public class ReflectUtil
         String name = "getReflectedObject";
         try {
             JSONReflectedClass refClass = cfg.ensureReflectedClass(propertyValue);
-            Set<String> fieldNames = refClass.getFieldNames();
+            String[] fieldNames = refClass.getFieldNamesRaw();
             Class<?> clazz = refClass.getObjClass();
 
-            if ( fieldNames == null || fieldNames.size() < 1 ){
+            if ( fieldNames == null ){
                 // no field names specified
                 int privacyLevel = cfg.getReflectionPrivacy();
                 boolean isNotPrivate = privacyLevel != PRIVATE;
@@ -357,7 +353,7 @@ public class ReflectUtil
                         continue;       // ignore static and transient fields.
                     }
                     name = field.getName();
-                    Method getter = getGetter(clazz, getterMethods, field, name, cfg);
+                    Method getter = getGetter(clazz, getterMethods, field, name, cfg.getReflectionPrivacy(), cfg);
                     if ( getter != null ){
                         // prefer the argumentless getter over direct access.
                         ensureAccessible(getter);
@@ -378,7 +374,7 @@ public class ReflectUtil
                 for ( String fieldName : fieldNames ){
                     name = fieldName;
                     Field field = fields.get(name);
-                    Method getter = getGetter(clazz, getterMethods, field, name, cfg);
+                    Method getter = getGetter(clazz, getterMethods, field, name, PRIVATE, cfg);
                     if ( getter != null ){
                         // prefer the argumentless getter over direct access.
                         ensureAccessible(getter);
@@ -388,6 +384,7 @@ public class ReflectUtil
                         ensureAccessible(field);
                         obj.put(name, field.get(propertyValue));
                     }else{
+                        // no getter and no field with that name.
                         throw new JSONReflectionException(propertyValue, name, cfg);
                     }
                 }
@@ -507,7 +504,7 @@ public class ReflectUtil
     static Method getSetter( Class<?> clazz, Field field )
     {
         String fieldName = field.getName();
-        String setterName = makeSetterName(fieldName);
+        String setterName = makeBeanMethodName(fieldName,"set");
 
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
@@ -552,8 +549,9 @@ public class ReflectUtil
                 }else{
                     Map<Class<?>,Integer> minGetterCache = getMinGetterCache();
                     Integer minGetter = minGetterCache.get(clazz);
-                    boolean noGetterPrivacy = minGetter == null;
-                    if ( !noGetterPrivacy && privacyLevel <= minGetter ){
+                    boolean getterPrivacy = minGetter != null;
+                    boolean noGetterPrivacy = ! getterPrivacy;
+                    if ( getterPrivacy && privacyLevel <= minGetter ){
                         return methodCache;
                     }
                     int g = 0;
@@ -586,33 +584,39 @@ public class ReflectUtil
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
             for ( Method method : tmpClass.getDeclaredMethods() ){
-                String name = method.getName();
+                if ( method.getParameterTypes().length != 0 ){
+                    continue;
+                }
                 Class<?> retType = method.getReturnType();
-                if ( method.getParameterTypes().length == 0 && ! getterMethods.containsKey(name) &&
-                        ! Void.TYPE.equals(retType) && GETTER.matcher(name).matches() ){
-                    if ( name.startsWith("is") && ! (Boolean.class.equals(retType) || Boolean.TYPE.equals(retType)) ){
-                        continue;   // "is" prefix only valid getter for booleans.
-                    }
-                    if ( isPrivate ){
-                        getterMethods.put(name, method);
-                        if ( cacheMethods ){
-                            int getterLevel = getLevel(method.getModifiers());
-                            if ( getterLevel < minPrivacy ){
-                                minPrivacy = getterLevel;
-                            }
-                        }
-                    }else{
+                if ( Void.TYPE.equals(retType) ){
+                    continue;
+                }
+                String name = method.getName();
+                if ( getterMethods.containsKey(name) || ! GETTER.matcher(name).matches() ){
+                    continue;
+                }
+                if ( name.startsWith("is") && ! BOOLEANS.contains(retType) ){
+                    continue;   // "is" prefix only valid getter for booleans.
+                }
+                if ( isPrivate ){
+                    getterMethods.put(name, method);
+                    if ( cacheMethods ){
                         int getterLevel = getLevel(method.getModifiers());
-                        if ( getterLevel >= privacyLevel ){
-                            getterMethods.put(name, method);
-                            ++g;
+                        if ( getterLevel < minPrivacy ){
+                            minPrivacy = getterLevel;
                         }
-                        if ( cacheMethods ){
-                            methodCache.put(name, method);
-                            ++m;
-                            if ( getterLevel < minPrivacy ){
-                                minPrivacy = getterLevel;
-                            }
+                    }
+                }else{
+                    int getterLevel = getLevel(method.getModifiers());
+                    if ( getterLevel >= privacyLevel ){
+                        getterMethods.put(name, method);
+                        ++g;
+                    }
+                    if ( cacheMethods ){
+                        methodCache.put(name, method);
+                        ++m;
+                        if ( getterLevel < minPrivacy ){
+                            minPrivacy = getterLevel;
                         }
                     }
                 }
@@ -633,13 +637,14 @@ public class ReflectUtil
      * Get the getter for the given field.
      *
      * @param clazz The class for this field and getter.
-     * @param getterMethods The available getter methods.
+     * @param getterMethods The available getter methods at the current privacy level.
      * @param field The field
      * @param name The field name.
+     * @param privacyLevel the privacy level.
      * @param cfg The config object.
      * @return The getter or null if one cannot be found.
      */
-    private static Method getGetter( Class<?> clazz, Map<String,Method> getterMethods, Field field, String name, JSONConfig cfg )
+    private static Method getGetter( Class<?> clazz, Map<String,Method> getterMethods, Field field, String name, int privacyLevel, JSONConfig cfg )
     {
         boolean cacheReflectionData = cfg.isCacheReflectionData();
 
@@ -651,8 +656,9 @@ public class ReflectUtil
                 Map<Field,Method> compat = compatCache.get(clazz);
                 getter = compat != null ? compat.get(field) : null;
             }
-            if ( getter != null && getterMethods.containsKey(getter.getName()) ){
-                return getter;
+            if ( getter != null ){
+                // check privacy level and return null if level not met.
+                return privacyLevel == PRIVATE ? getter : getterMethods.get(getter.getName());
             }
             Map<Class<?>,Map<Field,Method>> incompatCache = getFieldMethodIncompat();
             synchronized ( incompatCache ){
@@ -664,9 +670,9 @@ public class ReflectUtil
             }
         }
 
-        Method getter = getterMethods.get(makeGetterName(name));
+        Method getter = getterMethods.get(makeBeanMethodName(name,"get"));
         if ( getter == null ){
-            getter = getterMethods.get(makeIsName(name));
+            getter = getterMethods.get(makeBeanMethodName(name,"is"));
         }
         if ( field == null || getter == null ){
             return getter;
@@ -699,39 +705,6 @@ public class ReflectUtil
         }
 
         return isCompatible ? getter : null;
-    }
-
-    /**
-     * Make a JavaBeans getter name from a field name.
-     *
-     * @param fieldName the field name.
-     * @return the getter name.
-     */
-    private static String makeGetterName( String fieldName )
-    {
-        return makeBeanMethodName(fieldName, "get");
-    }
-
-    /**
-     * Make a JavaBeans "is" getter name from a field name.
-     *
-     * @param fieldName the field name.
-     * @return the "is" getter name.
-     */
-    private static String makeIsName( String fieldName )
-    {
-        return makeBeanMethodName(fieldName, "is");
-    }
-
-    /**
-     * Make a JavaBeans setter name from a field name.
-     *
-     * @param fieldName the field name.
-     * @return the setter name.
-     */
-    private static String makeSetterName( String fieldName )
-    {
-        return makeBeanMethodName(fieldName, "set");
     }
 
     /**

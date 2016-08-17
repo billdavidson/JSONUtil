@@ -15,10 +15,8 @@
  */
 package org.kopitubruk.util.json;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -57,7 +55,7 @@ import java.util.Set;
 public class JSONReflectedClass implements Cloneable
 {
     private Class<?> objClass;
-    private Set<String> fieldNames;
+    private String[] fieldNames;
 
     /**
      * Create a new JSONReflectedClass
@@ -94,42 +92,65 @@ public class JSONReflectedClass implements Cloneable
     }
 
     /**
-     * Get the set of field names to reflect.
+     * Get a copy of the set of field names to reflect. Modifications to the
+     * returned {@link Set} will not affect reflection. You must use
+     * {@link #setFieldNames(Collection)} in order to change the set of field
+     * names to reflect for this object.
      *
-     * @return the names of the fields to reflect.
+     * @return a copy of the list of field names to reflect.
      */
     public Set<String> getFieldNames()
+    {
+        if ( fieldNames == null ){
+            return null;
+        }
+        Set<String> result = new LinkedHashSet<String>(fieldNames.length);
+        for ( String fieldName : fieldNames ){
+            result.add(fieldName);
+        }
+        return result;
+    }
+
+    /**
+     * Package private version of {@link #getFieldNames()} that gives direct
+     * access for performance. The methods that use this are smart enough to not
+     * modify the array, which is effectively internally immutable once it is
+     * created. It can only be replaced entirely -- not modified. That way any
+     * changes will have to go through validation to be changed while normal
+     * performance is maximized because there is no need to revalidate the
+     * contents after the call to {@link #setFieldNames(Collection)}
+     *
+     * @return the list of field names to reflect.
+     */
+    String[] getFieldNamesRaw()
     {
         return fieldNames;
     }
 
     /**
-     * Set the set of field names to reflect.  This silently discards
-     * any names that are not valid Java identifiers.
+     * Set the set of field names to reflect. This silently discards any names
+     * that are not valid Java identifiers.
      *
-     * @param fieldNames The list of field names to include in output.
-     *            Internally, this gets converted to a {@link Set} which you can
-     *            access via {@link #getFieldNames()}.
+     * @param fieldNames The field names to include in reflected JSON output.
      */
     public void setFieldNames( Collection<String> fieldNames )
     {
         if ( fieldNames == null ){
             this.fieldNames = null;
         }else{
-            List<String> ids = new ArrayList<String>(fieldNames.size());
+            // the LinkedHashSet preserves order and removes dups.
+            Set<String> ids = new LinkedHashSet<String>(fieldNames.size());
             for ( String id : fieldNames ){
                 if ( id != null ){
-                    String tid = id.trim();
+                    String tid = id.trim();     // ignore whitespace, if any.
                     if ( isValidJavaIdentifier(tid) ){
                         ids.add(tid);
                     }
+                    // else invalid identifiers are silently discarded.
                 }
+                // else null is silently discarded.
             }
-            if ( ids.size() > 0 ){
-                this.fieldNames = new LinkedHashSet<String>(ids);
-            }else{
-                this.fieldNames = null;
-            }
+            this.fieldNames = ids.size() > 0 ? ids.toArray(new String[ids.size()]) : null;
         }
     }
 
@@ -166,7 +187,7 @@ public class JSONReflectedClass implements Cloneable
     public JSONReflectedClass clone()
     {
         JSONReflectedClass result = new JSONReflectedClass(objClass, null);
-        result.fieldNames = fieldNames == null ? null : new LinkedHashSet<String>(fieldNames);
+        result.fieldNames = fieldNames;
         return result;
     }
 
