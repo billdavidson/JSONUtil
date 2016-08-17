@@ -82,75 +82,6 @@ class JNDIUtil
     }
 
     /**
-     * Shorthand for doing JNDI lookups.
-     *
-     * @param ctx The context.
-     * @param name The name to look up.
-     * @param defaultValue The result if you don't find it.
-     * @return The value of the variable being looked up or defaultValue if not found.
-     */
-    static boolean getBoolean( Context ctx, String name, boolean defaultValue )
-    {
-        Object obj = getObject(ctx, name);
-        return obj instanceof Boolean ? (Boolean)obj : defaultValue;
-    }
-
-    /**
-     * Shorthand for doing JNDI lookups.
-     *
-     * @param ctx The context.
-     * @param name The name to look up.
-     * @param defaultValue The result if you don't find it.
-     * @return The value of the variable being looked up or defaultValue if not found.
-     */
-    static int getInt( Context ctx, String name, int defaultValue )
-    {
-        Object obj = getObject(ctx, name);
-        return obj instanceof Integer ? (Integer)obj : defaultValue;
-    }
-
-    /**
-     * Shorthand for doing JNDI lookups.
-     *
-     * @param ctx The context.
-     * @param name The name to look up.
-     * @param defaultValue The result if you don't find it.
-     * @return The value of the variable being looked up or defaultValue if not found.
-     */
-    static String getString( Context ctx, String name, String defaultValue )
-    {
-        Object obj = getObject(ctx, name);
-        return obj instanceof String ? (String)obj : defaultValue;
-    }
-
-    /**
-     * Shorthand for doing JNDI lookups.  I prefer to return null for
-     * things that aren't set rather than catch an exception every
-     * time in other code.
-     *
-     * @param ctx The context.
-     * @param name The name to look up.
-     * @return The value of the variable being looked up or null if not found.
-     */
-    static Object getObject( Context ctx, String name )
-    {
-        Object obj;
-
-        try{
-            obj = ctx.lookup(name);
-            if ( logging && obj != null ){
-                Log log = Logger.getLog();
-                if ( log.isDebugEnabled() ){
-                    log.debug(name+" = "+obj);
-                }
-            }
-        }catch ( NamingException e ){
-            obj = null;
-        }
-        return obj;
-    }
-
-    /**
      * Get all JNDI data for the given context.
      *
      * @param ctx The context.
@@ -162,20 +93,33 @@ class JNDIUtil
         Map<String,Object> jndiVariables = new HashMap<String,Object>();
         NamingEnumeration<Binding> bindings = ctx.listBindings("");
 
+        Log log = null;
+        boolean doLogging = logging;
+        if ( doLogging ){
+            log = Logger.getLog(JNDIUtil.class);
+            doLogging = log.isDebugEnabled();
+            if ( ! doLogging ){
+                Logger.freeLog(JNDIUtil.class);
+                log = null;
+            }
+        }
+
         while ( bindings.hasMore() ){
             Binding binding = bindings.next();
             String name = binding.getName();
             Object obj = binding.getObject();
             if ( obj != null ){
-                if ( logging ){
-                    Log log = Logger.getLog();
-                    if ( log.isDebugEnabled() ){
-                        log.debug(name+" = "+obj);
-                    }
+                if ( doLogging ){
+                    log.debug(name+" = "+obj);
                 }
                 jndiVariables.put(name, obj);
             }
         }
+
+        if ( doLogging ){
+            Logger.freeLog(JNDIUtil.class);
+        }
+
         return jndiVariables;
     }
 
