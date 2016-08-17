@@ -16,10 +16,6 @@ import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import javax.management.MBeanException;
-
-import org.apache.commons.logging.Log;
-
 /**
  * Some reflection utility constants to be used with
  * {@link JSONConfig#setReflectionPrivacy(int)} and

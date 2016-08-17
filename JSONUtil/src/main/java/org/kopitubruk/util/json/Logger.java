@@ -36,6 +36,7 @@ class Logger
             }else{
                 log = LogFactory.getLog(clazz);
             }
+            LOGGERS.put(clazz, log);
         }
         return log;
     }

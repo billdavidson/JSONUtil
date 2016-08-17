@@ -407,7 +407,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                         Log log = Logger.getLog(jsonConfigDefaults.getClass());
                         if ( log.isDebugEnabled() ){
                             ResourceBundle bundle = JSONUtil.getBundle(JSONConfigDefaults.getLocale());
-                            String msg = String.format(bundle.getString("couldntAddClass"), parts[0]);
+                            String msg = String.format(bundle.getString("couldntLoadClass"), parts[0]);
                             log.debug(msg, e);
                         }
                     }
@@ -1142,7 +1142,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             addReflectClass(new JSONReflectedClass(clazz, fieldNames));
         }catch ( ClassNotFoundException e ){
             ResourceBundle bundle = JSONUtil.getBundle(JSONConfigDefaults.getLocale());
-            String msg = String.format(bundle.getString("couldntAddClass"), className);
+            String msg = String.format(bundle.getString("couldntLoadClass"), className);
             if ( logging ){
                 Log log = Logger.getLog(jsonConfigDefaults.getClass());
                 if ( log.isErrorEnabled() ){
@@ -1195,7 +1195,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             removeReflectClass(ReflectUtil.getClassByName(className));
         }catch ( ClassNotFoundException e ){
             ResourceBundle bundle = JSONUtil.getBundle(JSONConfigDefaults.getLocale());
-            String msg = String.format(bundle.getString("couldntAddClass"), className);
+            String msg = String.format(bundle.getString("couldntLoadClass"), className);
             if ( logging ){
                 Log log = Logger.getLog(jsonConfigDefaults.getClass());
                 if ( log.isErrorEnabled() ){

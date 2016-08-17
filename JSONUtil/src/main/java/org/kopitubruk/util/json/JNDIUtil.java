@@ -100,6 +100,7 @@ class JNDIUtil
             doLogging = log.isDebugEnabled();
             if ( ! doLogging ){
                 Logger.freeLog(JNDIUtil.class);
+                log = null;
             }
         }
 
