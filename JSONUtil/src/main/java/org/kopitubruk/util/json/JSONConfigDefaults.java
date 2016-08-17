@@ -393,6 +393,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      */
     private static void loadReflectClassesFromJNDI( Map<String,Object> jndiData )
     {
+        Log log = null;
         List<JSONReflectedClass> classes = new ArrayList<>();
         for ( Entry<String,Object> entry : jndiData.entrySet() ){
             Object value = entry.getValue();
@@ -404,11 +405,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                     classes.add(new JSONReflectedClass(clazz, fieldNames));
                 }catch ( ClassNotFoundException e ){
                     if ( logging ){
-                        Log log = Logger.getLog(jsonConfigDefaults.getClass());
+                        if ( log == null ){
+                            log = Logger.getLog(jsonConfigDefaults.getClass());
+                        }
                         if ( log.isDebugEnabled() ){
-                            ResourceBundle bundle = JSONUtil.getBundle(JSONConfigDefaults.getLocale());
-                            String msg = String.format(bundle.getString("couldntLoadClass"), parts[0]);
-                            log.debug(msg, e);
+                            log.debug(getClassNotFoundExceptionMsg(e, parts[0], false), e);
                         }
                     }
                 }
@@ -1141,16 +1142,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             List<String> fieldNames = JSONConfigUtil.getFieldNames(parts);
             addReflectClass(new JSONReflectedClass(clazz, fieldNames));
         }catch ( ClassNotFoundException e ){
-            ResourceBundle bundle = JSONUtil.getBundle(JSONConfigDefaults.getLocale());
-            String msg = String.format(bundle.getString("couldntLoadClass"), className);
-            if ( logging ){
-                Log log = Logger.getLog(jsonConfigDefaults.getClass());
-                if ( log.isErrorEnabled() ){
-                    log.error(msg, e);
-                }
-                Logger.freeLog(jsonConfigDefaults.getClass());
-            }
-            throw new MBeanException(e, msg);   // MBeans should only throw MBeanExceptions.
+            throw new MBeanException(e, getClassNotFoundExceptionMsg(e, parts[0], logging));
         }
     }
 
@@ -1191,20 +1183,35 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void removeReflectClassByName( String className ) throws MBeanException
     {
+        String[] parts = className.split(",");
         try{
-            removeReflectClass(ReflectUtil.getClassByName(className));
+            removeReflectClass(ReflectUtil.getClassByName(parts[0]));
         }catch ( ClassNotFoundException e ){
-            ResourceBundle bundle = JSONUtil.getBundle(JSONConfigDefaults.getLocale());
-            String msg = String.format(bundle.getString("couldntLoadClass"), className);
-            if ( logging ){
-                Log log = Logger.getLog(jsonConfigDefaults.getClass());
-                if ( log.isErrorEnabled() ){
-                    log.error(msg, e);
-                }
-                Logger.freeLog(jsonConfigDefaults.getClass());
-            }
-            throw new MBeanException(e, msg);   // MBeans should only throw MBeanExceptions.
+            throw new MBeanException(e, getClassNotFoundExceptionMsg(e, parts[0], logging));
         }
+    }
+
+    /**
+     * Get the exception message for a {@link ClassNotFoundException} and log the
+     * exception if appropriate.
+     *
+     * @param e the exception.
+     * @param className the class name that it failed to load.
+     * @param isLogging if true then also log the message and exception.
+     * @return The message.
+     */
+    private static String getClassNotFoundExceptionMsg( ClassNotFoundException e, String className, boolean isLogging )
+    {
+        ResourceBundle bundle = JSONUtil.getBundle(JSONConfigDefaults.getLocale());
+        String msg = String.format(bundle.getString("couldntLoadClass"), className);
+        if ( isLogging ){
+            Log log = Logger.getLog(jsonConfigDefaults.getClass());
+            if ( log.isErrorEnabled() ){
+                log.error(msg, e);
+            }
+            Logger.freeLog(jsonConfigDefaults.getClass());
+        }
+        return msg;
     }
 
     /**
