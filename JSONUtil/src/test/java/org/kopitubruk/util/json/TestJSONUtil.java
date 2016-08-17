@@ -54,7 +54,6 @@ import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
 import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -80,7 +79,7 @@ import jdk.nashorn.api.scripting.ScriptObjectMirror;
  */
 public class TestJSONUtil
 {
-    private static Log s_log = LogFactory.getLog(TestJSONUtil.class);
+    private static final Log s_log = Logger.getLog();
 
     //private static SimpleDateFormat s_sdf;
 

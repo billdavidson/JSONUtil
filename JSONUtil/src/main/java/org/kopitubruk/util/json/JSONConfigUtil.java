@@ -244,6 +244,25 @@ class JSONConfigUtil
     }
 
     /**
+     * Return a list of fields from a string array for a class being loaded by name.
+     *
+     * @param parts The array of parts from the original string.
+     * @return the fields or null if there aren't any.
+     * @since 1.9.1
+     */
+    static List<String> getFieldNames( String[] parts )
+    {
+        List<String> fields = null;
+        if ( parts.length > 1 ){
+            fields = new ArrayList<>(parts.length-1);
+            for ( int i = 1; i < parts.length; i++ ){
+                fields.add(parts[i]);
+            }
+        }
+        return fields;
+    }
+
+    /**
      * This class should never be instantiated.
      */
     private JSONConfigUtil()
