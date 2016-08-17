@@ -25,7 +25,6 @@ import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 
 import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 /**
  * Just a little shorthand for JNDI, used by other classes in the package.
@@ -36,23 +35,15 @@ import org.apache.commons.logging.LogFactory;
  */
 class JNDIUtil
 {
-    private static Log s_log = null;
-
-    private static boolean logging = true;
+    private static boolean logging;
 
     private static final String ENV_CONTEXT = "java:/comp/env";
 
     private static final String TOMCAT_URL_PREFIXES = "org.apache.naming";
     private static final String TOMCAT_CONTEXT_FACTORY = ".java.javaURLContextFactory";
 
-    /**
-     * Make sure that the logger is initialized.
-     */
-    private static synchronized void ensureLogger()
-    {
-        if ( s_log == null ){
-            s_log = LogFactory.getLog(JNDIUtil.class);
-        }
+    static {
+        logging = Boolean.parseBoolean(System.getProperty(JNDIUtil.class.getPackage().getName()+'.'+"logging", "true"));
     }
 
     /**
@@ -148,9 +139,9 @@ class JNDIUtil
         try{
             obj = ctx.lookup(name);
             if ( logging && obj != null ){
-                ensureLogger();
-                if ( s_log.isDebugEnabled() ){
-                    s_log.debug(name+" = "+obj);
+                Log log = Logger.getLog();
+                if ( log.isDebugEnabled() ){
+                    log.debug(name+" = "+obj);
                 }
             }
         }catch ( NamingException e ){
@@ -170,8 +161,6 @@ class JNDIUtil
     {
         Map<String,Object> jndiVariables = new HashMap<String,Object>();
         NamingEnumeration<Binding> bindings = ctx.listBindings("");
-        boolean needLogger = true;
-        boolean debug = false;
 
         while ( bindings.hasMore() ){
             Binding binding = bindings.next();
@@ -179,13 +168,9 @@ class JNDIUtil
             Object obj = binding.getObject();
             if ( obj != null ){
                 if ( logging ){
-                    if ( needLogger ){
-                        ensureLogger();
-                        needLogger = false;
-                        debug = s_log.isDebugEnabled();
-                    }
-                    if ( debug ){
-                        s_log.debug(name+" = "+obj);
+                    Log log = Logger.getLog();
+                    if ( log.isDebugEnabled() ){
+                        log.debug(name+" = "+obj);
                     }
                 }
                 jndiVariables.put(name, obj);
