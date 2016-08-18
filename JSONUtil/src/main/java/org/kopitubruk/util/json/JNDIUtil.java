@@ -93,31 +93,33 @@ class JNDIUtil
         Map<String,Object> jndiVariables = new HashMap<String,Object>();
         NamingEnumeration<Binding> bindings = ctx.listBindings("");
 
-        Log log = null;
-        boolean doLogging = logging;
-        if ( doLogging ){
-            log = Logger.getLog(JNDIUtil.class);
-            doLogging = log.isDebugEnabled();
-            if ( ! doLogging ){
-                Logger.freeLog(JNDIUtil.class);
-                log = null;
-            }
-        }
-
-        while ( bindings.hasMore() ){
-            Binding binding = bindings.next();
-            String name = binding.getName();
-            Object obj = binding.getObject();
-            if ( obj != null ){
-                if ( doLogging ){
-                    log.debug(name+" = "+obj);
+        if ( bindings.hasMore() ){
+            Log log = null;
+            boolean doLogging = logging;
+            if ( doLogging ){
+                log = Logger.getLog(JNDIUtil.class);
+                doLogging = log.isDebugEnabled();
+                if ( ! doLogging ){
+                    Logger.freeLog(JNDIUtil.class);
+                    log = null;
                 }
-                jndiVariables.put(name, obj);
             }
-        }
 
-        if ( doLogging ){
-            Logger.freeLog(JNDIUtil.class);
+            while ( bindings.hasMore() ){
+                Binding binding = bindings.next();
+                String name = binding.getName();
+                Object obj = binding.getObject();
+                if ( obj != null ){
+                    if ( doLogging ){
+                        log.debug(name+" = "+obj);
+                    }
+                    jndiVariables.put(name, obj);
+                }
+            }
+
+            if ( doLogging ){
+                Logger.freeLog(JNDIUtil.class);
+            }
         }
 
         return jndiVariables;
@@ -135,19 +137,6 @@ class JNDIUtil
     {
         Object value = jndiVariables.get(name);
         return value instanceof Boolean ? (Boolean)value : defaultValue;
-    }
-
-    /**
-     * Get a boolean from a map or null if it's not there.
-     *
-     * @param jndiVariables A map of JNDI variables to look things up.
-     * @param name The name to look up.
-     * @return The value or the default if the value isn't in the map.
-     */
-    static Boolean getBoolean( Map<String,Object> jndiVariables, String name )
-    {
-        Object value = jndiVariables.get(name);
-        return value instanceof Boolean ? (Boolean)value : null;
     }
 
     /**
@@ -175,7 +164,7 @@ class JNDIUtil
     static int getInt( Map<String,Object> jndiVariables, String name, int defaultValue )
     {
         Object value = jndiVariables.get(name);
-        return value instanceof String ? (Integer)value : defaultValue;
+        return value instanceof Integer ? (Integer)value : defaultValue;
     }
 
     /**
