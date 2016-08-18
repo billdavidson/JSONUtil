@@ -27,7 +27,6 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -102,7 +101,7 @@ public class JSONParser
     /**
      * Recognize literals
      */
-    private static final Pattern LITERAL_PAT = Pattern.compile("^(null|true|false)$");
+    static final Pattern LITERAL_PAT = Pattern.compile("^(null|true|false)$");
 
     /**
      * Recognize octal
@@ -113,24 +112,24 @@ public class JSONParser
      * Recognize unquoted id's.  They must conform to the ECMAScript 6 standard.
      * Id's which do not conform must be quoted.
      */
-    private static final Pattern UNQUOTED_ID_PAT = JSONUtil.VALID_ECMA6_PROPERTY_NAME_PAT;
+    static final Pattern UNQUOTED_ID_PAT = JSONUtil.VALID_ECMA6_PROPERTY_NAME_PAT;
 
     /**
      * Recognize Javascript floating point.
      */
-    private static final Pattern JAVASCRIPT_FLOATING_POINT_PAT =
+    static final Pattern JAVASCRIPT_FLOATING_POINT_PAT =
             Pattern.compile("^((?:[-+]?(?:(?:\\d+\\.\\d+|\\.\\d+)(?:[eE][-+]?\\d+)?|Infinity))|NaN)$");
 
     /**
      * Recognize Javascript integers.
      */
-    private static final Pattern JAVASCRIPT_INTEGER_PAT =
+    static final Pattern JAVASCRIPT_INTEGER_PAT =
             Pattern.compile("^([-+]?(?:\\d+|0[xX][\\da-fA-F]+))$");
 
     /**
      * Recognize an embedded new Date().
      */
-    private static final Pattern NEW_DATE_PAT = Pattern.compile("^(new\\s+Date\\s*\\(\\s*('[^']+'|\"[^\"]+\")\\s*\\))$");
+    static final Pattern NEW_DATE_PAT = Pattern.compile("^(new\\s+Date\\s*\\(\\s*('[^']+'|\"[^\"]+\")\\s*\\))$");
 
     /**
      * Maximum possible significant digits in a 32 bit floating point number.
@@ -169,7 +168,7 @@ public class JSONParser
     /**
      * Trivial class to hold a token from the JSON input string.
      */
-    private static class Token
+    static class Token
     {
         TokenType tokenType;
         String value;
@@ -241,7 +240,7 @@ public class JSONParser
     {
         JSONConfig jcfg = cfg == null ? new JSONConfig() : cfg;
 
-        TokenReader tokens = new TokenReader(json, jcfg);
+        JSONTokenReader tokens = new JSONTokenReader(json, jcfg);
         try {
             return parseTokens(tokens.nextToken(), tokens);
         }catch ( JSONException|IOException e ){
@@ -253,7 +252,7 @@ public class JSONParser
 
     /**
      * Parse the tokens from the input stream.  This method is recursive
-     * via the {@link #getValue(Token, TokenReader)} method.
+     * via the {@link #getValue(Token, JSONTokenReader)} method.
      *
      * @param token The current token to work on.
      * @param tokens The token reader.
@@ -261,7 +260,7 @@ public class JSONParser
      * @throws IOException If there's a problem with I/O.
      * @throws ParseException If there's a problem parsing dates.
      */
-    private static Object parseTokens( Token token, TokenReader tokens ) throws IOException, ParseException
+    private static Object parseTokens( Token token, JSONTokenReader tokens ) throws IOException, ParseException
     {
         if ( token == null ){
             return null;
@@ -278,22 +277,23 @@ public class JSONParser
 
     /**
      * Parse the tokens from the input stream for an object.  This method is recursive
-     * via the {@link #getValue(Token, TokenReader)} method.
+     * via the {@link #getValue(Token, JSONTokenReader)} method.
      *
      * @param tokens The token reader.
      * @return the object that results from parsing.
      * @throws IOException If there's a problem with I/O.
      * @throws ParseException If there's a problem parsing dates.
      */
-    private static Map<?,?> parseObject( TokenReader tokens ) throws IOException, ParseException
+    private static Map<?,?> parseObject( JSONTokenReader tokens ) throws IOException, ParseException
     {
         Map<String,Object> map = new LinkedHashMap<>();
+        JSONConfig cfg = tokens.getJSONConfig();
         Token token = tokens.nextToken();
         while ( token != null ){
             // need an identifier
             if ( token.tokenType == TokenType.STRING || token.tokenType == TokenType.UNQUOTED_ID ){
                 // got an identifier.
-                String key = CodePointData.unEscape(token.value, tokens.cfg);
+                String key = CodePointData.unEscape(token.value, cfg);
                 // need a colon
                 token = tokens.nextToken();
                 if ( token.tokenType == TokenType.COLON ){
@@ -301,12 +301,12 @@ public class JSONParser
                     token = tokens.nextToken();
                     map.put(key, getValue(token, tokens));
                 }else{
-                    throw new JSONParserException(TokenType.COLON, token.tokenType, tokens.cfg);
+                    throw new JSONParserException(TokenType.COLON, token.tokenType, cfg);
                 }
             }else if ( token.tokenType == TokenType.END_OBJECT ){
                 break;                                  // empty object; break out of loop.
             }else{
-                throw new JSONParserException(TokenType.END_OBJECT, token.tokenType, tokens.cfg);
+                throw new JSONParserException(TokenType.END_OBJECT, token.tokenType, cfg);
             }
             token = tokens.nextToken();
             if ( token.tokenType == TokenType.END_OBJECT ){
@@ -314,7 +314,7 @@ public class JSONParser
             }else if ( token.tokenType == TokenType.COMMA ){
                 token = tokens.nextToken();             // next field.
             }else{
-                throw new JSONParserException(TokenType.END_OBJECT, token.tokenType, tokens.cfg);
+                throw new JSONParserException(TokenType.END_OBJECT, token.tokenType, cfg);
             }
         }
         // minimize memory usage.
@@ -323,16 +323,17 @@ public class JSONParser
 
     /**
      * Parse the tokens from the input stream for an array.  This method is recursive
-     * via the {@link #getValue(Token, TokenReader)} method.
+     * via the {@link #getValue(Token, JSONTokenReader)} method.
      *
      * @param tokens The token reader.
      * @return the object that results from parsing.
      * @throws IOException If there's a problem with I/O.
      * @throws ParseException If there's a problem parsing dates.
      */
-    private static Object parseArray( TokenReader tokens ) throws IOException, ParseException
+    private static Object parseArray( JSONTokenReader tokens ) throws IOException, ParseException
     {
         ArrayList<Object> list = new ArrayList<>();
+        JSONConfig cfg = tokens.getJSONConfig();
         Token token = tokens.nextToken();
         while ( token != null && token.tokenType != TokenType.END_ARRAY ){
             list.add(getValue(token, tokens));
@@ -342,15 +343,15 @@ public class JSONParser
             }else if ( token.tokenType == TokenType.COMMA ){
                 token = tokens.nextToken();             // next item.
             }else{
-                throw new JSONParserException(TokenType.END_ARRAY, token.tokenType, tokens.cfg);
+                throw new JSONParserException(TokenType.END_ARRAY, token.tokenType, cfg);
             }
         }
         // minimize memory usage.
         list.trimToSize();
 
-        if ( tokens.cfg.isUsePrimitiveArrays() ){
+        if ( cfg.isUsePrimitiveArrays() ){
             // try to make it an array of primitives if possible.
-            Object array = getArrayOfPrimitives(list, tokens.cfg.isSmallNumbers());
+            Object array = getArrayOfPrimitives(list, cfg.isSmallNumbers());
             if ( array != null ){
                 return array;
             }
@@ -368,9 +369,9 @@ public class JSONParser
      * @throws ParseException if there's a problem with date parsing.
      * @throws IOException If there's an IO problem.
      */
-    private static Object getValue( Token token, TokenReader tokens ) throws ParseException, IOException
+    private static Object getValue( Token token, JSONTokenReader tokens ) throws ParseException, IOException
     {
-        JSONConfig cfg = tokens.cfg;
+        JSONConfig cfg = tokens.getJSONConfig();
         switch ( token.tokenType ){
             case STRING:
                 String unesc = CodePointData.unEscape(token.value, cfg);
@@ -402,12 +403,12 @@ public class JSONParser
                     return Boolean.valueOf(token.value);
                 }
             case DATE:
-                return parseDate(CodePointData.unEscape(token.value, tokens.cfg), tokens.cfg);
+                return parseDate(CodePointData.unEscape(token.value, cfg), cfg);
             case START_OBJECT:
             case START_ARRAY:
                 return parseTokens(token, tokens);
             default:
-                throw new JSONParserException(TokenType.STRING, token.tokenType, tokens.cfg);
+                throw new JSONParserException(TokenType.STRING, token.tokenType, cfg);
         }
     }
 
@@ -749,237 +750,4 @@ public class JSONParser
     private JSONParser()
     {
     }
-
-    /**
-     * This inner class is used to read tokens from the input stream.
-     *
-     * @since 1.7
-     */
-    private static class TokenReader
-    {
-        // simple tokens that can be safely shared by all threads.
-        private static final Map<Character,Token> SIMPLE_TOKENS;
-
-        static {
-            Map<Character,Token> simpleTokens = new HashMap<>();
-            simpleTokens.put('{', new Token(TokenType.START_OBJECT, null));
-            simpleTokens.put('}', new Token(TokenType.END_OBJECT, null));
-            simpleTokens.put('[', new Token(TokenType.START_ARRAY, null));
-            simpleTokens.put(']', new Token(TokenType.END_ARRAY, null));
-            simpleTokens.put(',', new Token(TokenType.COMMA, null));
-            simpleTokens.put(':', new Token(TokenType.COLON, null));
-            SIMPLE_TOKENS = new HashMap<>(simpleTokens);
-        }
-
-        // save the extra token when needed.
-        private Token extraToken = null;
-
-        // the reader.
-        private Reader json;
-
-        // the config object.
-        private JSONConfig cfg;
-
-        // the count of characters that have been read.
-        private long charCount = 0;
-
-        /**
-         * Create a TokenReader.
-         *
-         * @param json The reader to get the JSON data from.
-         * @param cfg the config object.
-         */
-        private TokenReader( Reader json, JSONConfig cfg )
-        {
-            this.json = json;
-            this.cfg = cfg;
-        }
-
-        /**
-         * Get the next token.
-         *
-         * @return The next token.
-         * @throws IOException If there's a problem with I/O.
-         */
-        private Token nextToken() throws IOException
-        {
-            if ( extraToken != null ){
-                // read the next token already.
-                Token result = extraToken;
-                extraToken = null;
-                return result;
-            }
-
-            // get to the first non space code point.
-            int codePoint = nextCodePoint();
-            while ( codePoint >= 0 && Character.isWhitespace(codePoint) ){
-                codePoint = nextCodePoint();
-            }
-            if ( codePoint < 0 ){
-                return null;                // end of input.
-            }
-            char ch = codePoint <= 0xFFFF ? (char)codePoint : 0;
-
-            // look for the token.
-            switch ( ch ){
-                case '{':
-                case '}':
-                case '[':
-                case ']':
-                case ',':
-                case ':':
-                    return SIMPLE_TOKENS.get(ch);
-                case '"':
-                case '\'':
-                    // string or quoted identifier or date string.
-                    return new Token(TokenType.STRING, getQuotedString(ch));
-                default:
-                    // something else.  need to go to the next token or end of input
-                    // to get this token.
-                    return matchOthers(getOtherTokenString(codePoint));
-            }
-        }
-
-        /**
-         * Get a string for any type of token other than string or simple tokens.
-         *
-         * @param codePoint The current codepoint
-         * @return The token
-         * @throws IOException If there's an I/O error.
-         */
-        private String getOtherTokenString( int codePoint ) throws IOException
-        {
-            StringBuilder buf = new StringBuilder();
-            int escapeCount = 0;
-            do{
-                char ch  = codePoint <= 0xFFFF ? (char)codePoint : 0;
-                if ( ch == '\\' ){
-                    ++escapeCount;          // track escapes.
-                    buf.append(ch);
-                }else if ( (ch == '\'' || ch == '"') && escapeCount % 2 == 0 ){
-                    buf.append(ch)
-                       .append(getQuotedString(ch))
-                       .append(ch);
-                    escapeCount = 0;
-                }else{
-                    extraToken = SIMPLE_TOKENS.get(ch);
-                    if ( extraToken != null ){
-                        break;              // ran into next token.  stop.
-                    }else{
-                        buf.appendCodePoint(codePoint);
-                        escapeCount = 0;
-                    }
-                }
-                codePoint = nextCodePoint();
-            }while ( codePoint >= 0 );
-
-            // remove trailing whitespace.
-            return buf.toString().trim();
-        }
-
-        /**
-         * Match other possible tokens that could occur in the stream.
-         *
-         * @param str the string to match.
-         * @return the token.
-         */
-        private Token matchOthers( String str )
-        {
-            // check for new Date(), numbers, literals and unquoted ids.
-            Matcher matcher = NEW_DATE_PAT.matcher(str);
-            if ( matcher.matches() ){
-                String qs = matcher.group(2);
-                return new Token(TokenType.DATE, qs.substring(1, qs.length()-1));
-            }
-            matcher = JAVASCRIPT_FLOATING_POINT_PAT.matcher(str);
-            if ( matcher.matches() ){
-                String number = matcher.group(1);
-                return new Token(TokenType.FLOATING_POINT_NUMBER, number);
-            }
-            matcher = JAVASCRIPT_INTEGER_PAT.matcher(str);
-            if ( matcher.matches() ){
-                String number = matcher.group(1);
-                return new Token(TokenType.INTEGER_NUMBER, number);
-            }
-            matcher = LITERAL_PAT.matcher(str);
-            if ( matcher.matches() ){
-                String literal = matcher.group(1);
-                return new Token(TokenType.LITERAL, literal);
-            }
-            matcher = UNQUOTED_ID_PAT.matcher(str);
-            if ( matcher.matches() ){
-                String id = matcher.group(0);
-                return new Token(TokenType.UNQUOTED_ID, id);
-            }
-            throw new JSONParserException(str, charCount, cfg);
-        }
-
-        /**
-         * Get the string from the stream that is enclosed by the given quote
-         * which has just been read from the stream.
-         *
-         * @param q The quote char.
-         * @return The string (without quotes).
-         * @throws IOException If there's a problem with I/O.
-         */
-        private String getQuotedString( char q ) throws IOException
-        {
-            StringBuilder str = new StringBuilder();
-            int escapeCount = 0;
-
-            while ( true ){
-                int nextChar = json.read();
-                if ( nextChar < 0 ){
-                    throw new JSONParserException(q, cfg);  // missing close quote.
-                }else{
-                    ++charCount;
-                    char ch = (char)nextChar;
-                    if ( ch == '\\' ){
-                        ++escapeCount;
-                        str.append(ch);
-                    }else if ( ch == q ){
-                        if ( escapeCount % 2 == 0 ){
-                            // even number of slashes -- string is done.
-                            break;
-                        }else{
-                            // odd number of slashes -- quote is escaped.  keep going.
-                            str.append(ch);
-                            escapeCount = 0;
-                        }
-                    }else{
-                        str.append(ch);
-                        escapeCount = 0;
-                    }
-                }
-            }
-
-            return str.toString();
-        }
-
-        /**
-         * Get the next code point from the input stream.
-         *
-         * @param json the input stream.
-         * @return the code point.
-         * @throws IOException If there's a problem with I/O.
-         */
-        private int nextCodePoint() throws IOException
-        {
-            int codePoint = json.read();
-
-            if ( codePoint >= 0 ){
-                if ( Character.isHighSurrogate((char)codePoint) ){
-                    int ch = json.read();
-                    if ( ch >= 0 && Character.isLowSurrogate((char)ch) ){
-                        codePoint = Character.toCodePoint((char)codePoint, (char)ch);
-                    }else{
-                        throw new JSONParserException(codePoint, ch, charCount, cfg);
-                    }
-                }
-                charCount += Character.charCount(codePoint);
-            }
-
-            return codePoint;
-        }
-    } // class TokenReader
 }
