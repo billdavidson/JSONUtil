@@ -310,7 +310,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             // locale.
             String languageTag = JNDIUtil.getString(jndiData, "locale", null);
             if ( languageTag != null ){
-                jsonConfigDefaults.setLocale(languageTag);
+                jsonConfigDefaults.setLocaleLanguageTag(languageTag);
+            }else{
+                languageTag = JNDIUtil.getString(jndiData, "defaultLocale", null);
+                if ( languageTag != null ){
+                    jsonConfigDefaults.setLocaleLanguageTag(languageTag);
+                }
             }
 
             loadDateFormatsFromJNDI(jndiData);
@@ -741,30 +746,48 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Set the default locale for new {@link JSONConfig} objects to use.
+     * Get the IETF BCP 47 language tag of the default locale for new
+     * {@link JSONConfig} objects.
      * <p>
      * Accessible via MBean server.
      *
-     * @param languageTag A language tag suitable for use by {@link Locale#forLanguageTag(String)}.
+     * @return The string form of the default locale.
      */
     @Override
-    public void setLocale( String languageTag )
+    public String getLocaleLanguageTag()
+    {
+        return getLocale().toLanguageTag();
+    }
+
+    /**
+     * Set the default locale for new {@link JSONConfig} objects to use by
+     * specifying a IETF BCP 47 language tag suitable for use by
+     * {@link Locale#forLanguageTag(String)}.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @param languageTag A IETF BCP 47 language tag suitable for use by {@link Locale#forLanguageTag(String)}.
+     */
+    @Override
+    public void setLocaleLanguageTag( String languageTag )
     {
         if ( languageTag != null ){
-            setLocale(Locale.forLanguageTag(languageTag));
+            setLocale(Locale.forLanguageTag(languageTag.replaceAll("_", "-")));
         }else{
             setLocale((Locale)null);
         }
     }
 
     /**
-     * Set a default locale for new {@link JSONConfig} objects to use.
+     * Set the default locale for new {@link JSONConfig} objects to use.
      *
-     * @param loc the default locale.
+     * @param languageTag A language tag suitable for use by {@link Locale#forLanguageTag(String)}.
+     * @deprecated Use {@link #setLocaleLanguageTag(String)} instead.
      */
-    public static synchronized void setLocale( Locale loc )
+    @Deprecated
+    public void setLocale( String languageTag )
     {
-        locale = loc;
+        setLocale(languageTag);
     }
 
     /**
@@ -777,6 +800,16 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public static synchronized Locale getLocale()
     {
         return locale != null ? locale : Locale.getDefault();
+    }
+
+    /**
+     * Set a default locale for new {@link JSONConfig} objects to use.
+     *
+     * @param loc the default locale.
+     */
+    public static synchronized void setLocale( Locale loc )
+    {
+        locale = loc;
     }
 
     /**
@@ -1061,19 +1094,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Return true if the given class is in the set of classes being
-     * automatically reflected.
-     *
-     * @param refClass The reflected class.
-     * @return true if the class is automatically reflected.
-     * @since 1.9
-     */
-    public static synchronized boolean isReflectClass( JSONReflectedClass refClass )
-    {
-        return reflectClasses == null || refClass == null ? false : reflectClasses.containsKey(refClass.getObjClass());
-    }
-
-    /**
      * Return true if objects with the same class given object are in the set of
      * classes being automatically reflected.
      *
@@ -1083,33 +1103,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      */
     public static boolean isReflectClass( Object obj )
     {
-        return obj == null ? false : isReflectClass(ensureReflectedClass(obj));
+        return getReflectedClass(obj) != null;
     }
 
     /**
-     * Get the {@link JSONReflectedClass} for the given object or create a dummy
-     * one if there isn't one.  Creating one does not affect the results of the
-     * isReflectClass() methods.  If you didn't add one then it isn't stored.
-     *
-     * @param obj The class to look up.
-     * @return the reflected class object.
-     */
-    public static JSONReflectedClass ensureReflectedClass( Object obj )
-    {
-        JSONReflectedClass result = null;
-        if ( obj instanceof JSONReflectedClass ){
-            result = (JSONReflectedClass)obj;
-        }else{
-            result = getReflectedClass(obj);
-            if ( result == null ){
-                result = ReflectUtil.ensureReflectedClass(obj);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Return the JSONReflectedClass for this object if it is stored as a default.
+     * Get the {@link JSONReflectedClass} for the given object if it is stored.
+     * The main reason that you might want to use this is to modify the fields
+     * that are reflected in the class.
      *
      * @param obj The class to look up.
      * @return the reflected class object or null if not found.

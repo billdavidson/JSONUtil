@@ -15,6 +15,7 @@
  */
 package org.kopitubruk.util.json;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -136,7 +137,17 @@ class JNDIUtil
     static boolean getBoolean( Map<String,Object> jndiVariables, String name, boolean defaultValue )
     {
         Object value = jndiVariables.get(name);
-        return value instanceof Boolean ? (Boolean)value : defaultValue;
+        if ( value instanceof Boolean ){
+            return (Boolean)value;
+        }else{
+            if ( value instanceof CharSequence ){
+                String val = value.toString();
+                if ( "true".equalsIgnoreCase(val) || "false".equalsIgnoreCase(val) ){
+                    return Boolean.parseBoolean(val);
+                }
+            }
+            return defaultValue;
+        }
     }
 
     /**
@@ -150,7 +161,13 @@ class JNDIUtil
     static String getString( Map<String,Object> jndiVariables, String name, String defaultValue )
     {
         Object value = jndiVariables.get(name);
-        return value instanceof String ? (String)value : defaultValue;
+        if ( value instanceof String ){
+            return (String)value;
+        }else if ( value instanceof CharSequence || value instanceof Character ){
+            return value.toString();
+        }else{
+            return defaultValue;
+        }
     }
 
     /**
@@ -164,7 +181,15 @@ class JNDIUtil
     static int getInt( Map<String,Object> jndiVariables, String name, int defaultValue )
     {
         Object value = jndiVariables.get(name);
-        return value instanceof Integer ? (Integer)value : defaultValue;
+        if ( value instanceof Integer ){
+            return (Integer)value;
+        }else{
+            try{
+                return new BigDecimal(value.toString()).intValueExact();
+            }catch ( Exception e ){
+                return defaultValue;
+            }
+        }
     }
 
     /**
