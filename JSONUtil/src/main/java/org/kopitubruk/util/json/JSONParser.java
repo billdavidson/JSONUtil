@@ -28,6 +28,7 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -492,7 +493,7 @@ public class JSONParser
         boolean haveLong = false;
         boolean haveInt = false;
         boolean haveShort = false;
-        ArrayList<Number> workList = new ArrayList<>(list.size());
+        List<Number> workList = new ArrayList<>(list.size());
         for ( Object num : list ){
             workList.add((Number)num);
         }
@@ -546,7 +547,9 @@ public class JSONParser
                     if ( num instanceof Long ){
                         BigDecimal bigDec = new BigDecimal(num.toString());
                         Double d = bigDec.doubleValue();
-                        if ( bigDec.compareTo(new BigDecimal(d.toString())) != 0 ){
+                        if ( bigDec.compareTo(new BigDecimal(d.toString())) == 0 ){
+                            workList.set(i, d);
+                        }else{
                             return null;    // data loss.  abort.
                         }
                     }
