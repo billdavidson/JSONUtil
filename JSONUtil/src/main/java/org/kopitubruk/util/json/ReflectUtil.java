@@ -837,7 +837,7 @@ public class ReflectUtil
         Set<Class<?>> types = new LinkedHashSet<>();
         Class<?> tmpClass = objType;
         while ( tmpClass != null ){
-            if ( ! "java.lang.Object".equals(tmpClass.getClass().getCanonicalName()) ){
+            if ( ! "java.lang.Object".equals(tmpClass.getCanonicalName()) ){
                 types.add(tmpClass);
             }
             tmpClass = tmpClass.getSuperclass();
