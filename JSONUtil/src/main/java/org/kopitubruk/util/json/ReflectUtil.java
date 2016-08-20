@@ -81,7 +81,8 @@ public class ReflectUtil
             new HashSet<>(Arrays.asList(PRIVATE, PACKAGE, PROTECTED, PUBLIC));
 
     /**
-     * Primitive number type names.
+     * Primitive number types and the number class which includes all number
+     * wrappers and BigDecimal and BigInteger.
      */
     private static final Set<Class<?>> NUMBERS =
             new HashSet<>(Arrays.asList(Double.TYPE, Float.TYPE, Long.TYPE, Integer.TYPE, Short.TYPE, Byte.TYPE, Number.class));
@@ -604,7 +605,7 @@ public class ReflectUtil
      * @param getterMethods The available getter methods at the current privacy level.
      * @param field The field
      * @param name The field name.
-     * @param privacyLevel the privacy level.
+     * @param privacyLevel the privacy level -- may override the cfg.
      * @param cfg The config object.
      * @return The getter or null if one cannot be found.
      */
