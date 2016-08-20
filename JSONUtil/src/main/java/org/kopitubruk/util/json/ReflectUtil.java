@@ -523,7 +523,7 @@ public class ReflectUtil
                     int m = methodCache.size();
                     int minPrivacy = PUBLIC;
                     // filter by privacy level.
-                    getterMethods = new HashMap<>(methodCache.size());
+                    getterMethods = new HashMap<>(m);
                     for ( Method method : methodCache.values() ){
                         int getterLevel = getLevel(method.getModifiers());
                         if ( getterLevel >= privacyLevel ){
@@ -565,12 +565,6 @@ public class ReflectUtil
                 }
                 if ( isPrivate ){
                     getterMethods.put(name, method);
-                    if ( cacheMethods ){
-                        int getterLevel = getLevel(method.getModifiers());
-                        if ( getterLevel < minPrivacy ){
-                            minPrivacy = getterLevel;
-                        }
-                    }
                 }else{
                     int getterLevel = getLevel(method.getModifiers());
                     if ( getterLevel >= privacyLevel ){

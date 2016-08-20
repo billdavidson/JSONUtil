@@ -310,7 +310,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             // locale.
             String languageTag = JNDIUtil.getString(jndiData, "locale", null);
             if ( languageTag != null ){
-                jsonConfigDefaults.setLocale(languageTag);
+                jsonConfigDefaults.setDefaultLocale(languageTag);
             }
 
             loadDateFormatsFromJNDI(jndiData);
@@ -741,6 +741,19 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
+     * Get the default locale for new {@link JSONConfig} objects in string form.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @return The string form of the default locale.
+     */
+    @Override
+    public String getDefaultLocale()
+    {
+        return getLocale().toString();
+    }
+
+    /**
      * Set the default locale for new {@link JSONConfig} objects to use.
      * <p>
      * Accessible via MBean server.
@@ -748,13 +761,25 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @param languageTag A language tag suitable for use by {@link Locale#forLanguageTag(String)}.
      */
     @Override
-    public void setLocale( String languageTag )
+    public void setDefaultLocale( String languageTag )
     {
         if ( languageTag != null ){
-            setLocale(Locale.forLanguageTag(languageTag));
+            setLocale(Locale.forLanguageTag(languageTag.replaceAll("_", "-")));
         }else{
             setLocale((Locale)null);
         }
+    }
+
+    /**
+     * Set the default locale for new {@link JSONConfig} objects to use.
+     *
+     * @param languageTag A language tag suitable for use by {@link Locale#forLanguageTag(String)}.
+     * @deprecated Use {@link #setDefaultLocale(String)} instead.
+     */
+    @Deprecated
+    public void setLocale( String languageTag )
+    {
+        setLocale(languageTag);
     }
 
     /**
