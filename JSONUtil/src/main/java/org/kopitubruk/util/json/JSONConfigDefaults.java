@@ -1061,19 +1061,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Return true if the given class is in the set of classes being
-     * automatically reflected.
-     *
-     * @param refClass The reflected class.
-     * @return true if the class is automatically reflected.
-     * @since 1.9
-     */
-    public static synchronized boolean isReflectClass( JSONReflectedClass refClass )
-    {
-        return reflectClasses == null || refClass == null ? false : reflectClasses.containsKey(refClass.getObjClass());
-    }
-
-    /**
      * Return true if objects with the same class given object are in the set of
      * classes being automatically reflected.
      *
@@ -1083,33 +1070,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      */
     public static boolean isReflectClass( Object obj )
     {
-        return obj == null ? false : isReflectClass(ensureReflectedClass(obj));
+        return getReflectedClass(obj) != null;
     }
 
     /**
-     * Get the {@link JSONReflectedClass} for the given object or create a dummy
-     * one if there isn't one.  Creating one does not affect the results of the
-     * isReflectClass() methods.  If you didn't add one then it isn't stored.
-     *
-     * @param obj The class to look up.
-     * @return the reflected class object.
-     */
-    public static JSONReflectedClass ensureReflectedClass( Object obj )
-    {
-        JSONReflectedClass result = null;
-        if ( obj instanceof JSONReflectedClass ){
-            result = (JSONReflectedClass)obj;
-        }else{
-            result = getReflectedClass(obj);
-            if ( result == null ){
-                result = ReflectUtil.ensureReflectedClass(obj);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Return the JSONReflectedClass for this object if it is stored as a default.
+     * Get the {@link JSONReflectedClass} for the given object if it is stored.
+     * The main reason that you might want to use this is to modify the fields
+     * that are reflected in the class.
      *
      * @param obj The class to look up.
      * @return the reflected class object or null if not found.

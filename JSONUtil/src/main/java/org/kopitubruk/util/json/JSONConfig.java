@@ -204,9 +204,9 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * Return a clone of this object.  Note that this is unsynchronized,
-     * so code accordingly.  This is a deep clone so any date or number formats
-     * defined for this instance will also be cloned.
+     * Return a clone of this object. Note that this is unsynchronized, so code
+     * accordingly. This is a deep clone so any date or number formats defined
+     * for this instance will also be cloned.
      *
      * @return a clone of this object.
      */
@@ -670,29 +670,16 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * Return true if the given class is in the set of classes being
-     * automatically reflected.
-     *
-     * @param refClass The class.
-     * @return true if the class is automatically reflected.
-     * @since 1.9
-     */
-    public boolean isReflectClass( JSONReflectedClass refClass )
-    {
-        return reflectClasses == null || refClass == null ? false : reflectClasses.containsKey(refClass.getObjClass());
-    }
-
-    /**
      * Return true if objects with the same class given object are in the set of
      * classes being automatically reflected.
      *
      * @param obj An object to check
-     * @return true if objects of the same type are reflected.
+     * @return true if objects of the type are reflected.
      * @since 1.9
      */
     public boolean isReflectClass( Object obj )
     {
-        return obj == null ? false : isReflectClass(ensureReflectedClass(obj));
+        return getReflectedClass(obj) != null;
     }
 
     /**
@@ -703,7 +690,7 @@ public class JSONConfig implements Serializable, Cloneable
      * @param obj The class to look up.
      * @return the reflected class object.
      */
-    public JSONReflectedClass ensureReflectedClass( Object obj )
+    JSONReflectedClass ensureReflectedClass( Object obj )
     {
         JSONReflectedClass result = null;
         if ( obj instanceof JSONReflectedClass ){
@@ -719,6 +706,8 @@ public class JSONConfig implements Serializable, Cloneable
 
     /**
      * Get the {@link JSONReflectedClass} for the given object if it is stored.
+     * The main reason that you might want to use this is to modify the fields
+     * that are reflected in the class.
      *
      * @param obj the class being reflected.
      * @return The JSONReflectedClass object or null if one is not stored.
