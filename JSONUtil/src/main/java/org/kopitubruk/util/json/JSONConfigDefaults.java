@@ -311,6 +311,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             String languageTag = JNDIUtil.getString(jndiData, "locale", null);
             if ( languageTag != null ){
                 jsonConfigDefaults.setDefaultLocale(languageTag);
+            }else{
+                languageTag = JNDIUtil.getString(jndiData, "defaultLocale", null);
+                if ( languageTag != null ){
+                    jsonConfigDefaults.setDefaultLocale(languageTag);
+                }
             }
 
             loadDateFormatsFromJNDI(jndiData);
