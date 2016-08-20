@@ -746,8 +746,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the IETF BCP 47 language tag of the default locale for new
-     * {@link JSONConfig} objects.
+     * Get the result of {@link Locale#toLanguageTag()} from the current default
+     * locale.
      * <p>
      * Accessible via MBean server.
      *
