@@ -83,7 +83,8 @@ public class ReflectUtil
             new HashSet<Integer>(Arrays.asList(PRIVATE, PACKAGE, PROTECTED, PUBLIC));
 
     /**
-     * Primitive number type names.
+     * Primitive number types and the number class which includes all number
+     * wrappers and BigDecimal and BigInteger.
      */
     private static final Set<Class<?>> NUMBERS;
 
@@ -542,7 +543,7 @@ public class ReflectUtil
                     int m = methodCache.size();
                     int minPrivacy = PUBLIC;
                     // filter by privacy level.
-                    getterMethods = new HashMap<String,Method>(methodCache.size());
+                    getterMethods = new HashMap<String,Method>(m);
                     for ( Method method : methodCache.values() ){
                         int getterLevel = getLevel(method.getModifiers());
                         if ( getterLevel >= privacyLevel ){
@@ -584,12 +585,6 @@ public class ReflectUtil
                 }
                 if ( isPrivate ){
                     getterMethods.put(name, method);
-                    if ( cacheMethods ){
-                        int getterLevel = getLevel(method.getModifiers());
-                        if ( getterLevel < minPrivacy ){
-                            minPrivacy = getterLevel;
-                        }
-                    }
                 }else{
                     int getterLevel = getLevel(method.getModifiers());
                     if ( getterLevel >= privacyLevel ){
@@ -624,7 +619,7 @@ public class ReflectUtil
      * @param getterMethods The available getter methods at the current privacy level.
      * @param field The field
      * @param name The field name.
-     * @param privacyLevel the privacy level.
+     * @param privacyLevel the privacy level -- may override the cfg.
      * @param cfg The config object.
      * @return The getter or null if one cannot be found.
      */
@@ -864,7 +859,7 @@ public class ReflectUtil
         Set<Class<?>> types = new LinkedHashSet<Class<?>>();
         Class<?> tmpClass = objType;
         while ( tmpClass != null ){
-            if ( ! "java.lang.Object".equals(tmpClass.getClass().getCanonicalName()) ){
+            if ( ! "java.lang.Object".equals(tmpClass.getCanonicalName()) ){
                 types.add(tmpClass);
             }
             tmpClass = tmpClass.getSuperclass();

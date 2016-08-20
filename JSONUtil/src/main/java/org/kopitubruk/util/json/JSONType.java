@@ -51,10 +51,11 @@ class JSONType
             if ( isMapType ){
                 isArrayType = isReflectType = false;
             }else{
+                Class<?> clazz = null;
                 isArrayType = propertyValue instanceof Iterable ||
                               propertyValue instanceof Enumeration ||
-                              propertyValue.getClass().isArray();
-                isReflectType = isArrayType ? false : cfg.isReflectClass(propertyValue);
+                              (clazz = propertyValue.getClass()).isArray();
+                isReflectType = isArrayType ? false : cfg.isReflectClass(clazz);
             }
         }
     }

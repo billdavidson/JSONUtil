@@ -21,19 +21,6 @@ and controlling the way that the JSON is generated.
 * [Most defaults can be read or modified via a JMX MBean client](https://github.com/billdavidson/JSONUtil/wiki/Viewing-and-Modifying-Configuration-Defaults-Using-a-JMX-MBean-Client)
 * Option to format output for debugging.
 
-The trunk branch requires Java 8, but there are branches for Java 5,
-Java 6 and Java 7, which maintain the same functionality except for
-the default methods in an interface.
-
-Files are included for the Maven project and an Eclipse project.
-
-It has JUnit tests for most of the functionality.
-
-There is a run time dependency on
-[Apache Commons Logging](http://commons.apache.org/proper/commons-logging/)
-facade so that it should work with whatever logging framework you already
-use.
-
 [Binaries](https://github.com/billdavidson/JSONUtil/releases)
 
 [Getting Started Guide](https://github.com/billdavidson/JSONUtil/wiki/Getting-Started-Guide)
@@ -45,3 +32,8 @@ use.
 [Comments (Disqus)](http://kopitubruk.org/JSONUtil/#comments)
 
 [Report Issues](https://github.com/billdavidson/JSONUtil/issues)
+
+### What's New
+* Aug 17 - [JSONUtil 1.9.1](https://github.com/billdavidson/JSONUtil/releases/tag/JSONUtil-1.9.1) released to fix bugs.
+* Aug 17 - [JMX MBean Wiki page updated with images](https://github.com/billdavidson/JSONUtil/wiki/Viewing-and-Modifying-Configuration-Defaults-Using-a-JMX-MBean-Client)
+* Aug 15 - JSONUtil 1.9 released to [support object reflection](https://github.com/billdavidson/JSONUtil/wiki/Using-Reflection-to-Encode-Objects-as-JSON), arbitrary precision numbers and parsing to primitive arrays.

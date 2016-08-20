@@ -24,7 +24,7 @@
 
   <groupId>org.kopitubruk.util</groupId>
   <artifactId>JSONUtil</artifactId>
-  <version>1.9.1-java6</version>
+  <version>1.9.2-java6-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>JSONUtil</name>
   <description>A library for generating JSON</description>

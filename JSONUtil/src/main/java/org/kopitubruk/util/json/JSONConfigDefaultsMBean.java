@@ -39,11 +39,18 @@ public interface JSONConfigDefaultsMBean
     public void setCodeDefaults();
 
     /**
+     * Get the default locale for new {@link JSONConfig} objects in string form.
+     *
+     * @return The string form of the default locale.
+     */
+    public String getLocaleLanguageTag();
+
+    /**
      * Set the default locale for new {@link JSONConfig} objects to use.
      *
      * @param languageTag A language tag used to create a {@link Locale}.
      */
-    public void setLocale( String languageTag );
+    public void setLocaleLanguageTag( String languageTag );
 
     /**
      * Clear any default number formats.
