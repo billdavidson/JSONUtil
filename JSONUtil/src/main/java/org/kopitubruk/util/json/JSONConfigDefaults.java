@@ -310,11 +310,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             // locale.
             String languageTag = JNDIUtil.getString(jndiData, "locale", null);
             if ( languageTag != null ){
-                jsonConfigDefaults.setDefaultLocale(languageTag);
+                jsonConfigDefaults.setLocaleLanguageTag(languageTag);
             }else{
                 languageTag = JNDIUtil.getString(jndiData, "defaultLocale", null);
                 if ( languageTag != null ){
-                    jsonConfigDefaults.setDefaultLocale(languageTag);
+                    jsonConfigDefaults.setLocaleLanguageTag(languageTag);
                 }
             }
 
@@ -746,27 +746,30 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the default locale for new {@link JSONConfig} objects in string form.
+     * Get the IETF BCP 47 language tag of the default locale for new
+     * {@link JSONConfig} objects.
      * <p>
      * Accessible via MBean server.
      *
      * @return The string form of the default locale.
      */
     @Override
-    public String getDefaultLocale()
+    public String getLocaleLanguageTag()
     {
-        return getLocale().toString();
+        return getLocale().toLanguageTag();
     }
 
     /**
-     * Set the default locale for new {@link JSONConfig} objects to use.
+     * Set the default locale for new {@link JSONConfig} objects to use by
+     * specifying a IETF BCP 47 language tag suitable for use by
+     * {@link Locale#forLanguageTag(String)}.
      * <p>
      * Accessible via MBean server.
      *
-     * @param languageTag A language tag suitable for use by {@link Locale#forLanguageTag(String)}.
+     * @param languageTag A IETF BCP 47 language tag suitable for use by {@link Locale#forLanguageTag(String)}.
      */
     @Override
-    public void setDefaultLocale( String languageTag )
+    public void setLocaleLanguageTag( String languageTag )
     {
         if ( languageTag != null ){
             setLocale(Locale.forLanguageTag(languageTag.replaceAll("_", "-")));
@@ -779,22 +782,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Set the default locale for new {@link JSONConfig} objects to use.
      *
      * @param languageTag A language tag suitable for use by {@link Locale#forLanguageTag(String)}.
-     * @deprecated Use {@link #setDefaultLocale(String)} instead.
+     * @deprecated Use {@link #setLocaleLanguageTag(String)} instead.
      */
     @Deprecated
     public void setLocale( String languageTag )
     {
         setLocale(languageTag);
-    }
-
-    /**
-     * Set a default locale for new {@link JSONConfig} objects to use.
-     *
-     * @param loc the default locale.
-     */
-    public static synchronized void setLocale( Locale loc )
-    {
-        locale = loc;
     }
 
     /**
@@ -807,6 +800,16 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public static synchronized Locale getLocale()
     {
         return locale != null ? locale : Locale.getDefault();
+    }
+
+    /**
+     * Set a default locale for new {@link JSONConfig} objects to use.
+     *
+     * @param loc the default locale.
+     */
+    public static synchronized void setLocale( Locale loc )
+    {
+        locale = loc;
     }
 
     /**
