@@ -1491,6 +1491,7 @@ public class TestJSONUtil
         cfg.addReflectClass(ReflectTestClass.class);
 
         int interations = 100000;
+        //int interations = 0;
         long start, end;
 
         /*
