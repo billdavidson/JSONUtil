@@ -26,6 +26,7 @@ import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 
 import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /**
  * Just a little shorthand for JNDI, used by other classes in the package.
@@ -98,10 +99,9 @@ class JNDIUtil
             Log log = null;
             boolean doLogging = logging;
             if ( doLogging ){
-                log = Logger.getLog(JNDIUtil.class);
+                log = LogFactory.getLog(JNDIUtil.class);
                 doLogging = log.isDebugEnabled();
                 if ( ! doLogging ){
-                    Logger.freeLog(JNDIUtil.class);
                     log = null;
                 }
             }
@@ -116,10 +116,6 @@ class JNDIUtil
                     }
                     jndiVariables.put(name, obj);
                 }
-            }
-
-            if ( doLogging ){
-                Logger.freeLog(JNDIUtil.class);
             }
         }
 
