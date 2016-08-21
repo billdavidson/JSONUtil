@@ -165,12 +165,8 @@ class JSONConfigUtil
         for ( Object obj : classes ){
             if ( obj != null ){
                 JSONReflectedClass refClass = ReflectUtil.ensureReflectedClass(obj);
-                if ( refClass != null ){
-                    Class<?> clazz = refClass.getObjClass();
-                    if ( ! refClasses.containsKey(clazz) ){
-                        needTrim = true;
-                    }
-                    refClasses.put(clazz, refClass);
+                if ( refClasses.put(refClass.getObjClass(), refClass) == null ){
+                    needTrim = true;
                 }
             }
         }
@@ -212,15 +208,8 @@ class JSONConfigUtil
 
         boolean needTrim = false;
         for ( Object obj : classes ){
-            if ( obj != null ){
-                JSONReflectedClass refClass = ReflectUtil.ensureReflectedClass(obj);
-                if ( refClass != null ){
-                    Class<?> clazz = refClass.getObjClass();
-                    if ( refClasses.containsKey(clazz) ){
-                        refClasses.remove(clazz);
-                        needTrim = true;
-                    }
-                }
+            if ( obj != null && refClasses.remove(ReflectUtil.getClass(obj)) != null ){
+                needTrim = true;
             }
         }
 
