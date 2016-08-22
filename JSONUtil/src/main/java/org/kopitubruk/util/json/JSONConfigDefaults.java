@@ -529,14 +529,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         cfg.addDateParseFormats(getDateParseFormats());
         cfg.setReflectionPrivacy(reflectionPrivacy);
 
-        if ( reflectClasses != null ){
-            Collection<JSONReflectedClass> refClasses = reflectClasses.values();
-            List<JSONReflectedClass> refCopy = new ArrayList<>(refClasses.size());
-            for ( JSONReflectedClass refClass : refClasses ){
-                refCopy.add(refClass.clone());
+        Map<Class<?>,JSONReflectedClass> refClasses = reflectClasses == null ? null : new HashMap<>(reflectClasses.size());
+        if ( refClasses != null ){
+            for ( Entry<Class<?>,JSONReflectedClass> entry : reflectClasses.entrySet() ){
+                refClasses.put(entry.getKey(), entry.getValue().clone());
             }
-            cfg.addReflectClasses(refCopy);
         }
+        cfg.setReflectClasses(refClasses);
 
         // validation options.
         cfg.setValidatePropertyNames(validatePropertyNames);

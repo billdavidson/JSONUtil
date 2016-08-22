@@ -221,9 +221,9 @@ public class JSONConfig implements Serializable, Cloneable
         // NumberFormat and DateFormat are not thread safe so clone them.
 
         if ( numberFormatMap != null ){
-            result.numberFormatMap = new HashMap<>(numberFormatMap);
-            for ( Entry<?,NumberFormat> entry : result.numberFormatMap.entrySet() ){
-                entry.setValue((NumberFormat)entry.getValue().clone());
+            result.numberFormatMap = new HashMap<>(numberFormatMap.size());
+            for ( Entry<Class<? extends Number>,NumberFormat> entry : numberFormatMap.entrySet() ){
+                result.numberFormatMap.put(entry.getKey(), (NumberFormat)entry.getValue().clone());
             }
         }else{
             result.numberFormatMap = null;
@@ -243,12 +243,10 @@ public class JSONConfig implements Serializable, Cloneable
         if ( reflectClasses == null ){
             result.reflectClasses = null;
         }else{
-            Collection<JSONReflectedClass> refClasses = reflectClasses.values();
-            List<JSONReflectedClass> refCopy = new ArrayList<>(refClasses.size());
-            for ( JSONReflectedClass refClass : refClasses ){
-                refCopy.add(refClass.clone());
+            result.reflectClasses = new HashMap<>(reflectClasses.size());
+            for ( Entry<Class<?>,JSONReflectedClass> entry : reflectClasses.entrySet() ){
+                result.reflectClasses.put(entry.getKey(), entry.getValue().clone());
             }
-            result.addReflectClasses(refCopy);
         }
 
         result.indentPadding = indentPadding == null ? null : indentPadding.clone();
@@ -774,6 +772,16 @@ public class JSONConfig implements Serializable, Cloneable
     public void clearReflectClasses()
     {
         reflectClasses = null;
+    }
+
+    /**
+     * Set the reflectClasses map.
+     *
+     * @param refClasses The reflectClasses map.
+     */
+    void setReflectClasses( Map<Class<?>,JSONReflectedClass> refClasses )
+    {
+        reflectClasses = refClasses;
     }
 
     /**

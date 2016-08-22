@@ -71,6 +71,10 @@ public class JSONReflectedClass implements Cloneable
         setFieldNames(fieldNames);
     }
 
+    private JSONReflectedClass()
+    {
+    }
+
     /**
      * Get the class being reflected.
      *
@@ -186,7 +190,8 @@ public class JSONReflectedClass implements Cloneable
     @Override
     public JSONReflectedClass clone()
     {
-        JSONReflectedClass result = new JSONReflectedClass(objClass, null);
+        JSONReflectedClass result = new JSONReflectedClass();
+        result.objClass = objClass;
         result.fieldNames = fieldNames;
         return result;
     }
