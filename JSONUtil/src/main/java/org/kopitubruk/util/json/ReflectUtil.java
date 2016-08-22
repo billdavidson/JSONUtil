@@ -302,11 +302,12 @@ public class ReflectUtil
         String[] fieldNames = refClass.getFieldNamesRaw();
         Class<?> clazz = refClass.getObjClass();
         boolean fieldsSpecified = fieldNames != null;
-        int privacyLevel;
+        boolean fieldsNotSpecified = ! fieldsSpecified;
+        int privacyLevel, modifiers = 0;
         String name = "getReflectedObject()";
 
         try {
-            Map<String,Field> fields = getFields(clazz, ! fieldsSpecified, cacheData);
+            Map<String,Field> fields = getFields(clazz, cacheData);
             if ( fieldsSpecified ){
                 privacyLevel = PRIVATE;
             }else{
@@ -320,11 +321,17 @@ public class ReflectUtil
             for ( String fieldName : fieldNames ){
                 name = fieldName;
                 Field field = fields.get(name);
+                if ( fieldsNotSpecified ){
+                    modifiers = field.getModifiers();
+                    if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
+                        continue;       // ignore static and transient fields.
+                    }
+                }
                 Method getter = getGetter(clazz, getterMethods, field, name, privacyLevel, cacheData);
                 if ( getter != null ){
                     ensureAccessible(getter);
                     obj.put(name, getter.invoke(propertyValue));
-                }else if ( field != null && (isPrivate || getLevel(field.getModifiers()) >= privacyLevel) ){
+                }else if ( field != null && (isPrivate || getLevel(modifiers) >= privacyLevel) ){
                     ensureAccessible(field);
                     obj.put(name, field.get(propertyValue));
                 }else if ( fieldsSpecified ){
@@ -364,11 +371,10 @@ public class ReflectUtil
      * Get all of the fields for a given class.
      *
      * @param clazz The class.
-     * @param fieldsNotSpecified if fields are not specified, then filter out static and transient fields.
      * @param cacheFields if true, then cache data.
      * @return The fields.
      */
-    private static Map<String,Field> getFields( Class<?> clazz, boolean fieldsNotSpecified, boolean cacheFields )
+    private static Map<String,Field> getFields( Class<?> clazz, boolean cacheFields )
     {
         Map<String,Field> fields;
         Map<Class<?>,Map<String,Field>> theCache = null;
@@ -381,16 +387,10 @@ public class ReflectUtil
             }
         }
 
-        fields = new LinkedHashMap<>(0);
+        fields = new LinkedHashMap<>();
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
             for ( Field field : tmpClass.getDeclaredFields() ){
-                if ( fieldsNotSpecified ){
-                    int modifiers = field.getModifiers();
-                    if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
-                        continue;       // ignore static and transient fields.
-                    }
-                }
                 String name = field.getName();
                 if ( ! fields.containsKey(name) ){
                     fields.put(name, field);
