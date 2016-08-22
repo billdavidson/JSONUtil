@@ -571,7 +571,9 @@ public class ReflectUtil
                 methodCache = new HashMap<>(methodCache);
             }
             theCache.put(clazz, methodCache);
-            getMinGetterCache().put(clazz, minPrivacy);
+            if ( m > 0 ){
+                getMinGetterCache().put(clazz, minPrivacy);
+            }
         }
 
         return getterMethods;
