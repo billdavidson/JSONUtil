@@ -21,9 +21,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 /**
  * Package private utility methods for JSONConfig/JSONConfigDefaults that don't
@@ -233,22 +236,37 @@ class JSONConfigUtil
     }
 
     /**
-     * Return a list of fields from a string array for a class being loaded by name.
+     * Make a {@link JSONReflectedClass} with the given field names, if any.
      *
-     * @param parts The array of parts from the original string.
-     * @return the fields or null if there aren't any.
-     * @since 1.9.1
+     * @param clazz The class.
+     * @param parts The field names or custom name mappings or both.
+     * @return the JSONReflectedClass
      */
-    static List<String> getFieldNames( String[] parts )
+    static JSONReflectedClass getJSONReflectedClass( Class<?> clazz, String[] parts )
     {
-        List<String> fields = null;
+        Set<String> fieldNames = null;
+        Map<String,String> fieldAliases = null;
         if ( parts.length > 1 ){
-            fields = new ArrayList<>(parts.length-1);
+            fieldNames = new LinkedHashSet<>();
+            fieldAliases = new LinkedHashMap<>();
             for ( int i = 1; i < parts.length; i++ ){
-                fields.add(parts[i]);
+                String fieldName = parts[i];
+                fieldName = parts[i] == null ? "" : parts[i].trim();
+                if ( fieldName.indexOf('=') >= 0 ){
+                    String[] pair = fieldName.split("=");
+                    if ( pair.length == 2 ){
+                        fieldName = pair[0] == null ? "" : pair[0].trim();
+                        String fieldAlias = pair[1] == null ? "" : pair[1].trim();
+                        if ( fieldName.length() > 0 && fieldAlias.length() > 0 ){
+                            fieldAliases.put(fieldName, fieldAlias);
+                        }
+                    }
+                }else if ( fieldName.length() > 0 ){
+                    fieldNames.add(fieldName);
+                }
             }
         }
-        return fields;
+        return new JSONReflectedClass(clazz, fieldNames, fieldAliases);
     }
 
     /**

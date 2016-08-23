@@ -155,8 +155,12 @@ import org.apache.commons.logging.LogFactory;
  * names are followed by a comma and strings separated by commas, those
  * strings will be taken as field names to use for {@link JSONReflectedClass}.
  * Field names which do not look like valid Java identifier names will be
- * silently discarded.
- * These classes will be added to all JSONConfig objects that are created
+ * silently discarded.  If the field names are of the form "name=alias"
+ * then a field called "name" will be represented as "alias" in the output.
+ * Aliases do not effect field selection so you can have aliases without
+ * selection.  If you want to specify only field "foo" and you want it called
+ * "bar" then you will need to specify "foo,foo=bar" in the string.
+ * These reflect classes will be added to all JSONConfig objects that are created
  * in the same class loader.
  * <p>
  * Number formats and date formats are cloned when they are added because they
@@ -443,8 +447,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 String[] parts = ((String)value).split(",");
                 try{
                     Class<?> clazz = ReflectUtil.getClassByName(parts[0]);
-                    List<String> fieldNames = JSONConfigUtil.getFieldNames(parts);
-                    classes.add(new JSONReflectedClass(clazz, fieldNames));
+                    classes.add(JSONConfigUtil.getJSONReflectedClass(clazz, parts));
                 }catch ( ClassNotFoundException e ){
                     if ( logging ){
                         ensureLogger();
@@ -832,12 +835,14 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     {
         setLocaleLanguageTag(languageTag);
         if ( logging ){
-            ensureLogger();
-            if ( log.isWarnEnabled() ){
-                ResourceBundle bundle = JSONUtil.getBundle(getLocale());
-                log.warn(String.format(bundle.getString("setLocaleDeprecated")));
+            synchronized ( getClass() ){
+                ensureLogger();
+                if ( log.isWarnEnabled() ){
+                    ResourceBundle bundle = JSONUtil.getBundle(getLocale());
+                    log.warn(String.format(bundle.getString("setLocaleDeprecated")));
+                }
+                releaseLogger();
             }
-            releaseLogger();
         }
     }
 
@@ -1194,8 +1199,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         String[] parts = className.split(",");
         try{
             Class<?> clazz = ReflectUtil.getClassByName(parts[0]);
-            List<String> fieldNames = JSONConfigUtil.getFieldNames(parts);
-            addReflectClass(new JSONReflectedClass(clazz, fieldNames));
+            addReflectClass(JSONConfigUtil.getJSONReflectedClass(clazz, parts));
         }catch ( ClassNotFoundException e ){
             throw new MBeanException(e, getClassNotFoundExceptionMsg(e, parts[0], logging));
         }
@@ -1260,11 +1264,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         ResourceBundle bundle = JSONUtil.getBundle(getLocale());
         String msg = String.format(bundle.getString("couldntLoadClass"), className);
         if ( isLogging ){
-            ensureLogger();
-            if ( log.isErrorEnabled() ){
-                log.error(msg, e);
+            synchronized ( jsonConfigDefaults.getClass() ){
+                ensureLogger();
+                if ( log.isErrorEnabled() ){
+                    log.error(msg, e);
+                }
+                releaseLogger();
             }
-            releaseLogger();
         }
         return msg;
     }
@@ -1343,6 +1349,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 if ( fieldNames != null ){
                     for ( String fieldName : fieldNames ){
                         buf.append(',').append(fieldName);
+                    }
+                }
+                Map<String,String> customNames = refClass.getFieldAliases();
+                if ( customNames != null ){
+                    for ( Entry<String,String> entry : customNames.entrySet() ){
+                        buf.append(',').append(entry.getKey()).append('=').append(entry.getValue());
                     }
                 }
                 classes.add(buf.toString());

@@ -252,7 +252,7 @@ public class ReflectUtil
         if ( obj instanceof JSONReflectedClass ){
              return (JSONReflectedClass)obj;
         }else if ( obj != null ){
-            return new JSONReflectedClass(getClass(obj), null);
+            return new JSONReflectedClass(getClass(obj));
         }else{
             return null;
         }
@@ -319,15 +319,15 @@ public class ReflectUtil
             Map<Object,Object> obj = new LinkedHashMap<>(fieldNames.length);
 
             for ( String fieldName : fieldNames ){
-                name = fieldName;
-                Field field = fields.get(name);
+                name = refClass.getAlias(fieldName);
+                Field field = fields.get(fieldName);
                 if ( fieldsNotSpecified ){
                     modifiers = field.getModifiers();
                     if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
                         continue;       // ignore static and transient fields.
                     }
                 }
-                Method getter = getGetter(clazz, getterMethods, field, name, privacyLevel, cacheData);
+                Method getter = getGetter(clazz, getterMethods, field, fieldName, privacyLevel, cacheData);
                 if ( getter != null ){
                     ensureAccessible(getter);
                     obj.put(name, getter.invoke(propertyValue));
@@ -335,7 +335,7 @@ public class ReflectUtil
                     ensureAccessible(field);
                     obj.put(name, field.get(propertyValue));
                 }else if ( fieldsSpecified ){
-                    throw new JSONReflectionException(propertyValue, name, cfg);
+                    throw new JSONReflectionException(propertyValue, fieldName, cfg);
                 }
             }
             return obj;
