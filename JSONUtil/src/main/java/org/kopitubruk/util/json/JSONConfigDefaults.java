@@ -40,6 +40,7 @@ import java.util.regex.Pattern;
 
 import javax.management.MBeanException;
 import javax.management.MBeanServer;
+import javax.management.ObjectInstance;
 import javax.management.ObjectName;
 import javax.naming.Context;
 
@@ -79,6 +80,19 @@ import org.apache.commons.logging.LogFactory;
  *   <Environment name="org/kopitubruk/util/json/validatePropertyNames" type="java.lang.Boolean" value="false" override="false" />
  *   <Environment name="org/kopitubruk/util/json/fullJSONIdentifierCodePoints" type="java.lang.Boolean" value="true" override="false" />
  * </Context>}</pre>
+ * <p>
+ * Because the appName tends to remain consistent across all deployments, it
+ * might be preferable to put it into your webapp's web.xml.  This should work
+ * with all JEE web tier containers. There is a different syntax for adding
+ * context environment variables in web.xml:
+ * <pre>{@code <env-entry>
+ *   <env-entry-name>org/kopitubruk/util/json/appName</env-entry-name>
+ *   <env-entry-type>java.lang.String</env-entry-type>
+ *   <env-entry-value>MyApp</env-entry-value>
+ * </env-entry>}</pre>
+ * <p>
+ * You can use this method for any other JNDI environment variables provided
+ * that you always want them the same on all deployments.
  * <p>
  * These are the names and their normal defaults if you don't change them.
  * See their setters for these for descriptions of what they do.
@@ -225,6 +239,31 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     // logging.
     private static boolean logging;
+    private static LogFactory logFactory = null;
+    private static Log log = null;
+
+    /**
+     * Make sure that the logger is there.
+     */
+    private static synchronized void ensureLogger()
+    {
+        if ( log == null ){
+            logFactory = LogFactory.getFactory();
+            log = logFactory.getInstance(JSONConfigDefaults.class);
+        }
+    }
+
+    /**
+     * Release the logger.
+     */
+    private static synchronized void releaseLogger()
+    {
+        if ( log != null ){
+            logFactory.release();
+            log = null;
+            logFactory = null;
+        }
+    }
 
     // patterns for JNDI variable names.
     private static final Pattern DATE_PARSE_FORMAT_PAT = Pattern.compile("^dateParseFormat(\\d+)$");
@@ -271,6 +310,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         if ( registerMBean ){
             initMBean(appName);
         }
+
+        releaseLogger();
     }
 
     /**
@@ -324,7 +365,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 ReflectUtil.confirmPrivacyLevel(reflectionPrivacy, new JSONConfig());
             }catch ( JSONReflectionException ex ){
                 if ( logging ){
-                    Log log = LogFactory.getLog(jsonConfigDefaults.getClass());
+                    ensureLogger();
                     if ( log.isDebugEnabled() ){
                         log.debug(ex.getLocalizedMessage(), ex);
                     }
@@ -334,7 +375,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         }catch ( Exception e ){
             // Nothing set in JNDI.  Use code defaults.  Not a problem.
             if ( logging ){
-                Log log = LogFactory.getLog(jsonConfigDefaults.getClass());
+                ensureLogger();
                 if ( log.isDebugEnabled() ){
                     ResourceBundle bundle = JSONUtil.getBundle(getLocale());
                     log.debug(bundle.getString("badJNDIforConfig"), e);
@@ -395,7 +436,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      */
     private static void loadReflectClassesFromJNDI( Map<String,Object> jndiData )
     {
-        Log log = null;
         List<JSONReflectedClass> classes = new ArrayList<>();
         for ( Entry<String,Object> entry : jndiData.entrySet() ){
             Object value = entry.getValue();
@@ -407,9 +447,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                     classes.add(new JSONReflectedClass(clazz, fieldNames));
                 }catch ( ClassNotFoundException e ){
                     if ( logging ){
-                        if ( log == null ){
-                            log = LogFactory.getLog(jsonConfigDefaults.getClass());
-                        }
+                        ensureLogger();
                         if ( log.isDebugEnabled() ){
                             log.debug(getClassNotFoundExceptionMsg(e, parts[0], false), e);
                         }
@@ -482,18 +520,26 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
 
             mBeanName = JMXUtil.getObjectName(jsonConfigDefaults, appName);
+            try{
+                ObjectInstance instance = mBeanServer.getObjectInstance(mBeanName);
+                if ( instance != null ){
+                    mBeanServer.unregisterMBean(mBeanName);
+                }
+            }catch ( Exception ex ){
+            }
+
             mBeanServer.registerMBean(jsonConfigDefaults, mBeanName);
             if ( logging ){
-                Log log = LogFactory.getLog(jsonConfigDefaults.getClass());
+                ensureLogger();
                 if ( log.isDebugEnabled() ){
                     ResourceBundle bundle = JSONUtil.getBundle(getLocale());
                     log.debug(String.format(bundle.getString("registeredMbean"), mBeanName));
                 }
             }
         }catch ( Exception e ){
-            // No MBean server.  Not a problem.
+            // Probably no MBean server.  Not a problem.
             if ( logging ){
-                Log log = LogFactory.getLog(jsonConfigDefaults.getClass());
+                ensureLogger();
                 if ( log.isDebugEnabled() ){
                     ResourceBundle bundle = JSONUtil.getBundle(getLocale());
                     log.debug(bundle.getString("couldntRegisterMBean"), e);
@@ -647,7 +693,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
                 mBeanServer.unregisterMBean(mBeanName);
                 if ( logging ){
-                    Log log = LogFactory.getLog(jsonConfigDefaults.getClass());
+                    ensureLogger();
                     if ( log.isDebugEnabled() ){
                         ResourceBundle bundle = JSONUtil.getBundle(getLocale());
                         log.debug(String.format(bundle.getString("unregistered"), mBeanName));
@@ -655,7 +701,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 }
             }catch ( Exception e ){
                 if ( logging ){
-                    Log log = LogFactory.getLog(jsonConfigDefaults.getClass());
+                    ensureLogger();
                     if ( log.isErrorEnabled() ){
                         ResourceBundle bundle = JSONUtil.getBundle(getLocale());
                         log.error(String.format(bundle.getString("couldntUnregister"), mBeanName), e);
@@ -666,6 +712,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 mBeanName = null;
             }
         }
+        releaseLogger();
     }
 
     /**
@@ -785,11 +832,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     {
         setLocaleLanguageTag(languageTag);
         if ( logging ){
-            Log log = LogFactory.getLog(getClass());
+            ensureLogger();
             if ( log.isWarnEnabled() ){
                 ResourceBundle bundle = JSONUtil.getBundle(getLocale());
                 log.warn(String.format(bundle.getString("setLocaleDeprecated")));
             }
+            releaseLogger();
         }
     }
 
@@ -1084,13 +1132,16 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         try{
             privacyLevel = ReflectUtil.confirmPrivacyLevel(dflt, new JSONConfig());
         }catch ( JSONReflectionException e ){
-            if ( logging ){
-                Log log = LogFactory.getLog(getClass());
-                if ( log.isErrorEnabled() ){
-                    log.error(e.getLocalizedMessage(), e);
+            synchronized ( getClass() ){
+                if ( logging ){
+                    ensureLogger();
+                    if ( log.isErrorEnabled() ){
+                        log.error(e.getLocalizedMessage(), e);
+                    }
+                    releaseLogger();
                 }
+                throw new MBeanException(e);   // MBeans should only throw MBeanExceptions.
             }
-            throw new MBeanException(e);   // MBeans should only throw MBeanExceptions.
         }
         synchronized ( getClass() ){
             reflectionPrivacy = privacyLevel;
@@ -1209,10 +1260,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         ResourceBundle bundle = JSONUtil.getBundle(getLocale());
         String msg = String.format(bundle.getString("couldntLoadClass"), className);
         if ( isLogging ){
-            Log log = LogFactory.getLog(jsonConfigDefaults.getClass());
+            ensureLogger();
             if ( log.isErrorEnabled() ){
                 log.error(msg, e);
             }
+            releaseLogger();
         }
         return msg;
     }
