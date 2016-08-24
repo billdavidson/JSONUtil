@@ -70,6 +70,14 @@
           </compilerArguments>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>2.6</version>
+        <configuration>
+          <addMavenDescriptor>true</addMavenDescriptor>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 
@@ -126,19 +134,6 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
-  
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>2.6</version>
-        <configuration>
-          <addMavenDescriptor>true</addMavenDescriptor>
-        </configuration>
-      </plugin>
-    </plugins>
-  </build>
 
   <distributionManagement>
     <snapshotRepository>
