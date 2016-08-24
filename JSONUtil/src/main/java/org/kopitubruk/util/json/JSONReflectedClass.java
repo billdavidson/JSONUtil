@@ -252,7 +252,10 @@ public class JSONReflectedClass implements Cloneable
      */
     String getAlias( String name )
     {
-        String result = fieldAliases == null ? name : fieldAliases.get(name);
+        if ( fieldAliases == null ){
+            return name;
+        }
+        String result = fieldAliases.get(name);
         return result == null ? name : result;
     }
 
