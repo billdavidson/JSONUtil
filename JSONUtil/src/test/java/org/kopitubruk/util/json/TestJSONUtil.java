@@ -49,6 +49,7 @@ import javax.naming.Context;
 import javax.naming.NamingException;
 
 import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -67,7 +68,7 @@ import org.junit.Test;
  */
 public class TestJSONUtil
 {
-    private static final Log s_log = Logger.getLog(TestJSONUtil.class);
+    private static final Log s_log = LogFactory.getLog(TestJSONUtil.class);
 
     //private static SimpleDateFormat s_sdf;
 
@@ -94,7 +95,7 @@ public class TestJSONUtil
             Context ctx = JNDIUtil.createEnvContext(JSONUtil.class.getPackage().getName().replaceAll("\\.", "/"));
 
             ctx.bind("appName", "TestJSONUtil");
-            ctx.bind("reflectClass0", "org.kopitubruk.util.json.ReflectTestClass,a,e");
+            ctx.bind("reflectClass0", "org.kopitubruk.util.json.ReflectTestClass,a,e,e=k");
             ctx.bind("preciseNumbers", true);
         }catch ( NamingException e ){
             s_log.fatal("Couldn't create context", e);
@@ -1269,7 +1270,7 @@ public class TestJSONUtil
 
         // JNDI set up to only show fields a and e.
         String json = JSONUtil.toJSON(jsonObj, cfg);
-        assertThat(json, is("{\"f\":{\"a\":1,\"e\":25.0}}"));
+        assertThat(json, is("{\"f\":{\"a\":1,\"k\":25.0}}"));
 
         cfg.clearReflectClasses();
         cfg.addReflectClass(ReflectTestClass.class);
@@ -1292,7 +1293,7 @@ public class TestJSONUtil
 
         cfg = new JSONConfig(); // reload defaults.
         json = JSONUtil.toJSON(jsonObj, cfg);
-        assertThat(json, is("{\"f\":{\"a\":1,\"e\":25.0}}"));
+        assertThat(json, is("{\"f\":{\"a\":1,\"k\":25.0}}"));
 
         JSONConfigDefaults.getInstance().clearReflectClasses();
         ReflectUtil.clearReflectionCache();
