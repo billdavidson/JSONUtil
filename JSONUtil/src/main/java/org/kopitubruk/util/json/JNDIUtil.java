@@ -26,6 +26,7 @@ import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 
 import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /**
  * Just a little shorthand for JNDI, used by other classes in the package.
@@ -36,9 +37,36 @@ import org.apache.commons.logging.Log;
  */
 class JNDIUtil
 {
+    // logging.
     private static boolean logging;
+    private static LogFactory logFactory = null;
+    private static Log log = null;
+
+    /**
+     * Make sure that the logger is there.
+     */
+    private static synchronized void ensureLogger()
+    {
+        if ( log == null ){
+            logFactory = LogFactory.getFactory();
+            log = logFactory.getInstance(JSONConfigDefaults.class);
+        }
+    }
+
+    /**
+     * Release the logger.
+     */
+    private static synchronized void releaseLogger()
+    {
+        if ( log != null ){
+            logFactory.release();
+            log = null;
+            logFactory = null;
+        }
+    }
 
     private static final String ENV_CONTEXT = "java:/comp/env";
+
 
     private static final String TOMCAT_URL_PREFIXES = "org.apache.naming";
     private static final String TOMCAT_CONTEXT_FACTORY = ".java.javaURLContextFactory";
@@ -95,32 +123,35 @@ class JNDIUtil
         NamingEnumeration<Binding> bindings = ctx.listBindings("");
 
         if ( bindings.hasMore() ){
-            Log log = null;
             boolean doLogging = logging;
             if ( doLogging ){
-                log = Logger.getLog(JNDIUtil.class);
+                ensureLogger();
                 doLogging = log.isDebugEnabled();
                 if ( ! doLogging ){
-                    Logger.freeLog(JNDIUtil.class);
-                    log = null;
+                    releaseLogger();
                 }
             }
 
             while ( bindings.hasMore() ){
-                Binding binding = bindings.next();
-                String name = binding.getName();
-                Object obj = binding.getObject();
-                if ( obj != null ){
-                    if ( doLogging ){
-                        log.debug(name+" = "+obj);
+                try{
+                    Binding binding = bindings.next();
+                    String name = binding.getName();
+                    Object obj = binding.getObject();
+                    if ( obj != null ){
+                        if ( doLogging ){
+                            log.debug(name+" = "+obj);
+                        }
+                        jndiVariables.put(name, obj);
                     }
-                    jndiVariables.put(name, obj);
+                }catch ( Exception e ){
+                    if ( doLogging ){
+                        log.error("", e);
+                    }
+                    break;
                 }
             }
 
-            if ( doLogging ){
-                Logger.freeLog(JNDIUtil.class);
-            }
+            releaseLogger();
         }
 
         return jndiVariables;
