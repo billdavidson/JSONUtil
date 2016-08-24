@@ -552,16 +552,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Find out if logging is enabled.
-     *
-     * @return the logging policy.
-     */
-    static boolean isLogging()
-    {
-        return logging;
-    }
-
-    /**
      * Apply defaults to the given {@link JSONConfig} object.
      *
      * @param cfg The config object to initialize with defaults.

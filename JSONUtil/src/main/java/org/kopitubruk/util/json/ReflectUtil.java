@@ -339,12 +339,10 @@ public class ReflectUtil
                 }
             }
             return obj;
+        }catch ( JSONReflectionException e ){
+            throw e;
         }catch ( Exception e ){
-            if ( e instanceof JSONReflectionException ){
-                throw (JSONReflectionException)e;
-            }else{
-                throw new JSONReflectionException(propertyValue, name, e, cfg);
-            }
+            throw new JSONReflectionException(propertyValue, name, e, cfg);
         }
     }
 
