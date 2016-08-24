@@ -16,7 +16,10 @@
 package org.kopitubruk.util.json;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 /**
@@ -49,6 +52,10 @@ import java.util.Set;
  *     that pseudo field name.
  *   </li>
  * </ul>
+ * <p>
+ * You can also specify a customNames map so that field names are aliased
+ * in the JSON output to a custom name that you specify with the map.  Any
+ * unmapped names will be left as is.
  *
  * @author Bill Davidson
  */
@@ -56,6 +63,17 @@ public class JSONReflectedClass implements Cloneable
 {
     private Class<?> objClass;
     private String[] fieldNames;
+    private Map<String,String> fieldAliases;
+
+    /**
+     * Create a new JSONReflectedClass
+     *
+     * @param obj An object of the type to be reflect or its class.
+     */
+    public JSONReflectedClass( Object obj )
+    {
+        this(obj, null, null);
+    }
 
     /**
      * Create a new JSONReflectedClass
@@ -67,8 +85,38 @@ public class JSONReflectedClass implements Cloneable
      */
     public JSONReflectedClass( Object obj, Collection<String> fieldNames )
     {
+        this(obj, fieldNames, null);
+    }
+
+    /**
+     * Create a new JSONReflectedClass
+     *
+     * @param obj An object of the type to be reflect or its class.
+     * @param fieldAliases Map from object field names to custom names for output.
+     */
+    public JSONReflectedClass( Object obj, Map<String,String> fieldAliases )
+    {
+        this(obj, null, fieldAliases);
+    }
+
+    /**
+     * Create a new JSONReflectedClass
+     *
+     * @param obj An object of the type to be reflect or its class.
+     * @param fieldNames The names of the fields to include in the reflection.
+     *            Internally, this gets converted to a {@link Set} which you can
+     *            access via {@link #getFieldNames()}.
+     * @param fieldAliases Map from object field names to custom names for output.
+     */
+    public JSONReflectedClass( Object obj, Collection<String> fieldNames, Map<String,String> fieldAliases )
+    {
         setObjClass(obj);
         setFieldNames(fieldNames);
+        setFieldAliases(fieldAliases);
+    }
+
+    private JSONReflectedClass()
+    {
     }
 
     /**
@@ -155,6 +203,63 @@ public class JSONReflectedClass implements Cloneable
     }
 
     /**
+     * Get the field aliases map.
+     *
+     * @return the fieldAliases
+     */
+    public Map<String,String> getFieldAliases()
+    {
+        return fieldAliases;
+    }
+
+    /**
+     * Set the custom names map. Makes a copy of the map, trimming the keys and
+     * values and discarding keys that are not valid Java identifiers and values
+     * that don't have at least one character.
+     *
+     * @param fieldAliases the fieldAliases to set
+     */
+    public void setFieldAliases( Map<String,String> fieldAliases )
+    {
+        if ( fieldAliases == null ){
+            this.fieldAliases = null;
+        }else{
+            this.fieldAliases = new LinkedHashMap<>(fieldAliases.size());
+            for ( Entry<String,String> entry : fieldAliases.entrySet() ){
+                String key = entry.getKey();
+                String fieldName = key == null ? "" : key.trim();
+                if ( isValidJavaIdentifier(fieldName) ){
+                    String value = entry.getValue();
+                    String alias = value == null ? "" : value.trim();
+                    if ( alias.length() > 0 ){
+                        this.fieldAliases.put(fieldName, alias);
+                    }
+                }
+            }
+            if ( this.fieldAliases.size() < 1 ){
+                this.fieldAliases = null;
+            }else if ( this.fieldAliases.size() < fieldAliases.size() ){
+                this.fieldAliases = new LinkedHashMap<>(this.fieldAliases);
+            }
+        }
+    }
+
+    /**
+     * Get the custom version of the name, if any.
+     *
+     * @param name The name to look up.
+     * @return The custom version of the name.
+     */
+    String getAlias( String name )
+    {
+        if ( fieldAliases == null ){
+            return name;
+        }
+        String result = fieldAliases.get(name);
+        return result == null ? name : result;
+    }
+
+    /**
      * Return true if the given string is a valid Java identifier.
      *
      * @param id The identifier.
@@ -186,8 +291,10 @@ public class JSONReflectedClass implements Cloneable
     @Override
     public JSONReflectedClass clone()
     {
-        JSONReflectedClass result = new JSONReflectedClass(objClass, null);
+        JSONReflectedClass result = new JSONReflectedClass();
+        result.objClass = objClass;
         result.fieldNames = fieldNames;
+        result.fieldAliases = fieldAliases == null ? null : new LinkedHashMap<>(fieldAliases);
         return result;
     }
 
