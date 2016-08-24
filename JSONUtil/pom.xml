@@ -50,6 +50,13 @@
     <tag>${project.artifactId}-${project.version}</tag>
   </scm>
 
+  <properties>
+    <log4j2.version>2.3</log4j2.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.target>1.6</maven.compiler.target>
+    <maven.compiler.source>1.6</maven.compiler.source>
+  </properties>
+
   <!--
     I swear that the native Javascript stuff worked without this before
     but then it stopped.  I found this workaround on the web which as
@@ -80,13 +87,6 @@
       </plugin>
     </plugins>
   </build>
-
-  <properties>
-    <log4j2.version>2.3</log4j2.version>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.target>1.6</maven.compiler.target>
-    <maven.compiler.source>1.6</maven.compiler.source>
-  </properties>
 
   <dependencies>
     <dependency>
