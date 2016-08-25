@@ -317,44 +317,44 @@ public class ReflectUtil
      */
     static Map<Object,Object> getReflectedObject( Object propertyValue, JSONConfig cfg )
     {
-        boolean cacheData = cfg.isCacheReflectionData();
+        boolean isCacheData = cfg.isCacheReflectionData();
         JSONReflectedClass refClass = cfg.ensureReflectedClass(propertyValue);
         String[] fieldNames = refClass.getFieldNamesRaw();
         Class<?> clazz = refClass.getObjClass();
-        boolean fieldsSpecified = fieldNames != null;
-        boolean fieldsNotSpecified = ! fieldsSpecified;
+        boolean isFieldsSpecified = fieldNames != null;
+        boolean isNotFieldsSpecified = ! isFieldsSpecified;
         int privacyLevel, modifiers = 0;
         String name = "getReflectedObject()";
 
         try {
-            Map<String,Field> fields = getFields(clazz, cacheData);
-            if ( fieldsSpecified ){
+            Map<String,Field> fields = getFields(clazz, isCacheData);
+            if ( isFieldsSpecified ){
                 privacyLevel = PRIVATE;
             }else{
                 privacyLevel = cfg.getReflectionPrivacy();
                 fieldNames = fields.keySet().toArray(new String[fields.size()]);
             }
             boolean isPrivate = privacyLevel == PRIVATE;
-            Map<String,Method> getterMethods = getGetterMethods(clazz, privacyLevel, cacheData);
+            Map<String,Method> getterMethods = getGetterMethods(clazz, privacyLevel, isCacheData);
             Map<Object,Object> obj = new LinkedHashMap<Object,Object>(fieldNames.length);
 
             for ( String fieldName : fieldNames ){
                 name = refClass.getAlias(fieldName);
                 Field field = fields.get(fieldName);
-                if ( fieldsNotSpecified ){
+                if ( isNotFieldsSpecified ){
                     modifiers = field.getModifiers();
                     if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
                         continue;       // ignore static and transient fields.
                     }
                 }
-                Method getter = getGetter(clazz, getterMethods, field, fieldName, privacyLevel, cacheData);
+                Method getter = getGetter(clazz, getterMethods, field, fieldName, isPrivate, isCacheData);
                 if ( getter != null ){
                     ensureAccessible(getter);
                     obj.put(name, getter.invoke(propertyValue));
                 }else if ( field != null && (isPrivate || getLevel(modifiers) >= privacyLevel) ){
                     ensureAccessible(field);
                     obj.put(name, field.get(propertyValue));
-                }else if ( fieldsSpecified ){
+                }else if ( isFieldsSpecified ){
                     throw new JSONReflectionException(propertyValue, fieldName, cfg);
                 }
             }
@@ -604,11 +604,11 @@ public class ReflectUtil
      * @param getterMethods The available getter methods at the current privacy level.
      * @param field The field
      * @param name The field name.
-     * @param privacyLevel the privacy level -- may override the cfg.
-     * @param cfg The config object.
+     * @param isPrivate if the privacy level is private.
+     * @param cacheMethods if true cache the method objects by field.
      * @return The getter or null if one cannot be found.
      */
-    private static Method getGetter( Class<?> clazz, Map<String,Method> getterMethods, Field field, String name, int privacyLevel, boolean cacheMethods )
+    private static Method getGetter( Class<?> clazz, Map<String,Method> getterMethods, Field field, String name, boolean isPrivate, boolean cacheMethods )
     {
         if ( cacheMethods && field != null ){
             // check the cache for previous validations.
@@ -620,7 +620,7 @@ public class ReflectUtil
             }
             if ( getter != null ){
                 // check privacy level and return null if level not met.
-                return privacyLevel == PRIVATE ? getter : getterMethods.get(getter.getName());
+                return isPrivate ? getter : getterMethods.get(getter.getName());
             }
             Map<Class<?>,Map<Field,Method>> incompatCache = getFieldMethodIncompat();
             synchronized ( incompatCache ){
