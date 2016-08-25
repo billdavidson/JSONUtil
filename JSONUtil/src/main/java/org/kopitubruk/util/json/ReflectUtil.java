@@ -86,12 +86,13 @@ public class ReflectUtil
      * Primitive number types and the number class which includes all number
      * wrappers and BigDecimal and BigInteger.
      */
-    private static final Set<Class<?>> NUMBERS;
+    private static final Set<Class<?>> NUMBERS =
+            classSet(Double.TYPE, Float.TYPE, Long.TYPE, Integer.TYPE, Short.TYPE, Byte.TYPE, Number.class);
 
     /**
      * Boolean types.
      */
-    private static final Set<Class<?>> BOOLEANS;
+    private static final Set<Class<?>> BOOLEANS = classSet(Boolean.class, Boolean.TYPE);
 
     /**
      * String types.
@@ -139,21 +140,22 @@ public class ReflectUtil
         // needed for loading classes via JMX MBean client.
         classLoader = ReflectUtil.class.getClassLoader();
         clearReflectionCache();
+    }
 
-        // Java 7 doesn't handle this as well as Java 8
-        List<?> list1 = Arrays.asList(Double.TYPE, Float.TYPE, Long.TYPE, Integer.TYPE, Short.TYPE, Byte.TYPE, Number.class);
-        List<Class<?>> list2 = new ArrayList<>(list1.size());
-        for ( Object type : list1 ){
-            list2.add((Class<?>)type);
+    /**
+     * Work around Java 7's weirdness that sometimes happens with
+     * {@link Arrays#asList(Object...)}
+     *
+     * @param classes The classes to add.
+     * @return The set of classes.
+     */
+    private static Set<Class<?>> classSet( Class<?>...classes )
+    {
+        List<Class<?>> list = new ArrayList<>(classes.length);
+        for ( Class<?> clazz : classes ){
+            list.add(clazz);
         }
-        NUMBERS = new HashSet<>(list2);
-
-        list1 = Arrays.asList(Boolean.class, Boolean.TYPE);
-        list2 = new ArrayList<>(list1.size());
-        for ( Object type : list1 ){
-            list2.add((Class<?>)type);
-        }
-        BOOLEANS = new HashSet<>(list2);
+        return new HashSet<>(list);
     }
 
     /**
