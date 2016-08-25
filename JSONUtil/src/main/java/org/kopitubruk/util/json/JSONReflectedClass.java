@@ -230,7 +230,7 @@ public class JSONReflectedClass implements Cloneable
                 String fieldName = key == null ? "" : key.trim();
                 if ( isValidJavaIdentifier(fieldName) ){
                     String value = entry.getValue();
-                    String alias = value == null ? "" : value.trim();
+                    String alias = value == null ? "" : value;
                     if ( alias.length() > 0 ){
                         this.fieldAliases.put(fieldName, alias);
                     }
@@ -256,7 +256,14 @@ public class JSONReflectedClass implements Cloneable
             return name;
         }
         String result = fieldAliases.get(name);
-        return result == null ? name : result;
+        if ( result != null ){
+            if ( result.length() > 0 ){
+                return result;
+            }else{
+                fieldAliases.remove(name);
+            }
+        }
+        return name;
     }
 
     /**
