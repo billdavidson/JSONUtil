@@ -729,6 +729,36 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
+     * Add the given class to the set of classes to be reflected.
+     * <p>
+     * If you wish to use reflection with fields, you can append the field names
+     * to the class name, separated by commas before each field name. Field
+     * names which do not look like valid Java identifier names will be silently
+     * discarded.  For example, if you want to reflect a class called
+     * "org.example.Widget" and it has fields called "a", "b" and "c" but you
+     * only want "a" and "c", then you can pass "org.example.Widget,a,c" to this
+     * method.
+     * <p>
+     * If you wish to use custom field names with reflection you can use
+     * name=alias pairs separated by commas as with the field names. For
+     * example, if you want to reflect a class called "org.example.Widget" and
+     * it has a field called "foo" but you want that field encoded as "bar" you
+     * can pass "org.example.Widget,foo=bar" to this method.
+     *
+     * @param className The name of the class suitable for
+     *            {@link ClassLoader#loadClass(String)} followed optionally by a
+     *            comma separated list of field names and/or field aliases.
+     * @throws ClassNotFoundException If the class cannot be loaded.
+     * @since 1.9.2
+     */
+    public void addReflectClassByName( String className ) throws ClassNotFoundException
+    {
+        String[] parts = className.split(",");
+        Class<?> clazz = ReflectUtil.getClassByName(parts[0]);
+        addReflectClass(JSONConfigUtil.getJSONReflectedClass(clazz, parts));
+    }
+
+    /**
      * Add the classes of all of the given objests to the list of classes
      * that automatically get reflected.
      *
