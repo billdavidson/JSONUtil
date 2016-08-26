@@ -137,6 +137,11 @@ public class ReflectUtil
      */
     private static volatile Map<Class<?>,SimpleType> SIMPLE_TYPE_CACHE;
 
+    /**
+     * Cache of types
+     */
+    private static volatile Map<Class<?>,Class<?>[]> TYPES_CACHE;
+
     static {
         // needed for loading classes via JMX MBean client.
         classLoader = ReflectUtil.class.getClassLoader();
@@ -168,6 +173,7 @@ public class ReflectUtil
         FIELD_METHOD_INCOMPAT = null;
         MIN_GETTER_PRIVACY = null;
         SIMPLE_TYPE_CACHE = null;
+        TYPES_CACHE = null;
     }
 
     /**
@@ -246,6 +252,19 @@ public class ReflectUtil
             SIMPLE_TYPE_CACHE = new Hashtable<Class<?>,SimpleType>(0);
         }
         return SIMPLE_TYPE_CACHE;
+    }
+
+    /**
+     * Get the types cache.
+     *
+     * @return The types cache.
+     */
+    private static synchronized Map<Class<?>,Class<?>[]> getTypesCache()
+    {
+        if ( TYPES_CACHE == null ){
+            TYPES_CACHE = new Hashtable<Class<?>,Class<?>[]>(0);
+        }
+        return TYPES_CACHE;
     }
 
     /**
@@ -715,77 +734,73 @@ public class ReflectUtil
     private static boolean isCompatible( Field field, Method method, boolean cacheTypes )
     {
         Class<?> fieldType = field.getType();
-        Class<?> retType = method.getReturnType();
+        Class<?> methodType = method.getReturnType();
 
-        if ( fieldType == retType ){
+        if ( fieldType == methodType ){
             return true;
         }else if ( cacheTypes ){
-            Map<Class<?>,SimpleType> typeCache = getSimpleCache();
-            SimpleType simpleFieldType = typeCache.get(fieldType);
-            if ( simpleFieldType == null ){
-                simpleFieldType = getSimpleType(getTypes(fieldType));
-                typeCache.put(fieldType, simpleFieldType);
+            Map<Class<?>,SimpleType> simpleTypeCache = getSimpleCache();
+            SimpleType methodSimpleType = getSimpleType(methodType, simpleTypeCache);
+
+            if ( methodSimpleType == SimpleType.OTHER ){
+                return isType(getCachedTypes(methodType), fieldType);
+            }else{
+                return getSimpleType(fieldType, simpleTypeCache) == methodSimpleType;
             }
-            SimpleType simpleReturnType = typeCache.get(retType);
-            Class<?>[] methodTypes = null;
-            if ( simpleReturnType == null ){
-                methodTypes = getTypes(retType);
-                simpleReturnType = getSimpleType(methodTypes);
-                typeCache.put(retType, simpleReturnType);
-            }
-            if ( simpleFieldType == simpleReturnType && simpleFieldType != SimpleType.OTHER ){
-                return true;
-            }
-            if ( methodTypes == null ){
-                methodTypes = getTypes(retType);
-            }
-            return isType(methodTypes, fieldType);
         }else{
-            Class<?>[] methodTypes = getTypes(retType);
+            Class<?>[] methodTypes = getTypes(methodType);
 
             if ( isType(methodTypes, fieldType) ){
                 return true;
             }
 
             Class<?>[] fieldTypes = getTypes(fieldType);
-
-            if ( isNumber(fieldTypes) && isNumber(methodTypes) ){
-                return true;
-            }else if ( isString(fieldTypes) && isString(methodTypes) ){
-                return true;
-            }else if ( isBoolean(fieldTypes) && isBoolean(methodTypes) ){
-                return true;
-            }else if ( isJSONArray(fieldTypes) && isJSONArray(methodTypes) ){
-                return true;
-            }else if ( isJSONMap(fieldTypes) && isJSONMap(methodTypes) ){
-                return true;
+            Class<?>[] t1, t2;
+            if ( fieldTypes.length < methodTypes.length ){
+                t1 = fieldTypes;
+                t2 = methodTypes;
             }else{
-                return false;
+                t1 = methodTypes;
+                t2 = fieldTypes;
             }
+
+            if ( isJSONNumber(t1) )       return isJSONNumber(t2);
+            else if ( isJSONString(t1) )  return isJSONString(t2);
+            else if ( isJSONBoolean(t1) ) return isJSONBoolean(t2);
+            else if ( isJSONArray(t1) )   return isJSONArray(t2);
+            else if ( isJSONMap(t1) )     return isJSONMap(t2);
+            else return false;
         }
     }
 
     /**
-     * Get the simple type of the given types
+     * Get the simple type for the given type.
      *
-     * @param types The types
-     * @return the simple type
+     * @param type the type.
+     * @param simpleTypeCache the simple type cache.
+     * @return the JSON simple type.
      */
-    private static SimpleType getSimpleType( Class<?>[] types )
+    private static SimpleType getSimpleType( Class<?> type, Map<Class<?>,SimpleType> simpleTypeCache )
     {
-        if ( isNumber(types) ){
-            return SimpleType.NUMBER;
-        }else if ( isString(types) ){
-            return SimpleType.STRING;
-        }else if ( isBoolean(types) ){
-            return SimpleType.BOOLEAN;
-        }else if ( isJSONArray(types) ){
-            return SimpleType.ARRAY;
-        }else if ( isJSONMap(types) ){
-            return SimpleType.MAP;
-        }else{
-            return SimpleType.OTHER;
+        SimpleType result = simpleTypeCache.get(type);
+        if ( result == null ){
+            Class<?>[] types = getTypes(type);
+            if ( isJSONNumber(types) ){
+                result = SimpleType.NUMBER;
+            }else if ( isJSONString(types) ){
+                result = SimpleType.STRING;
+            }else if ( isJSONBoolean(types) ){
+                result = SimpleType.BOOLEAN;
+            }else if ( isJSONArray(types) ){
+                result = SimpleType.ARRAY;
+            }else if ( isJSONMap(types) ){
+                result = SimpleType.MAP;
+            }else{
+                result = SimpleType.OTHER;
+            }
+            simpleTypeCache.put(type, result);
         }
+        return result;
     }
 
     /**
@@ -794,7 +809,7 @@ public class ReflectUtil
      * @param type the type to check.
      * @return true if the given type is a {@link Number} type.
      */
-    private static boolean isNumber( Class<?>[] objTypes )
+    private static boolean isJSONNumber( Class<?>[] objTypes )
     {
         return isType(objTypes, NUMBERS);
     }
@@ -805,7 +820,7 @@ public class ReflectUtil
      * @param type the type to check.
      * @return true if the given type is a {@link Boolean} type.
      */
-    private static boolean isBoolean( Class<?>[] objTypes )
+    private static boolean isJSONBoolean( Class<?>[] objTypes )
     {
         return isType(objTypes, BOOLEANS);
     }
@@ -816,7 +831,7 @@ public class ReflectUtil
      * @param type the type to check.
      * @return true if the given type is a {@link CharSequence} type.
      */
-    private static boolean isString( Class<?>[] objTypes )
+    private static boolean isJSONString( Class<?>[] objTypes )
     {
         return isType(objTypes, STRINGS);
     }
@@ -882,6 +897,24 @@ public class ReflectUtil
             }
         }
         return false;
+    }
+
+    /**
+     * Get the types for the given type from cache if cached or create and
+     * add to cache and return types if not already cached.
+     *
+     * @param objType the type.
+     * @return the types.
+     */
+    private static Class<?>[] getCachedTypes( Class<?> objType )
+    {
+        Map<Class<?>,Class<?>[]> typesCache = getTypesCache();
+        Class<?>[] result = typesCache.get(objType);
+        if ( result == null ){
+            result = getTypes(objType);
+            typesCache.put(objType, result);
+        }
+        return result;
     }
 
     /**
