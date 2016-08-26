@@ -262,7 +262,7 @@ public class ReflectUtil
     private static synchronized Map<Class<?>,Class<?>[]> getTypesCache()
     {
         if ( TYPES_CACHE == null ){
-            TYPES_CACHE = new Hashtable<>(0);
+            TYPES_CACHE = new Hashtable<Class<?>,Class<?>[]>(0);
         }
         return TYPES_CACHE;
     }
