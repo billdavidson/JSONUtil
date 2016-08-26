@@ -4,7 +4,6 @@ import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -12,7 +11,6 @@ import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
@@ -86,29 +84,28 @@ public class ReflectUtil
      * Primitive number types and the number class which includes all number
      * wrappers and BigDecimal and BigInteger.
      */
-    private static final Set<Class<?>> NUMBERS =
-            classSet(Double.TYPE, Float.TYPE, Long.TYPE, Integer.TYPE, Short.TYPE, Byte.TYPE, Number.class);
+    private static final Class<?>[] NUMBERS =
+            { Number.class, Integer.TYPE, Double.TYPE, Long.TYPE, Float.TYPE, Short.TYPE, Byte.TYPE };
 
     /**
      * Boolean types.
      */
-    private static final Set<Class<?>> BOOLEANS = classSet(Boolean.class, Boolean.TYPE);
+    private static final Class<?>[] BOOLEANS = { Boolean.class, Boolean.TYPE };
 
     /**
      * String types.
      */
-    private static final Set<Class<?>> STRINGS =
-            classSet(CharSequence.class, Character.class, Character.TYPE);
+    private static final Class<?>[] STRINGS = { CharSequence.class, Character.class, Character.TYPE };
 
     /**
      * Types that become arrays in JSON.
      */
-    private static final Set<Class<?>> ARRAY_TYPES = classSet(Iterable.class, Enumeration.class);
+    private static final Class<?>[] ARRAY_TYPES = { Iterable.class, Enumeration.class };
 
     /**
      * Types that become maps/objects in JSON.
      */
-    private static final Set<Class<?>> MAP_TYPES = classSet(Map.class, ResourceBundle.class);
+    private static final Class<?>[] MAP_TYPES = { Map.class, ResourceBundle.class };
 
     /**
      * Cache for fields.
@@ -135,6 +132,11 @@ public class ReflectUtil
      */
     private static volatile Map<Class<?>,Integer> MIN_GETTER_PRIVACY;
 
+    /**
+     * Cache of simple types
+     */
+    private static volatile Map<Class<?>,SimpleType> SIMPLE_TYPE_CACHE;
+
     static {
         // needed for loading classes via JMX MBean client.
         classLoader = ReflectUtil.class.getClassLoader();
@@ -142,19 +144,17 @@ public class ReflectUtil
     }
 
     /**
-     * Work around Java 7's weirdness that sometimes happens with
-     * {@link Arrays#asList(Object...)}
-     *
-     * @param classes The classes to add.
-     * @return The set of classes.
+     * Simple types used for JSON compatibility comparison between
+     * fields and getters.
      */
-    private static Set<Class<?>> classSet( Class<?>...classes )
+    private enum SimpleType
     {
-        List<Class<?>> list = new ArrayList<Class<?>>(classes.length);
-        for ( Class<?> clazz : classes ){
-            list.add(clazz);
-        }
-        return new HashSet<Class<?>>(list);
+        NUMBER,
+        STRING,
+        BOOLEAN,
+        ARRAY,
+        MAP,
+        OTHER
     }
 
     /**
@@ -167,6 +167,7 @@ public class ReflectUtil
         FIELD_METHOD_COMPAT = null;
         FIELD_METHOD_INCOMPAT = null;
         MIN_GETTER_PRIVACY = null;
+        SIMPLE_TYPE_CACHE = null;
     }
 
     /**
@@ -232,6 +233,19 @@ public class ReflectUtil
             FIELD_METHOD_INCOMPAT = new HashMap<Class<?>,Map<Field,Method>>(0);
         }
         return FIELD_METHOD_INCOMPAT;
+    }
+
+    /**
+     * Get the field cache.
+     *
+     * @return The field cache.
+     */
+    private static synchronized Map<Class<?>,SimpleType> getSimpleCache()
+    {
+        if ( SIMPLE_TYPE_CACHE == null ){
+            SIMPLE_TYPE_CACHE = new Hashtable<Class<?>,SimpleType>(0);
+        }
+        return SIMPLE_TYPE_CACHE;
     }
 
     /**
@@ -555,7 +569,7 @@ public class ReflectUtil
                 if ( getterMethods.containsKey(name) || ! GETTER.matcher(name).matches() ){
                     continue;
                 }
-                if ( name.startsWith("is") && ! BOOLEANS.contains(retType) ){
+                if ( name.startsWith("is") && ! isType(BOOLEANS, retType) ){
                     continue;   // "is" prefix only valid getter for booleans.
                 }
                 if ( isPrivate ){
@@ -636,7 +650,7 @@ public class ReflectUtil
             return getter;
         }
 
-        boolean isCompatible = isCompatible(field, getter);
+        boolean isCompatible = isCompatible(field, getter, cacheMethods);
 
         if ( cacheMethods ){
             if ( isCompatible ){
@@ -695,17 +709,45 @@ public class ReflectUtil
      *
      * @param field The field.
      * @param method The method to check the return type of.
+     * @param cacheTypes If true then cache simple type data.
      * @return true if they are compatible in JSON.
      */
-    private static boolean isCompatible( Field field, Method method )
+    private static boolean isCompatible( Field field, Method method, boolean cacheTypes )
     {
         Class<?> fieldType = field.getType();
-        Set<Class<?>> methodTypes = getTypes(method.getReturnType());
+        Class<?> retType = method.getReturnType();
 
-        if ( isType(methodTypes, fieldType) ){
+        if ( fieldType == retType ){
             return true;
+        }else if ( cacheTypes ){
+            Map<Class<?>,SimpleType> typeCache = getSimpleCache();
+            SimpleType simpleFieldType = typeCache.get(fieldType);
+            if ( simpleFieldType == null ){
+                simpleFieldType = getSimpleType(getTypes(fieldType));
+                typeCache.put(fieldType, simpleFieldType);
+            }
+            SimpleType simpleReturnType = typeCache.get(retType);
+            Class<?>[] methodTypes = null;
+            if ( simpleReturnType == null ){
+                methodTypes = getTypes(retType);
+                simpleReturnType = getSimpleType(methodTypes);
+                typeCache.put(retType, simpleReturnType);
+            }
+            if ( simpleFieldType == simpleReturnType && simpleFieldType != SimpleType.OTHER ){
+                return true;
+            }
+            if ( methodTypes == null ){
+                methodTypes = getTypes(retType);
+            }
+            return isType(methodTypes, fieldType);
         }else{
-            Set<Class<?>> fieldTypes = getTypes(fieldType);
+            Class<?>[] methodTypes = getTypes(retType);
+
+            if ( isType(methodTypes, fieldType) ){
+                return true;
+            }
+
+            Class<?>[] fieldTypes = getTypes(fieldType);
 
             if ( isNumber(fieldTypes) && isNumber(methodTypes) ){
                 return true;
@@ -717,10 +759,33 @@ public class ReflectUtil
                 return true;
             }else if ( isJSONMap(fieldTypes) && isJSONMap(methodTypes) ){
                 return true;
+            }else{
+                return false;
             }
         }
+    }
 
-        return false;
+    /**
+     * Get the simple type of the given types
+     *
+     * @param types The types
+     * @return the simple type
+     */
+    private static SimpleType getSimpleType( Class<?>[] types )
+    {
+        if ( isNumber(types) ){
+            return SimpleType.NUMBER;
+        }else if ( isString(types) ){
+            return SimpleType.STRING;
+        }else if ( isBoolean(types) ){
+            return SimpleType.BOOLEAN;
+        }else if ( isJSONArray(types) ){
+            return SimpleType.ARRAY;
+        }else if ( isJSONMap(types) ){
+            return SimpleType.MAP;
+        }else{
+            return SimpleType.OTHER;
+        }
     }
 
     /**
@@ -729,7 +794,7 @@ public class ReflectUtil
      * @param type the type to check.
      * @return true if the given type is a {@link Number} type.
      */
-    private static boolean isNumber( Set<Class<?>> objTypes )
+    private static boolean isNumber( Class<?>[] objTypes )
     {
         return isType(objTypes, NUMBERS);
     }
@@ -740,7 +805,7 @@ public class ReflectUtil
      * @param type the type to check.
      * @return true if the given type is a {@link Boolean} type.
      */
-    private static boolean isBoolean( Set<Class<?>> objTypes )
+    private static boolean isBoolean( Class<?>[] objTypes )
     {
         return isType(objTypes, BOOLEANS);
     }
@@ -751,7 +816,7 @@ public class ReflectUtil
      * @param type the type to check.
      * @return true if the given type is a {@link CharSequence} type.
      */
-    private static boolean isString( Set<Class<?>> objTypes )
+    private static boolean isString( Class<?>[] objTypes )
     {
         return isType(objTypes, STRINGS);
     }
@@ -762,7 +827,7 @@ public class ReflectUtil
      * @param type the type to check.
      * @return true if the given type is a JSON array type.
      */
-    private static boolean isJSONArray( Set<Class<?>> objTypes )
+    private static boolean isJSONArray( Class<?>[] objTypes )
     {
         for ( Class<?> clazz : objTypes ){
             if ( clazz.isArray() ){
@@ -780,7 +845,7 @@ public class ReflectUtil
      * @param type the type to check.
      * @return true if the given type is a JSON map type.
      */
-    private static boolean isJSONMap( Set<Class<?>> objTypes )
+    private static boolean isJSONMap( Class<?>[] objTypes )
     {
         return isType(objTypes, MAP_TYPES);
     }
@@ -793,11 +858,10 @@ public class ReflectUtil
      * @param type The type to check against.
      * @return true if there's a match.
      */
-    private static boolean isType( Set<Class<?>> objTypes, Class<?> type )
+    private static boolean isType( Class<?>[] objTypes, Class<?> type )
     {
-        List<Class<?>> typeList = new ArrayList<Class<?>>(1);
-        typeList.add(type);
-        return isType(objTypes, new HashSet<Class<?>>(typeList));
+        Class<?>[] typeList = { type };
+        return isType(objTypes, typeList);
     }
 
     /**
@@ -808,17 +872,11 @@ public class ReflectUtil
      * @param type The type to check against.
      * @return true if there's a match.
      */
-    private static boolean isType( Set<Class<?>> objTypes, Set<Class<?>> types )
+    private static boolean isType( Class<?>[] objTypes, Class<?>[] types )
     {
-        if ( objTypes.size() >= types.size() ){
-            for ( Class<?> type : types ){
-                if ( objTypes.contains(type) ){
-                    return true;
-                }
-            }
-        }else{
-            for ( Class<?> type : objTypes ){
-                if ( types.contains(type) ){
+        for ( int i = 0; i < types.length; i++ ){
+            for ( int j = 0; j < objTypes.length; j++ ){
+                if ( objTypes[j] == types[i] ){
                     return true;
                 }
             }
@@ -833,7 +891,7 @@ public class ReflectUtil
      * @param objType the original type.
      * @return the type and all its super types and interfaces.
      */
-    private static Set<Class<?>> getTypes( Class<?> objType )
+    private static Class<?>[] getTypes( Class<?> objType )
     {
         Set<Class<?>> types = new LinkedHashSet<Class<?>>();
         Class<?> tmpClass = objType;
@@ -844,7 +902,7 @@ public class ReflectUtil
             tmpClass = tmpClass.getSuperclass();
         }
         getInterfaces(objType, types);
-        return types;
+        return types.toArray(new Class<?>[types.size()]);
     }
 
     /**
