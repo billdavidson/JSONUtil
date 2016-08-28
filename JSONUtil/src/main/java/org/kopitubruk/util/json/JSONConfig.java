@@ -752,9 +752,7 @@ public class JSONConfig implements Serializable, Cloneable
      */
     public void addReflectClassByName( String className ) throws ClassNotFoundException
     {
-        String[] parts = className.split(",");
-        Class<?> clazz = ReflectUtil.getClassByName(parts[0]);
-        addReflectClass(JSONConfigUtil.getJSONReflectedClass(clazz, parts));
+        addReflectClass(new JSONReflectedClass(className));
     }
 
     /**

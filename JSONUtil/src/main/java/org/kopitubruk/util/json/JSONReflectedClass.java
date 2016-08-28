@@ -15,6 +15,8 @@
  */
 package org.kopitubruk.util.json;
 
+import java.lang.ref.WeakReference;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -64,6 +66,18 @@ public class JSONReflectedClass implements Cloneable
     private Class<?> objClass;
     private String[] fieldNames;
     private Map<String,String> fieldAliases;
+
+    /*
+     * Holds reference to cached reflection data. There's a hard reference in
+     * ReflectedObjectMapBuilder in its cache. If its cache gets cleared, then
+     * these weak references remain. Hopefully the garbage collector will clean
+     * them up soon enough, effectively completing the clearing of the cache.
+     * They are in this object to speed lookups of cached data because without
+     * them, a dummy ReflectioData object has to be created and looked up in a
+     * HashMap with hashCode() performed once and equals() performed one or more
+     * times depending upon the number of hash collisions.
+     */
+    private transient WeakReference<ReflectionData>[] reflectionData;
 
     /**
      * Create a new JSONReflectedClass
@@ -115,6 +129,63 @@ public class JSONReflectedClass implements Cloneable
         setFieldAliases(fieldAliases);
     }
 
+    /**
+     * Create a JSONReflectedClass using the given class name.
+     * <p>
+     * If you wish to use reflection with fields, you can append the field names
+     * to the class name, separated by commas before each field name. Field
+     * names which do not look like valid Java identifier names will be silently
+     * discarded.  For example, if you want to reflect a class called
+     * "org.example.Widget" and it has fields called "a", "b" and "c" but you
+     * only want "a" and "c", then you can pass "org.example.Widget,a,c" to this
+     * method.
+     * <p>
+     * If you wish to use custom field names with reflection you can use
+     * name=alias pairs separated by commas as with the field names. For
+     * example, if you want to reflect a class called "org.example.Widget" and
+     * it has a field called "foo" but you want that field encoded as "bar" you
+     * can pass "org.example.Widget,foo=bar" to this method.
+     *
+     * @param className The name of the class suitable for
+     *            {@link ClassLoader#loadClass(String)} followed optionally by a
+     *            comma separated list of field names and/or field aliases.
+     * @throws ClassNotFoundException If the class cannot be loaded.
+     * @since 1.9.3
+     */
+    public JSONReflectedClass( String className ) throws ClassNotFoundException
+    {
+        String[] parts = className.split(",");
+        Class<?> clazz = ReflectUtil.getClassByName(parts[0]);
+        Set<String> fieldNames = null;
+        Map<String,String> fieldAliases = null;
+        if ( parts.length > 1 ){
+            fieldNames = new LinkedHashSet<>();
+            fieldAliases = new LinkedHashMap<>();
+            for ( int i = 1; i < parts.length; i++ ){
+                String fieldName = parts[i];
+                fieldName = parts[i] == null ? "" : parts[i].trim();
+                if ( fieldName.indexOf('=') >= 0 ){
+                    String[] pair = fieldName.split("=");
+                    if ( pair.length == 2 ){
+                        fieldName = pair[0] == null ? "" : pair[0].trim();
+                        String fieldAlias = pair[1] == null ? "" : pair[1].trim();
+                        if ( fieldName.length() > 0 && fieldAlias.length() > 0 ){
+                            fieldAliases.put(fieldName, fieldAlias);
+                        }
+                    }
+                }else if ( fieldName.length() > 0 ){
+                    fieldNames.add(fieldName);
+                }
+            }
+        }
+        setObjClass(clazz);
+        setFieldNames(fieldNames);
+        setFieldAliases(fieldAliases);
+    }
+
+    /**
+     * Only used for clone()
+     */
     private JSONReflectedClass()
     {
     }
@@ -137,6 +208,7 @@ public class JSONReflectedClass implements Cloneable
     public void setObjClass( Object obj )
     {
         objClass = ReflectUtil.getClass(obj);
+        clearReflectionData();
     }
 
     /**
@@ -200,6 +272,7 @@ public class JSONReflectedClass implements Cloneable
             }
             this.fieldNames = ids.size() > 0 ? ids.toArray(new String[ids.size()]) : null;
         }
+        clearReflectionData();
     }
 
     /**
@@ -242,28 +315,103 @@ public class JSONReflectedClass implements Cloneable
                 this.fieldAliases = new LinkedHashMap<>(this.fieldAliases);
             }
         }
+        clearReflectionData();
+    }
+
+    /**
+     * Get the reflection data cache for the given privacy level.
+     *
+     * @param privacyLevel the privacy level
+     * @return The reflection data cache or null if there isn't one.
+     */
+    synchronized ReflectionData getReflectionData( int privacyLevel )
+    {
+        if ( reflectionData == null || reflectionData[privacyLevel] == null ){
+            return null;
+        }else{
+            ReflectionData rd = reflectionData[privacyLevel].get();
+            if ( rd == null ){
+                reflectionData[privacyLevel] = null;
+                cleanAllNullReflectionData();
+            }
+            return rd;
+        }
+    }
+
+    /**
+     * The the reflection data cache for the given privacy level.
+     *
+     * @param reflectionData the reflection data cache.
+     * @param privacyLevel the privacy level
+     */
+    synchronized void setReflectionData( ReflectionData reflectionData, int privacyLevel )
+    {
+        if ( reflectionData == null ){
+            if ( this.reflectionData != null ){
+                this.reflectionData[privacyLevel] = null;
+                cleanAllNullReflectionData();
+            }
+        }else{
+            if ( this.reflectionData == null ){
+                // can't create array of parameterized type.  annoying.
+                @SuppressWarnings("unchecked")
+                WeakReference<ReflectionData>[] rda = new WeakReference[ReflectUtil.PERMITTED_LEVELS.size()];
+                this.reflectionData = rda;
+            }
+            this.reflectionData[privacyLevel] = new WeakReference<>(reflectionData);
+        }
+    }
+
+    /**
+     * Clear out any dead reflection WeakReference's and remove the
+     * cache altogether if it has no more useful data.
+     */
+    private void cleanAllNullReflectionData()
+    {
+        boolean allNull = true;
+        for ( int i = 0; allNull && i < reflectionData.length; i++ ){
+            if ( reflectionData[i] != null ){
+                ReflectionData rd = reflectionData[i].get();
+                if ( rd == null ){
+                    reflectionData[i] = null;
+                }else{
+                    allNull = false;
+                }
+            }
+        }
+        if ( allNull ){
+            reflectionData = null;
+        }
+    }
+
+    /**
+     * Clear the reflection data cache.
+     */
+    private synchronized void clearReflectionData()
+    {
+        reflectionData = null;
     }
 
     /**
      * Get the custom version of the name, if any.
      *
-     * @param name The name to look up.
+     * @param fieldName The name to look up.
      * @return The custom version of the name.
      */
-    String getAlias( String name )
+    String getFieldAlias( String fieldName )
     {
         if ( fieldAliases == null ){
-            return name;
+            return fieldName;
         }
-        String result = fieldAliases.get(name);
+        String result = fieldAliases.get(fieldName);
         if ( result != null ){
             if ( result.length() > 0 ){
                 return result;
             }else{
-                fieldAliases.remove(name);
+                fieldAliases.remove(fieldName);
             }
         }
-        return name;
+        return fieldName;
     }
 
     /**
@@ -296,12 +444,13 @@ public class JSONReflectedClass implements Cloneable
      * @see java.lang.Object#clone()
      */
     @Override
-    public JSONReflectedClass clone()
+    public synchronized JSONReflectedClass clone()
     {
         JSONReflectedClass result = new JSONReflectedClass();
         result.objClass = objClass;
         result.fieldNames = fieldNames;
         result.fieldAliases = fieldAliases == null ? null : new LinkedHashMap<>(fieldAliases);
+        result.reflectionData = reflectionData == null ? null : Arrays.copyOf(reflectionData, reflectionData.length);
         return result;
     }
 
@@ -334,11 +483,35 @@ public class JSONReflectedClass implements Cloneable
         if ( getClass() != obj.getClass() )
             return false;
         JSONReflectedClass other = (JSONReflectedClass)obj;
-        if ( objClass == null ){
-            if ( other.objClass != null )
-                return false;
-        }else if ( !objClass.equals(other.objClass) )
+        if ( objClass != other.objClass )
             return false;
+        return true;
+    }
+
+    /**
+     * Equals that operates on more fields.  The normal equals() is used for storing
+     * these in a HashMap so that you only have one per class.  This one is used to
+     * check if they have the same parameters for reflection caching.
+     *
+     * @param obj The JSONReflectedClass to compare
+     * @return true if they are equal including fieldNames and fieldAliases.
+     */
+    boolean fullEquals( Object obj )
+    {
+        if ( this == obj )
+            return true;
+        if ( obj == null )
+            return false;
+        if ( getClass() != obj.getClass() )
+            return false;
+        JSONReflectedClass other = (JSONReflectedClass)obj;
+        if ( objClass != other.objClass )
+            return false;
+        if ( ! Arrays.equals(fieldNames, other.fieldNames) )
+            return false;
+        if ( ! ReflectionData.mapsEqual(fieldAliases, other.fieldAliases) ){
+            return false;
+        }
         return true;
     }
 }
