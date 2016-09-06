@@ -28,7 +28,7 @@ public class ReflectUtil
      * This needs to be saved at class load time so that the correct class
      * loader is used if someone tries to load a class via a JMX client.
      */
-    private static ClassLoader classLoader;
+    private static ClassLoader classLoader = ReflectUtil.class.getClassLoader();
 
     /**
      * Reflection will attempt to serialize all fields including private.
@@ -104,11 +104,6 @@ public class ReflectUtil
      * Types that become maps/objects in JSON.
      */
     private static final Class<?>[] MAP_TYPES = { Map.class, ResourceBundle.class };
-
-    static {
-        // needed for loading classes via JMX MBean client.
-        classLoader = ReflectUtil.class.getClassLoader();
-    }
 
     /**
      * Get the class of the given object or the object if it's a class object.

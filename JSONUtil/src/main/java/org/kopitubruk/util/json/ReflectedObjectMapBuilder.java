@@ -67,20 +67,17 @@ class ReflectedObjectMapBuilder
             Map<Object,Object> obj;
 
             if ( reflectionData == null ){
-                obj = new LinkedHashMap<>(fieldNames.length);
                 int modifiers = 0;
                 List<AccessibleObject> attributeList = null;
                 List<String> nameList = null;
+                obj = new LinkedHashMap<>(fieldNames.length);
                 if ( cacheReflectionData ){
-                    attributeList = new ArrayList<>();
-                    nameList = new ArrayList<>();
+                    attributeList = new ArrayList<>(fieldNames.length);
+                    nameList = new ArrayList<>(fieldNames.length);
                 }
 
                 for ( String fieldName : fieldNames ){
                     name = refClass.getFieldAlias(fieldName);
-                    if ( cacheReflectionData ){
-                        nameList.add(name);
-                    }
                     Field field = fields.get(fieldName);
                     if ( isNotFieldsSpecified ){
                         modifiers = field.getModifiers();
@@ -90,17 +87,19 @@ class ReflectedObjectMapBuilder
                     }
                     Method getter = getGetter(field, fieldName);
                     if ( getter != null ){
-                        if ( cacheReflectionData ){
-                            attributeList.add(getter);
-                        }
                         ReflectUtil.ensureAccessible(getter);
                         obj.put(name, getter.invoke(propertyValue));
-                    }else if ( field != null && (isPrivate || ReflectUtil.getPrivacyLevel(modifiers) >= privacyLevel) ){
                         if ( cacheReflectionData ){
-                            attributeList.add(field);
+                            nameList.add(name);
+                            attributeList.add(getter);
                         }
+                    }else if ( field != null && (isPrivate || ReflectUtil.getPrivacyLevel(modifiers) >= privacyLevel) ){
                         ReflectUtil.ensureAccessible(field);
                         obj.put(name, field.get(propertyValue));
+                        if ( cacheReflectionData ){
+                            nameList.add(name);
+                            attributeList.add(field);
+                        }
                     }else if ( isFieldsSpecified ){
                         throw new JSONReflectionException(propertyValue, fieldName, cfg);
                     }
@@ -116,7 +115,6 @@ class ReflectedObjectMapBuilder
                     AccessibleObject[] attributes = attributeList.toArray(new AccessibleObject[attributeList.size()]);
                     reflectionData = new ReflectionData(clazz, fnames, fieldAliases, privacyLevel, names, attributes);
                     reflectionDataCache.put(reflectionData, reflectionData);
-                    storeReflectionData();
                 }
             }else{
                 // use cached reflection data for better performance.
@@ -156,15 +154,9 @@ class ReflectedObjectMapBuilder
         privacyLevel = isFieldsSpecified ? ReflectUtil.PRIVATE : cfg.getReflectionPrivacy();
         cacheReflectionData = cfg.isCacheReflectionData();
         if ( cacheReflectionData ){
-            reflectionData = refClass.getReflectionData(privacyLevel);
-            if ( reflectionData == null ){
-                Map<String,String> fieldAliases = refClass.getFieldAliases();
-                reflectionDataCache = getReflectionDataCache();
-                reflectionData = reflectionDataCache.get(new ReflectionData(clazz, fieldNames, fieldAliases, privacyLevel, null, null));
-                if ( reflectionData != null ){
-                    storeReflectionData();
-                }
-            }
+            Map<String,String> fieldAliases = refClass.getFieldAliases();
+            reflectionDataCache = getReflectionDataCache();
+            reflectionData = reflectionDataCache.get(new ReflectionData(clazz, fieldNames, fieldAliases, privacyLevel, null, null));
         }else{
             reflectionData = null;
         }
@@ -196,13 +188,8 @@ class ReflectedObjectMapBuilder
                     if ( name.startsWith("is") && ! ReflectUtil.isType(ReflectUtil.BOOLEANS, retType) ){
                         continue;   // "is" prefix only valid getter for booleans.
                     }
-                    if ( isPrivate ){
+                    if ( ReflectUtil.getPrivacyLevel(method.getModifiers()) >= privacyLevel ){
                         getterMethods.put(name, method);
-                    }else{
-                        int getterPrivacyLevel = ReflectUtil.getPrivacyLevel(method.getModifiers());
-                        if ( getterPrivacyLevel >= privacyLevel ){
-                            getterMethods.put(name, method);
-                        }
                     }
                 }
                 tmpClass = tmpClass.getSuperclass();
@@ -276,21 +263,6 @@ class ReflectedObjectMapBuilder
         }
     }
 
-    /**
-     * Store reflection data in the refClass and JSONConfigDefaults if
-     * appropriate.
-     */
-    private void storeReflectionData()
-    {
-        refClass.setReflectionData(reflectionData, privacyLevel);
-        if ( JSONConfigDefaults.getInstance().isCacheReflectionData() ){
-            JSONReflectedClass rc = JSONConfigDefaults.getReflectedClass(clazz);
-            if ( refClass.fullEquals(rc) ){
-                rc.setReflectionData(reflectionData, privacyLevel);
-            }
-        }
-    }
-
     /*
      * static cache for reflection information.
      */
@@ -305,9 +277,9 @@ class ReflectedObjectMapBuilder
     }
 
     /**
-     * Get the field cache.
+     * Get the reflection data cache.
      *
-     * @return The field cache.
+     * @return reflection data cache.
      */
     private static synchronized Map<ReflectionData,ReflectionData> getReflectionDataCache()
     {

@@ -118,7 +118,7 @@ class ReflectionData
      * @param map1 second map
      * @return true if they have the same key value pairs.
      */
-    static boolean mapsEqual( Map<String,String> map0, Map<String,String> map1 )
+    private static boolean mapsEqual( Map<String,String> map0, Map<String,String> map1 )
     {
         if ( map0 == map1 ){
             return true;
@@ -131,10 +131,10 @@ class ReflectionData
         }
         for ( Entry<String,String> entry : map0.entrySet() ){
             String key0 = entry.getKey();
-            String value0 = entry.getValue();
             if ( ! map1.containsKey(key0) ){
                 return false;
             }
+            String value0 = entry.getValue();
             String value1 = map1.get(key0);
             if ( value0 == value1 ){
                 // OK
