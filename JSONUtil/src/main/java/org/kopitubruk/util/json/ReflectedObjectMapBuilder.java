@@ -18,10 +18,6 @@ import java.util.Map;
  */
 class ReflectedObjectMapBuilder
 {
-    static {
-        clearReflectionCache();
-    }
-
     /*
      * Data specific to the object being reflected.
      */
@@ -57,25 +53,26 @@ class ReflectedObjectMapBuilder
      *
      * @return A map representing the object's fields.
      */
-    Map<Object,Object> buildReflectedObjectMap()
+    Map<String,Object> buildReflectedObjectMap()
     {
         String name = "buildReflectedObjectMap()";
 
         init();
 
         try {
-            Map<Object,Object> obj;
+            Map<String,Object> obj;
 
             if ( reflectionData == null ){
                 int modifiers = 0;
                 List<AccessibleObject> attributeList = null;
                 List<String> nameList = null;
-                obj = new LinkedHashMap<>(fieldNames.length);
+                obj = new LinkedHashMap<>(0);
                 if ( cacheReflectionData ){
-                    attributeList = new ArrayList<>(fieldNames.length);
-                    nameList = new ArrayList<>(fieldNames.length);
+                    attributeList = new ArrayList<>();
+                    nameList = new ArrayList<>();
                 }
 
+                // populate the object map.
                 for ( String fieldName : fieldNames ){
                     name = refClass.getFieldAlias(fieldName);
                     Field field = fields.get(fieldName);
@@ -105,6 +102,7 @@ class ReflectedObjectMapBuilder
                         throw new JSONReflectionException(propertyValue, fieldName, cfg);
                     }
                 }
+
                 if ( cacheReflectionData ){
                     addReflectionData(attributeList, nameList);
                 }
@@ -113,6 +111,8 @@ class ReflectedObjectMapBuilder
                 String[] names = reflectionData.getNames();
                 AccessibleObject[] attributes = reflectionData.getAttributes();
                 obj = new LinkedHashMap<>(attributes.length);
+
+                // populate the object map.
                 for ( int i = 0; i < attributes.length; i++ ){
                     AccessibleObject attribute = attributes[i];
                     name = names[i];
@@ -180,15 +180,15 @@ class ReflectedObjectMapBuilder
             }
             for ( Method method : tmpClass.getDeclaredMethods() ){
                 if ( method.getParameterCount() != 0 ){
-                    continue;
+                    continue;   // no parameters in bean getter.
                 }
                 Class<?> retType = method.getReturnType();
                 if ( Void.TYPE == retType ){
-                    continue;
+                    continue;   // getters must return something.
                 }
                 String name = method.getName();
                 if ( getterMethods.containsKey(name) || ! ReflectUtil.GETTER.matcher(name).matches() ){
-                    continue;
+                    continue;   // don't have this name and name starts with "get" or "is"
                 }
                 if ( name.startsWith("is") && ! ReflectUtil.isType(ReflectUtil.BOOLEANS, retType) ){
                     continue;   // "is" prefix only valid getter for booleans.
@@ -307,5 +307,9 @@ class ReflectedObjectMapBuilder
             REFLECTION_DATA_CACHE = new Hashtable<>(0);
         }
         return REFLECTION_DATA_CACHE;
+    }
+
+    static {
+        clearReflectionCache();
     }
 }

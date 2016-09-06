@@ -366,7 +366,7 @@ public class JSONReflectedClass implements Cloneable
     {
         final int prime = 31;
         int result = 1;
-        result = prime * result + ((objClass == null) ? 0 : objClass.hashCode());
+        result = prime * result + objClass.hashCode();
         return result;
     }
 
