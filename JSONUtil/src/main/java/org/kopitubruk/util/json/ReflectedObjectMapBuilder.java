@@ -101,20 +101,12 @@ class ReflectedObjectMapBuilder
                             attributeList.add(field);
                         }
                     }else if ( isFieldsSpecified ){
+                        // field name specified but field/pseudo-field does not exist.
                         throw new JSONReflectionException(propertyValue, fieldName, cfg);
                     }
                 }
                 if ( cacheReflectionData ){
-                    // save the reflection data so that it can be used later for fast operation.
-                    String[] fnames = isFieldsSpecified ? fieldNames : null;
-                    Map<String,String> fieldAliases = refClass.getFieldAliases();
-                    if ( fieldAliases != null ){
-                        fieldAliases = new HashMap<>(fieldAliases);
-                    }
-                    String[] names = nameList.toArray(new String[nameList.size()]);
-                    AccessibleObject[] attributes = attributeList.toArray(new AccessibleObject[attributeList.size()]);
-                    reflectionData = new ReflectionData(clazz, fnames, fieldAliases, privacyLevel, names, attributes);
-                    reflectionDataCache.put(reflectionData, reflectionData);
+                    addReflectionData(attributeList, nameList);
                 }
             }else{
                 // use cached reflection data for better performance.
@@ -161,43 +153,51 @@ class ReflectedObjectMapBuilder
             reflectionData = null;
         }
         if ( reflectionData == null ){
-            // data needed for uncached operation.
+            // data needed if caching is disabled or hasn't happened yet.
             isPrivate = privacyLevel == ReflectUtil.PRIVATE;
             fields = new LinkedHashMap<>();
             getterMethods = new HashMap<>(0);
-            Class<?> tmpClass = clazz;
-            while ( tmpClass != null ){
-                for ( Field field : tmpClass.getDeclaredFields() ){
-                    String name = field.getName();
-                    if ( ! fields.containsKey(name) ){
-                        fields.put(name, field);
-                    }
-                }
-                for ( Method method : tmpClass.getDeclaredMethods() ){
-                    if ( method.getParameterCount() != 0 ){
-                        continue;
-                    }
-                    Class<?> retType = method.getReturnType();
-                    if ( Void.TYPE == retType ){
-                        continue;
-                    }
-                    String name = method.getName();
-                    if ( getterMethods.containsKey(name) || ! ReflectUtil.GETTER.matcher(name).matches() ){
-                        continue;
-                    }
-                    if ( name.startsWith("is") && ! ReflectUtil.isType(ReflectUtil.BOOLEANS, retType) ){
-                        continue;   // "is" prefix only valid getter for booleans.
-                    }
-                    if ( ReflectUtil.getPrivacyLevel(method.getModifiers()) >= privacyLevel ){
-                        getterMethods.put(name, method);
-                    }
-                }
-                tmpClass = tmpClass.getSuperclass();
-            }
+            initFieldsAndMethods();
             isNotFieldsSpecified = ! isFieldsSpecified;
             if ( isNotFieldsSpecified ){
                 fieldNames = fields.keySet().toArray(new String[fields.size()]);
             }
+        }
+    }
+
+    /**
+     * Initialize the maps of the fields and methods for the class.
+     */
+    private void initFieldsAndMethods()
+    {
+        Class<?> tmpClass = clazz;
+        while ( tmpClass != null ){
+            for ( Field field : tmpClass.getDeclaredFields() ){
+                String name = field.getName();
+                if ( ! fields.containsKey(name) ){
+                    fields.put(name, field);
+                }
+            }
+            for ( Method method : tmpClass.getDeclaredMethods() ){
+                if ( method.getParameterCount() != 0 ){
+                    continue;
+                }
+                Class<?> retType = method.getReturnType();
+                if ( Void.TYPE == retType ){
+                    continue;
+                }
+                String name = method.getName();
+                if ( getterMethods.containsKey(name) || ! ReflectUtil.GETTER.matcher(name).matches() ){
+                    continue;
+                }
+                if ( name.startsWith("is") && ! ReflectUtil.isType(ReflectUtil.BOOLEANS, retType) ){
+                    continue;   // "is" prefix only valid getter for booleans.
+                }
+                if ( ReflectUtil.getPrivacyLevel(method.getModifiers()) >= privacyLevel ){
+                    getterMethods.put(name, method);
+                }
+            }
+            tmpClass = tmpClass.getSuperclass();
         }
     }
 
@@ -261,6 +261,26 @@ class ReflectedObjectMapBuilder
             else if ( ReflectUtil.isJSONMap(t1) )     return ReflectUtil.isJSONMap(t2);
             else return false;
         }
+    }
+
+    /**
+     * Add reflection data to the cache.
+     *
+     * @param attributeList The list of reflected attributes.
+     * @param nameList The list of names.
+     */
+    private void addReflectionData( List<AccessibleObject> attributeList, List<String> nameList )
+    {
+        // save the reflection data so that it can be used later for fast operation.
+        String[] fnames = isFieldsSpecified ? fieldNames : null;
+        Map<String,String> fieldAliases = refClass.getFieldAliases();
+        if ( fieldAliases != null ){
+            fieldAliases = new HashMap<>(fieldAliases);
+        }
+        String[] names = nameList.toArray(new String[nameList.size()]);
+        AccessibleObject[] attributes = attributeList.toArray(new AccessibleObject[attributeList.size()]);
+        reflectionData = new ReflectionData(clazz, fnames, fieldAliases, privacyLevel, names, attributes);
+        reflectionDataCache.put(reflectionData, reflectionData);
     }
 
     /*
