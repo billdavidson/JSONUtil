@@ -21,12 +21,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 /**
  * Package private utility methods for JSONConfig/JSONConfigDefaults that don't
@@ -233,40 +230,6 @@ class JSONConfigUtil
     private static Map<Class<?>,JSONReflectedClass> trimClasses( Map<Class<?>,JSONReflectedClass> refClasses )
     {
         return refClasses.size() > 0 ? new HashMap<Class<?>, JSONReflectedClass>(refClasses) : null;
-    }
-
-    /**
-     * Make a {@link JSONReflectedClass} with the given field names, if any.
-     *
-     * @param clazz The class.
-     * @param parts The field names or custom name mappings or both.
-     * @return the JSONReflectedClass
-     */
-    static JSONReflectedClass getJSONReflectedClass( Class<?> clazz, String[] parts )
-    {
-        Set<String> fieldNames = null;
-        Map<String,String> fieldAliases = null;
-        if ( parts.length > 1 ){
-            fieldNames = new LinkedHashSet<String>();
-            fieldAliases = new LinkedHashMap<String,String>();
-            for ( int i = 1; i < parts.length; i++ ){
-                String fieldName = parts[i];
-                fieldName = parts[i] == null ? "" : parts[i].trim();
-                if ( fieldName.indexOf('=') >= 0 ){
-                    String[] pair = fieldName.split("=");
-                    if ( pair.length == 2 ){
-                        fieldName = pair[0] == null ? "" : pair[0].trim();
-                        String fieldAlias = pair[1] == null ? "" : pair[1].trim();
-                        if ( fieldName.length() > 0 && fieldAlias.length() > 0 ){
-                            fieldAliases.put(fieldName, fieldAlias);
-                        }
-                    }
-                }else if ( fieldName.length() > 0 ){
-                    fieldNames.add(fieldName);
-                }
-            }
-        }
-        return new JSONReflectedClass(clazz, fieldNames, fieldAliases);
     }
 
     /**
