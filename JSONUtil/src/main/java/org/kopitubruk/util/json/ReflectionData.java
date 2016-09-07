@@ -1,6 +1,6 @@
 package org.kopitubruk.util.json;
 
-import java.lang.reflect.AccessibleObject;
+import java.lang.reflect.Member;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -32,7 +32,7 @@ class ReflectionData
      * These are used to reflect the class.
      */
     private String[] names;
-    private AccessibleObject[] attributes;
+    private Member[] attributes;
 
     /**
      * Create a new ReflectionData for storing reflection data.
@@ -44,7 +44,7 @@ class ReflectionData
      * @param names the names for JSON output
      * @param attributes The list of methods and fields to use for reflection.
      */
-    ReflectionData( Class<?> clazz, Collection<String> fieldNames, Map<String,String> fieldAliases, int privacyLevel, String[] names, AccessibleObject[] attributes )
+    ReflectionData( Class<?> clazz, Collection<String> fieldNames, Map<String,String> fieldAliases, int privacyLevel, String[] names, Member[] attributes )
     {
         this.clazz = clazz;
         this.fieldNames = fieldNames;
@@ -85,7 +85,7 @@ class ReflectionData
      *
      * @return the attributes
      */
-    AccessibleObject[] getAttributes()
+    Member[] getAttributes()
     {
         return attributes;
     }

@@ -278,6 +278,48 @@ public class ReflectUtil
     }
 
     /**
+     * Return true if the type returned by the method is compatible in JSON
+     * with the type of the field.
+     *
+     * @param field The field.
+     * @param method The method to check the return type of.
+     * @return true if they are compatible in JSON.
+     */
+    static boolean isCompatibleInJSON( Field field, Method method )
+    {
+        Class<?> fieldType = field.getType();
+        Class<?> methodType = method.getReturnType();
+
+        if ( fieldType == methodType ){
+            return true;    // can't get more compatible than the exact same type.
+        }else{
+            Class<?>[] methodTypes = getTypes(methodType);
+
+            if ( isType(methodTypes, fieldType) ){
+                // fieldType is a super class or interface of methodType
+                return true;
+            }
+
+            // check for JSON level compatibility, which is much looser.
+            Class<?>[] fieldTypes = getTypes(fieldType);
+            Class<?>[] t1, t2;
+            // check the shorter list first.
+            if ( fieldTypes.length < methodTypes.length ){
+                t1 = fieldTypes;  t2 = methodTypes;
+            }else{
+                t1 = methodTypes; t2 = fieldTypes;
+            }
+
+            if ( isJSONNumber(t1) )       return isJSONNumber(t2);
+            else if ( isJSONString(t1) )  return isJSONString(t2);
+            else if ( isJSONBoolean(t1) ) return isJSONBoolean(t2);
+            else if ( isJSONArray(t1) )   return isJSONArray(t2);
+            else if ( isJSONMap(t1) )     return isJSONMap(t2);
+            else return false;
+        }
+    }
+
+    /**
      * Return true if the given type is a {@link Number} type.
      *
      * @param objTypes the type to check.
@@ -413,6 +455,41 @@ public class ReflectUtil
             }
             tmpClass = tmpClass.getSuperclass();
         }
+    }
+
+    /**
+     * Return true if the name looks like a getter.
+     *
+     * @param name the name
+     * @param retType the return type for checking "is" getters.
+     * @return true if it looks like a getter.
+     */
+    static boolean isGetterName( String name, Class<?> retType )
+    {
+        if ( GETTER.matcher(name).matches() ){
+            if ( name.startsWith("is") ){
+                // "is" prefix only valid getter for booleans.
+                return isType(BOOLEANS, retType);
+            }
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    /**
+     * Return true if it's OK to serialize this field.
+     *
+     * @param field the field.
+     * @return true if it's OK to serialize this field.
+     */
+    static boolean isSerializable( Field field )
+    {
+        int modifiers = field.getModifiers();
+        if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
+            return false;
+        }
+        return true;
     }
 
     /**

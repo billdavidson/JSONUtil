@@ -257,7 +257,7 @@ public class JSONReflectedClass implements Cloneable
                 // else null is silently discarded.
             }
             int size = ids.size();
-            if ( size == 0 ){
+            if ( size < 1 ){
                 this.fieldNames = null;
             }else if ( size == fieldNames.size() ){
                 this.fieldNames = ids;

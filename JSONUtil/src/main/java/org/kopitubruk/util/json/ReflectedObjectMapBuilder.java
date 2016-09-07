@@ -1,10 +1,8 @@
 package org.kopitubruk.util.json;
 
-import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -65,9 +63,9 @@ class ReflectedObjectMapBuilder
             Map<String,Object> obj;
 
             if ( reflectionData == null ){
-                List<AccessibleObject> attributeList = null;
+                List<Member> attributeList = null;
                 List<String> nameList = null;
-                obj = new LinkedHashMap<>();
+                obj = new LinkedHashMap<>(Math.min(DEFAULT_LOAD_FACTOR, fieldNames.size()));
                 if ( cacheReflectionData ){
                     attributeList = new ArrayList<>();
                     nameList = new ArrayList<>();
@@ -110,12 +108,12 @@ class ReflectedObjectMapBuilder
                  * accessible by the first run that created the cached data.
                  */
                 String[] names = reflectionData.getNames();
-                AccessibleObject[] attributes = reflectionData.getAttributes();
+                Member[] attributes = reflectionData.getAttributes();
                 obj = new LinkedHashMap<>(attributes.length);
 
                 // populate the object map.
                 for ( int i = 0; i < attributes.length; i++ ){
-                    AccessibleObject attribute = attributes[i];
+                    Member attribute = attributes[i];
                     name = names[i];
                     if ( attribute instanceof Method ){
                         obj.put(name, ((Method)attribute).invoke(propertyValue));
@@ -188,11 +186,7 @@ class ReflectedObjectMapBuilder
                             // only get the fields that were specified.
                             fields.put(name, field);
                         }
-                    }else{
-                        int modifiers = field.getModifiers();
-                        if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
-                            continue;       // ignore static and transient fields.
-                        }
+                    }else if ( ReflectUtil.isSerializable(field) ){
                         fieldNames.add(name);
                         fields.put(name, field);    // direct access or check against getter return type.
                     }
@@ -220,13 +214,10 @@ class ReflectedObjectMapBuilder
                     continue;   // getters must return something.
                 }
                 String name = method.getName();
-                if ( getterMethods.containsKey(name) || ! ReflectUtil.GETTER.matcher(name).matches() ){
-                    continue;   // don't have this name and name starts with "get" or "is"
+                if ( getterMethods.containsKey(name) ){
+                    continue;
                 }
-                if ( name.startsWith("is") && ! ReflectUtil.isType(ReflectUtil.BOOLEANS, retType) ){
-                    continue;   // "is" prefix only valid getter for booleans.
-                }
-                if ( isVisible(method) ){
+                if ( ReflectUtil.isGetterName(name, retType) && isVisible(method) ){
                     getterMethods.put(name, method);
                 }
             }
@@ -250,52 +241,9 @@ class ReflectedObjectMapBuilder
         if ( field == null || getter == null ){
             return getter;
         }else{
-            return isCompatible(field, getter) ? getter : null;
+            return ReflectUtil.isCompatibleInJSON(field, getter) ? getter : null;
         }
     }
-
-    /**
-     * Return true if the type returned by the method is compatible in JSON
-     * with the type of the field.
-     *
-     * @param field The field.
-     * @param method The method to check the return type of.
-     * @return true if they are compatible in JSON.
-     */
-    private static boolean isCompatible( Field field, Method method )
-    {
-        Class<?> fieldType = field.getType();
-        Class<?> methodType = method.getReturnType();
-
-        if ( fieldType == methodType ){
-            return true;    // can't get more compatible than the exact same type.
-        }else{
-            Class<?>[] methodTypes = ReflectUtil.getTypes(methodType);
-
-            if ( ReflectUtil.isType(methodTypes, fieldType) ){
-                // fieldType is a super class or interface of methodType
-                return true;
-            }
-
-            // check for JSON level compatibility, which is much looser.
-            Class<?>[] fieldTypes = ReflectUtil.getTypes(fieldType);
-            Class<?>[] t1, t2;
-            // check the shorter list first.
-            if ( fieldTypes.length < methodTypes.length ){
-                t1 = fieldTypes;  t2 = methodTypes;
-            }else{
-                t1 = methodTypes; t2 = fieldTypes;
-            }
-
-            if ( ReflectUtil.isJSONNumber(t1) )       return ReflectUtil.isJSONNumber(t2);
-            else if ( ReflectUtil.isJSONString(t1) )  return ReflectUtil.isJSONString(t2);
-            else if ( ReflectUtil.isJSONBoolean(t1) ) return ReflectUtil.isJSONBoolean(t2);
-            else if ( ReflectUtil.isJSONArray(t1) )   return ReflectUtil.isJSONArray(t2);
-            else if ( ReflectUtil.isJSONMap(t1) )     return ReflectUtil.isJSONMap(t2);
-            else return false;
-        }
-    }
-
 
     /**
      * Return true if the given field or method is visible with the current
@@ -315,7 +263,7 @@ class ReflectedObjectMapBuilder
      * @param attributeList The list of reflected attributes.
      * @param nameList The list of names.
      */
-    private void addReflectionData( List<AccessibleObject> attributeList, List<String> nameList )
+    private void addReflectionData( List<Member> attributeList, List<String> nameList )
     {
         // save the reflection data so that it can be used later for fast operation.
         List<String> fnames = isFieldsSpecified ? new ArrayList<>(fieldNames) : null;
@@ -324,7 +272,7 @@ class ReflectedObjectMapBuilder
             fieldAliases = new HashMap<>(fieldAliases);
         }
         String[] names = nameList.toArray(new String[nameList.size()]);
-        AccessibleObject[] attributes = attributeList.toArray(new AccessibleObject[attributeList.size()]);
+        Member[] attributes = attributeList.toArray(new Member[attributeList.size()]);
 
         reflectionData = new ReflectionData(clazz, fnames, fieldAliases, privacyLevel, names, attributes);
         reflectionDataCache.put(reflectionData, reflectionData);
@@ -334,6 +282,11 @@ class ReflectedObjectMapBuilder
      * static cache for reflection information.
      */
     private static volatile Map<ReflectionData,ReflectionData> REFLECTION_DATA_CACHE;
+
+    /*
+     * Default load factor for a HashMap.
+     */
+    private static final int DEFAULT_LOAD_FACTOR = 16;
 
     /**
      * Clear the reflection cache.
