@@ -1244,7 +1244,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     {
         String[] parts = className.split(",");
         try{
-            removeReflectClass(ReflectUtil.getClassByName(parts[0]));
+            removeReflectClass(ReflectUtil.getClassByName(parts[0].trim()));
         }catch ( ClassNotFoundException e ){
             throw new MBeanException(e, getClassNotFoundExceptionMsg(e, parts[0], logging));
         }

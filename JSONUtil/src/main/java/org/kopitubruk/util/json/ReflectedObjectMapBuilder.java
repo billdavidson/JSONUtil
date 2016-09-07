@@ -57,9 +57,8 @@ class ReflectedObjectMapBuilder
     {
         String name = "buildReflectedObjectMap()";
 
-        init();
-
         try {
+            init();
             Map<String,Object> obj;
 
             if ( reflectionData == null ){
@@ -74,7 +73,6 @@ class ReflectedObjectMapBuilder
 
                 // populate the object map.
                 for ( String fieldName : fieldNames ){
-                    name = refClass.getFieldAlias(fieldName);
                     Field field = fields.get(fieldName);
                     if ( isNotFieldsSpecified ){
                         modifiers = field.getModifiers();
@@ -82,6 +80,7 @@ class ReflectedObjectMapBuilder
                             continue;       // ignore static and transient fields.
                         }
                     }
+                    name = refClass.getFieldAlias(fieldName);
                     Method getter = getGetter(field, fieldName);
                     if ( getter != null ){
                         ReflectUtil.ensureAccessible(getter);
@@ -148,15 +147,13 @@ class ReflectedObjectMapBuilder
         if ( cacheReflectionData ){
             Map<String,String> fieldAliases = refClass.getFieldAliases();
             reflectionDataCache = getReflectionDataCache();
-            reflectionData = reflectionDataCache.get(new ReflectionData(clazz, fieldNames, fieldAliases, privacyLevel, null, null));
+            reflectionData = reflectionDataCache.get(new ReflectionData(clazz, fieldNames, fieldAliases, privacyLevel));
         }else{
             reflectionData = null;
         }
         if ( reflectionData == null ){
             // data needed if caching is disabled or hasn't happened yet.
             isPrivate = privacyLevel == ReflectUtil.PRIVATE;
-            fields = new LinkedHashMap<>();
-            getterMethods = new HashMap<>(0);
             initFieldsAndMethods();
             isNotFieldsSpecified = ! isFieldsSpecified;
             if ( isNotFieldsSpecified ){
@@ -170,6 +167,9 @@ class ReflectedObjectMapBuilder
      */
     private void initFieldsAndMethods()
     {
+        fields = new LinkedHashMap<>();
+        getterMethods = new HashMap<>(0);
+
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
             for ( Field field : tmpClass.getDeclaredFields() ){

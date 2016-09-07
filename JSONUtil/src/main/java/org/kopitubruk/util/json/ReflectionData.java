@@ -11,7 +11,8 @@ import java.util.Map.Entry;
  * given set of aliases, if any.
  * <p>
  * The names and attributes arrays are generated and not used to look up things
- * in the cache. They are only used to reflect objects.
+ * in the cache. They are only used to reflect objects.  The other data is used
+ * to look up this object in the cache.
  *
  * @author Bill Davidson
  */
@@ -32,7 +33,7 @@ class ReflectionData
     private AccessibleObject[] attributes;
 
     /**
-     * Create a new ReflectionData
+     * Create a new ReflectionData for storing reflection data.
      *
      * @param clazz the class being reflected.
      * @param fieldNames the fieldNames being reflected, if specified.
@@ -49,6 +50,22 @@ class ReflectionData
         this.privacyLevel = privacyLevel;
         this.names = names;
         this.attributes = attributes;
+    }
+
+    /**
+     * Create a new ReflectionData for looking things up other reflection data objects.
+     *
+     * @param clazz the class being reflected.
+     * @param fieldNames the fieldNames being reflected, if specified.
+     * @param fieldAliases the aliases map, if any.
+     * @param privacyLevel the privacy level for reflection.
+     */
+    ReflectionData( Class<?> clazz, String[] fieldNames, Map<String,String> fieldAliases, int privacyLevel )
+    {
+        this.clazz = clazz;
+        this.fieldNames = fieldNames;
+        this.fieldAliases = fieldAliases;
+        this.privacyLevel = privacyLevel;
     }
 
     /**
@@ -79,11 +96,33 @@ class ReflectionData
     {
         final int prime = 31;
         int hashCode = 1;
-        hashCode = prime * hashCode + ((fieldAliases == null) ? 0 : fieldAliases.hashCode());
         hashCode = prime * hashCode + ((clazz == null) ? 0 : clazz.hashCode());
-        hashCode = prime * hashCode + Arrays.hashCode(fieldNames);
+        hashCode = prime * hashCode + fieldNamesHashCode();
+        hashCode = prime * hashCode + ((fieldAliases == null) ? 0 : fieldAliases.hashCode());
         hashCode = prime * hashCode + privacyLevel;
         return hashCode;
+    }
+
+    /**
+     * Slightly faster than {@link Arrays#hashCode()} because it doesn't
+     * have to test for null elements.
+     *
+     * @param fieldNames An array of strings.
+     * @return the hash code.
+     */
+    private int fieldNamesHashCode()
+    {
+        if ( fieldNames == null ){
+            return 0;
+        }
+
+        int result = 1;
+
+        for ( Object element : fieldNames ){
+            result = 31 * result + element.hashCode();
+        }
+
+        return result;
     }
 
     /* (non-Javadoc)
@@ -103,39 +142,68 @@ class ReflectionData
             return false;
         if ( privacyLevel != other.privacyLevel )
             return false;
-        if ( ! Arrays.equals(fieldNames, other.fieldNames) )
+        if ( ! fieldNamesEqual(other.fieldNames) )
             return false;
-        if ( ! mapsEqual(fieldAliases, other.fieldAliases) ){
+        if ( ! aliasesEqual(other.fieldAliases) ){
             return false;
         }
         return true;
     }
 
     /**
-     * I don't entirely trust the JDK's Map equals() methods.
+     * Slightly faster than {@link Arrays#equals(Object)} because it
+     * eliminates a null check.
      *
-     * @param map0 first map to compare.
-     * @param map1 second map
-     * @return true if they have the same key value pairs.
+     * @param fnames Second array of strings.
+     * @return true if the arrays are equal.
      */
-    private static boolean mapsEqual( Map<String,String> map0, Map<String,String> map1 )
+    private boolean fieldNamesEqual( String[] fnames )
     {
-        if ( map0 == map1 ){
+        if ( fieldNames == fnames ){
             return true;
         }
-        if ( map0 == null || map1 == null ){
+        if ( fieldNames == null || fnames == null ){
             return false;
         }
-        if ( map0.size() != map1.size() ){
+
+        int length = fieldNames.length;
+        if ( fnames.length != length ){
             return false;
         }
-        for ( Entry<String,String> entry : map0.entrySet() ){
+
+        for ( int i = 0; i < length; i++ ){
+            if ( ! fieldNames[i].equals(fnames[i]) ){
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Compare field aliases
+     *
+     * @param aliases the aliases from the other object.
+     * @return true if they have the same key value pairs.
+     */
+    private boolean aliasesEqual( Map<String,String> aliases )
+    {
+        if ( fieldAliases == aliases ){
+            return true;
+        }
+        if ( fieldAliases == null || aliases == null ){
+            return false;
+        }
+        if ( fieldAliases.size() != aliases.size() ){
+            return false;
+        }
+        for ( Entry<String,String> entry : fieldAliases.entrySet() ){
             String key0 = entry.getKey();
-            if ( ! map1.containsKey(key0) ){
+            if ( ! aliases.containsKey(key0) ){
                 return false;
             }
             String value0 = entry.getValue();
-            String value1 = map1.get(key0);
+            String value1 = aliases.get(key0);
             if ( value0 == value1 ){
                 // OK
             }else if ( value0 == null ){

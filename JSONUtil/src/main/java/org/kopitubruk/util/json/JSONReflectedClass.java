@@ -15,11 +15,14 @@
  */
 package org.kopitubruk.util.json;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 import java.util.Set;
 
 /**
@@ -61,6 +64,11 @@ import java.util.Set;
  */
 public class JSONReflectedClass implements Cloneable
 {
+    // Used to split strings by the JSONReflectedClass(String) constructor.
+    private static final Pattern COMMA = Pattern.compile(",");
+    private static final Pattern EQUALS = Pattern.compile("=");
+
+    // instance data.
     private Class<?> objClass;
     private String[] fieldNames;
     private Map<String,String> fieldAliases;
@@ -81,7 +89,9 @@ public class JSONReflectedClass implements Cloneable
      * @param obj An object of the type to be reflect or its class.
      * @param fieldNames The names of the fields to include in the reflection.
      *            Internally, this gets converted to a {@link Set} which you can
-     *            access via {@link #getFieldNames()}.
+     *            access via {@link #getFieldNames()}.  If the input collection
+     *            has an iteration order, that order will be preserved in the
+     *            JSON output.
      */
     public JSONReflectedClass( Object obj, Collection<String> fieldNames )
     {
@@ -105,7 +115,9 @@ public class JSONReflectedClass implements Cloneable
      * @param obj An object of the type to be reflect or its class.
      * @param fieldNames The names of the fields to include in the reflection.
      *            Internally, this gets converted to a {@link Set} which you can
-     *            access via {@link #getFieldNames()}.
+     *            access via {@link #getFieldNames()}.  If the input collection
+     *            has an iteration order, that order will be preserved in the
+     *            JSON output.
      * @param fieldAliases Map from object field names to custom names for output.
      */
     public JSONReflectedClass( Object obj, Collection<String> fieldNames, Map<String,String> fieldAliases )
@@ -141,33 +153,28 @@ public class JSONReflectedClass implements Cloneable
      */
     public JSONReflectedClass( String className ) throws ClassNotFoundException
     {
-        String[] parts = className.split(",");
-        Class<?> clazz = ReflectUtil.getClassByName(parts[0]);
-        Set<String> fieldNames = null;
-        Map<String,String> fieldAliases = null;
+        String[] parts = COMMA.split(className,0);
+        Class<?> clazz = ReflectUtil.getClassByName(parts[0].trim());
+        List<String> fnames = null;
+        Map<String,String> aliases = null;
         if ( parts.length > 1 ){
-            fieldNames = new LinkedHashSet<>();
-            fieldAliases = new LinkedHashMap<>();
+            fnames = new ArrayList<>();
+            aliases = new LinkedHashMap<>();
             for ( int i = 1; i < parts.length; i++ ){
-                String fieldName = parts[i];
-                fieldName = parts[i] == null ? "" : parts[i].trim();
+                String fieldName = parts[i].trim();
                 if ( fieldName.indexOf('=') >= 0 ){
-                    String[] pair = fieldName.split("=");
+                    String[] pair = EQUALS.split(fieldName,0);
                     if ( pair.length == 2 ){
-                        fieldName = pair[0] == null ? "" : pair[0].trim();
-                        String fieldAlias = pair[1] == null ? "" : pair[1].trim();
-                        if ( fieldName.length() > 0 && fieldAlias.length() > 0 ){
-                            fieldAliases.put(fieldName, fieldAlias);
-                        }
+                        aliases.put(pair[0].trim(), pair[1].trim());
                     }
                 }else if ( fieldName.length() > 0 ){
-                    fieldNames.add(fieldName);
+                    fnames.add(fieldName);
                 }
             }
         }
         setObjClass(clazz);
-        setFieldNames(fieldNames);
-        setFieldAliases(fieldAliases);
+        setFieldNames(fnames);
+        setFieldAliases(aliases);
     }
 
     /**
@@ -282,7 +289,7 @@ public class JSONReflectedClass implements Cloneable
         if ( fieldAliases == null ){
             this.fieldAliases = null;
         }else{
-            this.fieldAliases = new LinkedHashMap<>(fieldAliases.size());
+            Map<String,String> aliases = new LinkedHashMap<>(fieldAliases.size());
             for ( Entry<String,String> entry : fieldAliases.entrySet() ){
                 String key = entry.getKey();
                 String fieldName = key == null ? "" : key.trim();
@@ -290,14 +297,16 @@ public class JSONReflectedClass implements Cloneable
                     String value = entry.getValue();
                     String alias = value == null ? "" : value;
                     if ( alias.length() > 0 ){
-                        this.fieldAliases.put(fieldName, alias);
+                        aliases.put(fieldName, alias);
                     }
                 }
             }
-            if ( this.fieldAliases.size() < 1 ){
+            if ( aliases.size() < 1 ){
                 this.fieldAliases = null;
-            }else if ( this.fieldAliases.size() < fieldAliases.size() ){
-                this.fieldAliases = new LinkedHashMap<>(this.fieldAliases);
+            }else if ( aliases.size() < fieldAliases.size() ){
+                this.fieldAliases = new LinkedHashMap<>(aliases);
+            }else{
+                this.fieldAliases = aliases;
             }
         }
     }
