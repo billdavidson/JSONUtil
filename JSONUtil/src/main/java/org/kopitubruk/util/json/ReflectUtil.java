@@ -318,12 +318,8 @@ public class ReflectUtil
      */
     static boolean isJSONArray( Class<?>[] objTypes )
     {
-        for ( Class<?> clazz : objTypes ){
-            if ( clazz.isArray() ){
-                return true;
-            }else{
-                break;
-            }
+        if ( objTypes[0].isArray() ){
+            return true;
         }
         return isType(objTypes, ARRAY_TYPES);
     }

@@ -2,6 +2,8 @@ package org.kopitubruk.util.json;
 
 import java.lang.reflect.AccessibleObject;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -22,7 +24,7 @@ class ReflectionData
      * These are used by hashCode and equals for Hashtable lookups.
      */
     private Class<?> clazz;
-    private String[] fieldNames;
+    private Collection<String> fieldNames;
     private Map<String,String> fieldAliases;
     private int privacyLevel;
 
@@ -42,7 +44,7 @@ class ReflectionData
      * @param names the names for JSON output
      * @param attributes The list of methods and fields to use for reflection.
      */
-    ReflectionData( Class<?> clazz, String[] fieldNames, Map<String,String> fieldAliases, int privacyLevel, String[] names, AccessibleObject[] attributes )
+    ReflectionData( Class<?> clazz, Collection<String> fieldNames, Map<String,String> fieldAliases, int privacyLevel, String[] names, AccessibleObject[] attributes )
     {
         this.clazz = clazz;
         this.fieldNames = fieldNames;
@@ -53,14 +55,14 @@ class ReflectionData
     }
 
     /**
-     * Create a new ReflectionData for looking things up other reflection data objects.
+     * Create a new ReflectionData for looking up other reflection data objects.
      *
      * @param clazz the class being reflected.
      * @param fieldNames the fieldNames being reflected, if specified.
      * @param fieldAliases the aliases map, if any.
      * @param privacyLevel the privacy level for reflection.
      */
-    ReflectionData( Class<?> clazz, String[] fieldNames, Map<String,String> fieldAliases, int privacyLevel )
+    ReflectionData( Class<?> clazz, Collection<String> fieldNames, Map<String,String> fieldAliases, int privacyLevel )
     {
         this.clazz = clazz;
         this.fieldNames = fieldNames;
@@ -104,8 +106,7 @@ class ReflectionData
     }
 
     /**
-     * Slightly faster than {@link Arrays#hashCode()} because it doesn't
-     * have to test for null elements.
+     * Get hash code for field names.
      *
      * @param fieldNames An array of strings.
      * @return the hash code.
@@ -157,7 +158,7 @@ class ReflectionData
      * @param fnames Second array of strings.
      * @return true if the arrays are equal.
      */
-    private boolean fieldNamesEqual( String[] fnames )
+    private boolean fieldNamesEqual( Collection<String> fnames )
     {
         if ( fieldNames == fnames ){
             return true;
@@ -166,13 +167,16 @@ class ReflectionData
             return false;
         }
 
-        int length = fieldNames.length;
-        if ( fnames.length != length ){
+        if ( fnames.size() != fieldNames.size() ){
             return false;
         }
 
-        for ( int i = 0; i < length; i++ ){
-            if ( ! fieldNames[i].equals(fnames[i]) ){
+        Iterator<String> local = fieldNames.iterator();
+        Iterator<String> other = fnames.iterator();
+        while ( local.hasNext() ){
+            String lfn = local.next();
+            String ofn = other.next();
+            if ( ! lfn.equals(ofn) ){
                 return false;
             }
         }

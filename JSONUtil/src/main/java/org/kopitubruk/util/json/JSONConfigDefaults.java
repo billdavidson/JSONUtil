@@ -1345,7 +1345,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             for ( JSONReflectedClass refClass : refClasses ){
                 Class<?> clazz = refClass.getObjClass();
                 StringBuilder buf = new StringBuilder(clazz.getCanonicalName());
-                String[] fieldNames = refClass.getFieldNamesRaw();
+                Collection<String> fieldNames = refClass.getFieldNamesRaw();
                 if ( fieldNames != null ){
                     for ( String fieldName : fieldNames ){
                         buf.append(',').append(fieldName);

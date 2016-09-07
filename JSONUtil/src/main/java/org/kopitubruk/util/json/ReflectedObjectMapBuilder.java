@@ -2,14 +2,18 @@ package org.kopitubruk.util.json;
 
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
+import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * This class builds a map of a reflected object.
@@ -25,7 +29,7 @@ class ReflectedObjectMapBuilder
     private JSONConfig cfg;
     private JSONReflectedClass refClass = null;
     private Class<?> clazz;
-    private String[] fieldNames;
+    private Collection<String> fieldNames;
     private Map<String,Field> fields;
     private Map<String,Method> getterMethods;
     private ReflectionData reflectionData;
@@ -33,7 +37,6 @@ class ReflectedObjectMapBuilder
     private int privacyLevel;
     private boolean cacheReflectionData;
     private boolean isFieldsSpecified;
-    private boolean isNotFieldsSpecified;
     private boolean isPrivate;
 
     /**
@@ -62,10 +65,9 @@ class ReflectedObjectMapBuilder
             Map<String,Object> obj;
 
             if ( reflectionData == null ){
-                int modifiers = 0;
                 List<AccessibleObject> attributeList = null;
                 List<String> nameList = null;
-                obj = new LinkedHashMap<>(0);
+                obj = new LinkedHashMap<>();
                 if ( cacheReflectionData ){
                     attributeList = new ArrayList<>();
                     nameList = new ArrayList<>();
@@ -73,14 +75,8 @@ class ReflectedObjectMapBuilder
 
                 // populate the object map.
                 for ( String fieldName : fieldNames ){
-                    Field field = fields.get(fieldName);
-                    if ( isNotFieldsSpecified ){
-                        modifiers = field.getModifiers();
-                        if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
-                            continue;       // ignore static and transient fields.
-                        }
-                    }
                     name = refClass.getFieldAlias(fieldName);
+                    Field field = fields.get(fieldName);
                     Method getter = getGetter(field, fieldName);
                     if ( getter != null ){
                         ReflectUtil.ensureAccessible(getter);
@@ -89,7 +85,7 @@ class ReflectedObjectMapBuilder
                             nameList.add(name);
                             attributeList.add(getter);
                         }
-                    }else if ( field != null && (isPrivate || ReflectUtil.getPrivacyLevel(modifiers) >= privacyLevel) ){
+                    }else if ( field != null && isVisible(field) ){
                         ReflectUtil.ensureAccessible(field);
                         obj.put(name, field.get(propertyValue));
                         if ( cacheReflectionData ){
@@ -106,7 +102,13 @@ class ReflectedObjectMapBuilder
                     addReflectionData(attributeList, nameList);
                 }
             }else{
-                // use cached reflection data for better performance.
+                /*
+                 * Use cached reflection data for better performance. At this
+                 * point, all getter availability and privacy level filtration
+                 * has been done.  Only have to apply the reflection to the
+                 * object with the list of attributes, which have all been made
+                 * accessible by the first run that created the cached data.
+                 */
                 String[] names = reflectionData.getNames();
                 AccessibleObject[] attributes = reflectionData.getAttributes();
                 obj = new LinkedHashMap<>(attributes.length);
@@ -154,30 +156,61 @@ class ReflectedObjectMapBuilder
         if ( reflectionData == null ){
             // data needed if caching is disabled or hasn't happened yet.
             isPrivate = privacyLevel == ReflectUtil.PRIVATE;
-            initFieldsAndMethods();
-            isNotFieldsSpecified = ! isFieldsSpecified;
-            if ( isNotFieldsSpecified ){
-                fieldNames = fields.keySet().toArray(new String[fields.size()]);
-            }
+            initFields();
+            initGetterMethods();
         }
     }
 
     /**
-     * Initialize the maps of the fields and methods for the class.
+     * Initialize the map of the fields for the class and fieldNames
+     * if they were not specified.
      */
-    private void initFieldsAndMethods()
+    private void initFields()
     {
-        fields = new LinkedHashMap<>();
-        getterMethods = new HashMap<>(0);
+        fields = new HashMap<>();
+
+        Set<String> allFieldNames = new HashSet<>();
+        Set<String> fieldNameSet = null;
+        if ( isFieldsSpecified ){
+            fieldNameSet = (Set<String>)fieldNames;
+        }else{
+            fieldNames = new ArrayList<>();
+        }
 
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
             for ( Field field : tmpClass.getDeclaredFields() ){
                 String name = field.getName();
-                if ( ! fields.containsKey(name) ){
-                    fields.put(name, field);
+                if ( ! allFieldNames.contains(name) ){
+                    allFieldNames.add(name);
+                    if ( isFieldsSpecified ){
+                        if ( fieldNameSet.contains(name) ){
+                            // only get the fields that were specified.
+                            fields.put(name, field);
+                        }
+                    }else{
+                        int modifiers = field.getModifiers();
+                        if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
+                            continue;       // ignore static and transient fields.
+                        }
+                        fieldNames.add(name);
+                        fields.put(name, field);    // direct access or check against getter return type.
+                    }
                 }
             }
+            tmpClass = tmpClass.getSuperclass();
+        }
+    }
+
+    /**
+     * Initialize the map of getter methods for the class.
+     */
+    private void initGetterMethods()
+    {
+        getterMethods = new HashMap<>();
+
+        Class<?> tmpClass = clazz;
+        while ( tmpClass != null ){
             for ( Method method : tmpClass.getDeclaredMethods() ){
                 if ( method.getParameterCount() != 0 ){
                     continue;   // no parameters in bean getter.
@@ -193,7 +226,7 @@ class ReflectedObjectMapBuilder
                 if ( name.startsWith("is") && ! ReflectUtil.isType(ReflectUtil.BOOLEANS, retType) ){
                     continue;   // "is" prefix only valid getter for booleans.
                 }
-                if ( ReflectUtil.getPrivacyLevel(method.getModifiers()) >= privacyLevel ){
+                if ( isVisible(method) ){
                     getterMethods.put(name, method);
                 }
             }
@@ -229,7 +262,7 @@ class ReflectedObjectMapBuilder
      * @param method The method to check the return type of.
      * @return true if they are compatible in JSON.
      */
-    private boolean isCompatible( Field field, Method method )
+    private static boolean isCompatible( Field field, Method method )
     {
         Class<?> fieldType = field.getType();
         Class<?> methodType = method.getReturnType();
@@ -263,6 +296,19 @@ class ReflectedObjectMapBuilder
         }
     }
 
+
+    /**
+     * Return true if the given field or method is visible with the current
+     * privacy level.
+     *
+     * @param member the field or method.
+     * @return true if the field or method is visible.
+     */
+    private boolean isVisible( Member member )
+    {
+        return isPrivate || ReflectUtil.getPrivacyLevel(member.getModifiers()) >= privacyLevel;
+    }
+
     /**
      * Add reflection data to the cache.
      *
@@ -272,13 +318,14 @@ class ReflectedObjectMapBuilder
     private void addReflectionData( List<AccessibleObject> attributeList, List<String> nameList )
     {
         // save the reflection data so that it can be used later for fast operation.
-        String[] fnames = isFieldsSpecified ? fieldNames : null;
+        List<String> fnames = isFieldsSpecified ? new ArrayList<>(fieldNames) : null;
         Map<String,String> fieldAliases = refClass.getFieldAliases();
         if ( fieldAliases != null ){
             fieldAliases = new HashMap<>(fieldAliases);
         }
         String[] names = nameList.toArray(new String[nameList.size()]);
         AccessibleObject[] attributes = attributeList.toArray(new AccessibleObject[attributeList.size()]);
+
         reflectionData = new ReflectionData(clazz, fnames, fieldAliases, privacyLevel, names, attributes);
         reflectionDataCache.put(reflectionData, reflectionData);
     }

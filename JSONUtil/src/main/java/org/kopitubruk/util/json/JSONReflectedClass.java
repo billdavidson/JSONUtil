@@ -70,7 +70,7 @@ public class JSONReflectedClass implements Cloneable
 
     // instance data.
     private Class<?> objClass;
-    private String[] fieldNames;
+    private Set<String> fieldNames;
     private Map<String,String> fieldAliases;
 
     /**
@@ -214,20 +214,13 @@ public class JSONReflectedClass implements Cloneable
      */
     public Set<String> getFieldNames()
     {
-        if ( fieldNames == null ){
-            return null;
-        }
-        Set<String> result = new LinkedHashSet<>(fieldNames.length);
-        for ( String fieldName : fieldNames ){
-            result.add(fieldName);
-        }
-        return result;
+        return fieldNames == null ? null : new LinkedHashSet<>(fieldNames);
     }
 
     /**
      * Package private version of {@link #getFieldNames()} that gives direct
      * access for performance. The methods that use this are smart enough to not
-     * modify the array, which is effectively internally immutable once it is
+     * modify the data, which is effectively internally immutable once it is
      * created. It can only be replaced entirely -- not modified. That way any
      * changes will have to go through validation to be changed while normal
      * performance is maximized because there is no need to revalidate the
@@ -235,7 +228,7 @@ public class JSONReflectedClass implements Cloneable
      *
      * @return the list of field names to reflect.
      */
-    String[] getFieldNamesRaw()
+    Set<String> getFieldNamesRaw()
     {
         return fieldNames;
     }
@@ -263,7 +256,14 @@ public class JSONReflectedClass implements Cloneable
                 }
                 // else null is silently discarded.
             }
-            this.fieldNames = ids.size() > 0 ? ids.toArray(new String[ids.size()]) : null;
+            int size = ids.size();
+            if ( size == 0 ){
+                this.fieldNames = null;
+            }else if ( size == fieldNames.size() ){
+                this.fieldNames = ids;
+            }else{
+                this.fieldNames = new LinkedHashSet<>(ids);
+            }
         }
     }
 
@@ -332,7 +332,7 @@ public class JSONReflectedClass implements Cloneable
      * @param id The identifier.
      * @return true if the given string is a valid Java identifier.
      */
-    private boolean isValidJavaIdentifier( String id )
+    static boolean isValidJavaIdentifier( String id )
     {
         int i = 0;
         int len = id.length();
