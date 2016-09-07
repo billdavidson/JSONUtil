@@ -15,11 +15,14 @@
  */
 package org.kopitubruk.util.json;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 import java.util.Set;
 
 /**
@@ -61,6 +64,11 @@ import java.util.Set;
  */
 public class JSONReflectedClass implements Cloneable
 {
+    // Used to split strings by the JSONReflectedClass(String) constructor.
+    private static final Pattern COMMA = Pattern.compile(",");
+    private static final Pattern EQUALS = Pattern.compile("=");
+
+    // instance data.
     private Class<?> objClass;
     private String[] fieldNames;
     private Map<String,String> fieldAliases;
@@ -81,7 +89,9 @@ public class JSONReflectedClass implements Cloneable
      * @param obj An object of the type to be reflect or its class.
      * @param fieldNames The names of the fields to include in the reflection.
      *            Internally, this gets converted to a {@link Set} which you can
-     *            access via {@link #getFieldNames()}.
+     *            access via {@link #getFieldNames()}.  If the input collection
+     *            has an iteration order, that order will be preserved in the
+     *            JSON output.
      */
     public JSONReflectedClass( Object obj, Collection<String> fieldNames )
     {
@@ -105,7 +115,9 @@ public class JSONReflectedClass implements Cloneable
      * @param obj An object of the type to be reflect or its class.
      * @param fieldNames The names of the fields to include in the reflection.
      *            Internally, this gets converted to a {@link Set} which you can
-     *            access via {@link #getFieldNames()}.
+     *            access via {@link #getFieldNames()}.  If the input collection
+     *            has an iteration order, that order will be preserved in the
+     *            JSON output.
      * @param fieldAliases Map from object field names to custom names for output.
      */
     public JSONReflectedClass( Object obj, Collection<String> fieldNames, Map<String,String> fieldAliases )
@@ -115,6 +127,59 @@ public class JSONReflectedClass implements Cloneable
         setFieldAliases(fieldAliases);
     }
 
+    /**
+     * Create a JSONReflectedClass using the given class name as a string optionally
+     * followed by field names and/or field name aliases.
+     * <p>
+     * If you wish to use reflection with fields, you can append the field names
+     * to the class name, separated by commas before each field name. Field
+     * names which do not look like valid Java identifier names will be silently
+     * discarded.  For example, if you want to reflect a class called
+     * "org.example.Widget" and it has fields called "a", "b" and "c" but you
+     * only want "a" and "c", then you can pass "org.example.Widget,a,c" to this
+     * method.
+     * <p>
+     * If you wish to use custom field names with reflection you can use
+     * name=alias pairs separated by commas as with the field names. For
+     * example, if you want to reflect a class called "org.example.Widget" and
+     * it has a field called "foo" but you want that field encoded as "bar" you
+     * can pass "org.example.Widget,foo=bar" to this method.
+     *
+     * @param className The name of the class suitable for
+     *            {@link ClassLoader#loadClass(String)} followed optionally by a
+     *            comma separated list of field names and/or field aliases.
+     * @throws ClassNotFoundException If the class cannot be loaded.
+     * @since 1.9.3
+     */
+    public JSONReflectedClass( String className ) throws ClassNotFoundException
+    {
+        String[] parts = COMMA.split(className,0);
+        Class<?> clazz = ReflectUtil.getClassByName(parts[0].trim());
+        List<String> fnames = null;
+        Map<String,String> aliases = null;
+        if ( parts.length > 1 ){
+            fnames = new ArrayList<>();
+            aliases = new LinkedHashMap<>();
+            for ( int i = 1; i < parts.length; i++ ){
+                String fieldName = parts[i].trim();
+                if ( fieldName.indexOf('=') >= 0 ){
+                    String[] pair = EQUALS.split(fieldName,0);
+                    if ( pair.length == 2 ){
+                        aliases.put(pair[0].trim(), pair[1].trim());
+                    }
+                }else if ( fieldName.length() > 0 ){
+                    fnames.add(fieldName);
+                }
+            }
+        }
+        setObjClass(clazz);
+        setFieldNames(fnames);
+        setFieldAliases(aliases);
+    }
+
+    /**
+     * Only used for clone()
+     */
     private JSONReflectedClass()
     {
     }
@@ -224,7 +289,7 @@ public class JSONReflectedClass implements Cloneable
         if ( fieldAliases == null ){
             this.fieldAliases = null;
         }else{
-            this.fieldAliases = new LinkedHashMap<>(fieldAliases.size());
+            Map<String,String> aliases = new LinkedHashMap<>(fieldAliases.size());
             for ( Entry<String,String> entry : fieldAliases.entrySet() ){
                 String key = entry.getKey();
                 String fieldName = key == null ? "" : key.trim();
@@ -232,14 +297,16 @@ public class JSONReflectedClass implements Cloneable
                     String value = entry.getValue();
                     String alias = value == null ? "" : value;
                     if ( alias.length() > 0 ){
-                        this.fieldAliases.put(fieldName, alias);
+                        aliases.put(fieldName, alias);
                     }
                 }
             }
-            if ( this.fieldAliases.size() < 1 ){
+            if ( aliases.size() < 1 ){
                 this.fieldAliases = null;
-            }else if ( this.fieldAliases.size() < fieldAliases.size() ){
-                this.fieldAliases = new LinkedHashMap<>(this.fieldAliases);
+            }else if ( aliases.size() < fieldAliases.size() ){
+                this.fieldAliases = new LinkedHashMap<>(aliases);
+            }else{
+                this.fieldAliases = aliases;
             }
         }
     }
@@ -247,23 +314,16 @@ public class JSONReflectedClass implements Cloneable
     /**
      * Get the custom version of the name, if any.
      *
-     * @param name The name to look up.
+     * @param fieldName The name to look up.
      * @return The custom version of the name.
      */
-    String getAlias( String name )
+    String getFieldAlias( String fieldName )
     {
         if ( fieldAliases == null ){
-            return name;
+            return fieldName;
         }
-        String result = fieldAliases.get(name);
-        if ( result != null ){
-            if ( result.length() > 0 ){
-                return result;
-            }else{
-                fieldAliases.remove(name);
-            }
-        }
-        return name;
+        String result = fieldAliases.get(fieldName);
+        return result != null ? result : fieldName;
     }
 
     /**
@@ -296,7 +356,7 @@ public class JSONReflectedClass implements Cloneable
      * @see java.lang.Object#clone()
      */
     @Override
-    public JSONReflectedClass clone()
+    public synchronized JSONReflectedClass clone()
     {
         JSONReflectedClass result = new JSONReflectedClass();
         result.objClass = objClass;
@@ -315,7 +375,7 @@ public class JSONReflectedClass implements Cloneable
     {
         final int prime = 31;
         int result = 1;
-        result = prime * result + ((objClass == null) ? 0 : objClass.hashCode());
+        result = prime * result + objClass.hashCode();
         return result;
     }
 
@@ -334,10 +394,7 @@ public class JSONReflectedClass implements Cloneable
         if ( getClass() != obj.getClass() )
             return false;
         JSONReflectedClass other = (JSONReflectedClass)obj;
-        if ( objClass == null ){
-            if ( other.objClass != null )
-                return false;
-        }else if ( !objClass.equals(other.objClass) )
+        if ( objClass != other.objClass )
             return false;
         return true;
     }

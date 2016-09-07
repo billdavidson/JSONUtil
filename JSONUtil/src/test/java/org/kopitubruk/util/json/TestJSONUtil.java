@@ -1499,7 +1499,7 @@ public class TestJSONUtil
         jsonObj.put("f", new ReflectTestClass());
         JSONConfig cfg = new JSONConfig();
         cfg.setCacheReflectionData(false);
-        ReflectUtil.clearReflectionCache();
+        //ReflectedObjectMapBuilder.clearReflectionCache();
 
         // JNDI set up to only show fields a and e.
         String json = JSONUtil.toJSON(jsonObj, cfg);
@@ -1529,7 +1529,7 @@ public class TestJSONUtil
         assertThat(json, is("{\"f\":{\"a\":1,\"k\":25.0}}"));
 
         JSONConfigDefaults.getInstance().clearReflectClasses();
-        ReflectUtil.clearReflectionCache();
+        ReflectedObjectMapBuilder.clearReflectionCache();
         cfg.setReflectUnknownObjects(false);
 
         cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
@@ -1569,7 +1569,7 @@ public class TestJSONUtil
         end = System.currentTimeMillis();
         s_log.debug("uncached: "+((end-start)/1000.0)+"s");
 
-        ReflectUtil.clearReflectionCache();
+        ReflectedObjectMapBuilder.clearReflectionCache();
         cfg.setCacheReflectionData(true);
         start = System.currentTimeMillis();
         for ( int i = 0; i < interations; i++ ){
@@ -1578,7 +1578,7 @@ public class TestJSONUtil
         }
         end = System.currentTimeMillis();
         s_log.debug("cached: "+((end-start)/1000.0)+"s");
-        ReflectUtil.clearReflectionCache();
+        ReflectedObjectMapBuilder.clearReflectionCache();
 
         r = new ReflectTestClass();
         start = System.currentTimeMillis();
@@ -1603,7 +1603,7 @@ public class TestJSONUtil
         end = System.currentTimeMillis();
         s_log.debug("uncached: "+((end-start)/1000.0)+"s");
 
-        ReflectUtil.clearReflectionCache();
+        ReflectedObjectMapBuilder.clearReflectionCache();
         cfg.setCacheReflectionData(true);
         start = System.currentTimeMillis();
         for ( int i = 0; i < interations; i++ ){
@@ -1612,6 +1612,6 @@ public class TestJSONUtil
         }
         end = System.currentTimeMillis();
         s_log.debug("cached: "+((end-start)/1000.0)+"s");
-        ReflectUtil.clearReflectionCache();
+        ReflectedObjectMapBuilder.clearReflectionCache();
     }
 }

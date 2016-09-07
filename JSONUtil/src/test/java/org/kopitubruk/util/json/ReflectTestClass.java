@@ -10,6 +10,9 @@ import java.util.List;
  */
 class ReflectTestClass
 {
+    static final String SOME_STATIC_DATA = "some static data";
+    transient int someTransientData = 4;
+
     private int a = 1;
     private String b = "something";
     private ArrayList<Long> c = new ArrayList<>();

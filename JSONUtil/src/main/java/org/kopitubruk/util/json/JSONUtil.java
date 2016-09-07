@@ -438,7 +438,7 @@ public class JSONUtil
             }else if ( jsonType.isMapType() ){
                 map = (Map<?,?>)propertyValue;
             }else if ( jsonType.isReflectType() ){
-                map = ReflectUtil.getReflectedObject(propertyValue, cfg);
+                map = new ReflectedObjectMapBuilder(propertyValue, cfg).buildReflectedObjectMap();
             }
             appendObjectPropertyValue(map, json, cfg);
         }

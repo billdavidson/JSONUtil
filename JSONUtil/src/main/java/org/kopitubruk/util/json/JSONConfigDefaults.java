@@ -444,15 +444,14 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         for ( Entry<String,Object> entry : jndiData.entrySet() ){
             Object value = entry.getValue();
             if ( value instanceof String && REFLECT_CLASS_PAT.matcher(entry.getKey()).matches() ){
-                String[] parts = ((String)value).split(",");
+                String className = (String)value;
                 try{
-                    Class<?> clazz = ReflectUtil.getClassByName(parts[0]);
-                    classes.add(JSONConfigUtil.getJSONReflectedClass(clazz, parts));
+                    classes.add(new JSONReflectedClass(className));
                 }catch ( ClassNotFoundException e ){
                     if ( logging ){
                         ensureLogger();
                         if ( log.isDebugEnabled() ){
-                            log.debug(getClassNotFoundExceptionMsg(e, parts[0], false), e);
+                            log.debug(getClassNotFoundExceptionMsg(e, className, false), e);
                         }
                     }
                 }
@@ -1204,12 +1203,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void addReflectClassByName( String className ) throws MBeanException
     {
-        String[] parts = className.split(",");
         try{
-            Class<?> clazz = ReflectUtil.getClassByName(parts[0]);
-            addReflectClass(JSONConfigUtil.getJSONReflectedClass(clazz, parts));
+            addReflectClass(new JSONReflectedClass(className));
         }catch ( ClassNotFoundException e ){
-            throw new MBeanException(e, getClassNotFoundExceptionMsg(e, parts[0], logging));
+            throw new MBeanException(e, getClassNotFoundExceptionMsg(e, className, logging));
         }
     }
 
@@ -1252,7 +1249,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     {
         String[] parts = className.split(",");
         try{
-            removeReflectClass(ReflectUtil.getClassByName(parts[0]));
+            removeReflectClass(ReflectUtil.getClassByName(parts[0].trim()));
         }catch ( ClassNotFoundException e ){
             throw new MBeanException(e, getClassNotFoundExceptionMsg(e, parts[0], logging));
         }
@@ -1329,7 +1326,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void clearReflectionCache()
     {
-        ReflectUtil.clearReflectionCache();
+        ReflectedObjectMapBuilder.clearReflectionCache();
     }
 
     /**
@@ -1841,7 +1838,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     {
         cacheReflectionData = dflt;
         if ( cacheReflectionData == false ){
-            ReflectUtil.clearReflectionCache();
+            ReflectedObjectMapBuilder.clearReflectionCache();
         }
     }
 
