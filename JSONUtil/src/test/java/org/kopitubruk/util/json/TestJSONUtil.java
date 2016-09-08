@@ -1498,7 +1498,8 @@ public class TestJSONUtil
         cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
         cfg.addReflectClass(ReflectTestClass.class);
 
-        int interations = 100000;
+        //int interations = 100000;
+        int interations = 100;
         //int interations = 0;
         long start, end;
 
