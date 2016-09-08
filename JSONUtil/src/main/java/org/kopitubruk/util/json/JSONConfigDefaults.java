@@ -29,6 +29,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -1208,7 +1209,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     /**
      * Add the class of the given object to the set of classes that
      * automatically get reflected. Note that default reflected classes can also
-     * be added via JNDI.
+     * be added via JNDI. If the object is an array, {@link Iterable} or
+     * {@link Enumeration}, then all objects in it will be added.
      *
      * @param obj The object whose class to add to the reflect list.
      * @since 1.9
@@ -1277,7 +1279,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Remove the given class from the list of automatically reflected
-     * classes.
+     * classes.  If the object is an array, {@link Iterable} or {@link Enumeration},
+     * then all objects in it will be removed.
      *
      * @param obj An object of the type to be removed from the reflect list.
      * @since 1.9

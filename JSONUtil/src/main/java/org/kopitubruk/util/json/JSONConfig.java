@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -717,7 +718,8 @@ public class JSONConfig implements Serializable, Cloneable
 
     /**
      * Add the class of the given object to the set of classes that
-     * automatically get reflected.
+     * automatically get reflected.  If the object is an array, {@link Iterable}
+     * or {@link Enumeration}, then all objects in it will be added.
      *
      * @param obj The object whose class to add to the reflect list.
      * @since 1.9
@@ -769,7 +771,8 @@ public class JSONConfig implements Serializable, Cloneable
 
     /**
      * Remove the given class from the list of automatically reflected
-     * classes.
+     * classes.  If the object is an array, {@link Iterable} or {@link Enumeration},
+     * then all objects in it will be removed.
      *
      * @param obj An object of the type to be removed from the reflect list.
      * @since 1.9

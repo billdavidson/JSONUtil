@@ -20,10 +20,13 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 /**
  * Package private utility methods for JSONConfig/JSONConfigDefaults that don't
@@ -130,7 +133,8 @@ class JSONConfigUtil
 
     /**
      * Add the given class to the given list of automatically reflected
-     * classes.
+     * classes.  If obj is an array, {@link Iterable} or {@link Enumeration},
+     * then the classes represented by the elements in it will be added.
      *
      * @param refClasses The current set of reflected classes.
      * @param obj An object of the types to be added from the reflect set.
@@ -139,7 +143,7 @@ class JSONConfigUtil
      */
     static Map<Class<?>,JSONReflectedClass> addReflectClass( Map<Class<?>,JSONReflectedClass> refClasses, Object obj )
     {
-        return obj == null ? refClasses : JSONConfigUtil.addReflectClasses(refClasses, Arrays.asList(obj));
+        return obj == null ? refClasses : JSONConfigUtil.addReflectClasses(refClasses, getReflectObjCollection(obj));
     }
 
     /**
@@ -180,7 +184,8 @@ class JSONConfigUtil
 
     /**
      * Remove the given classes from the given list of automatically reflected
-     * classes.
+     * classes.  If obj is an array, {@link Iterable} or {@link Enumeration},
+     * then the classes represented by the elements in it will be removed.
      *
      * @param refClasses The current set of reflected classes.
      * @param obj An object of the type to be removed from the reflect set.
@@ -188,7 +193,7 @@ class JSONConfigUtil
      */
     static Map<Class<?>,JSONReflectedClass> removeReflectClass( Map<Class<?>,JSONReflectedClass> refClasses, Object obj )
     {
-        return obj == null ? refClasses : removeReflectClasses(refClasses, Arrays.asList(obj));
+        return obj == null ? refClasses : removeReflectClasses(refClasses, getReflectObjCollection(obj));
     }
 
     /**
@@ -230,6 +235,31 @@ class JSONConfigUtil
     private static Map<Class<?>,JSONReflectedClass> trimClasses( Map<Class<?>,JSONReflectedClass> refClasses )
     {
         return refClasses.size() > 0 ? new HashMap<>(refClasses) : null;
+    }
+
+    /**
+     * If the given object is an array, {@link Iterable} or {@link Enumeration},
+     * then make it into a collection and return it. Otherwise, create a List
+     * with just the one element and return it.
+     *
+     * @param obj the object.
+     * @return the list.
+     */
+    private static Collection<?> getReflectObjCollection( Object obj )
+    {
+        if ( obj instanceof Iterable || obj instanceof Enumeration || obj.getClass().isArray() ){
+            Set<Object> objs = new HashSet<>();
+            for ( Object element : new JSONArrayData(obj) ){
+                if ( element instanceof Class || element instanceof JSONReflectedClass ){
+                    objs.add(element);
+                }else if ( element != null ){
+                    objs.add(ReflectUtil.getClass(element));
+                }
+            }
+            return objs;
+        }else{
+            return Arrays.asList(obj);
+        }
     }
 
     /**
