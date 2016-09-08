@@ -56,7 +56,7 @@ import java.util.Set;
  *   </li>
  * </ul>
  * <p>
- * You can also specify a customNames map so that field names are aliased
+ * You can also specify a fieldAliases map so that field names are aliased
  * in the JSON output to a custom name that you specify with the map.  Any
  * unmapped names will be left as is.
  *
@@ -237,7 +237,9 @@ public class JSONReflectedClass implements Cloneable
      * Set the set of field names to reflect. This silently discards any names
      * that are not valid Java identifiers.
      *
-     * @param fieldNames The field names to include in reflected JSON output.
+     * @param fieldNames The field names to include in reflected JSON output. If
+     *            the {@link Collection} that you send to this method has a set
+     *            iteration order, that order will be preserved.
      */
     public void setFieldNames( Collection<String> fieldNames )
     {
@@ -280,7 +282,12 @@ public class JSONReflectedClass implements Cloneable
     /**
      * Set the custom names map. Makes a copy of the map, trimming the keys and
      * values and discarding keys that are not valid Java identifiers and values
-     * that don't have at least one character.
+     * that don't have at least one character. The names being mapped from have
+     * to be valid Java identifiers. This does no validation to see if the
+     * aliases are valid ECMAScript or JSON identifiers. It leaves that to
+     * {@link JSONUtil#toJSON(Object, JSONConfig, java.io.Writer)} and the
+     * methods that it calls according to the configuration options that you've
+     * set.
      *
      * @param fieldAliases the fieldAliases to set
      */
@@ -295,7 +302,7 @@ public class JSONReflectedClass implements Cloneable
                 String fieldName = key == null ? "" : key.trim();
                 if ( isValidJavaIdentifier(fieldName) ){
                     String value = entry.getValue();
-                    String alias = value == null ? "" : value;
+                    String alias = value == null ? "" : value.trim();
                     if ( alias.length() > 0 ){
                         aliases.put(fieldName, alias);
                     }

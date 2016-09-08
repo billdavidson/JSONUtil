@@ -65,7 +65,7 @@ class ReflectedObjectMapBuilder
             if ( reflectionData == null ){
                 List<Member> attributeList = null;
                 List<String> nameList = null;
-                obj = new LinkedHashMap<>(Math.min(DEFAULT_LOAD_FACTOR, fieldNames.size()));
+                obj = new LinkedHashMap<>(Math.min(DEFAULT_INITIAL_CAPACITY, fieldNames.size()));
                 if ( cacheReflectionData ){
                     attributeList = new ArrayList<>();
                     nameList = new ArrayList<>();
@@ -75,6 +75,7 @@ class ReflectedObjectMapBuilder
                 for ( String fieldName : fieldNames ){
                     name = refClass.getFieldAlias(fieldName);
                     Field field = fields.get(fieldName);
+                    // prefer getter if possible.
                     Method getter = getGetter(field, fieldName);
                     if ( getter != null ){
                         ReflectUtil.ensureAccessible(getter);
@@ -84,6 +85,7 @@ class ReflectedObjectMapBuilder
                             attributeList.add(getter);
                         }
                     }else if ( field != null && isVisible(field) ){
+                        // no valid getter.  go with direct access.
                         ReflectUtil.ensureAccessible(field);
                         obj.put(name, field.get(propertyValue));
                         if ( cacheReflectionData ){
@@ -284,9 +286,9 @@ class ReflectedObjectMapBuilder
     private static volatile Map<ReflectionData,ReflectionData> REFLECTION_DATA_CACHE;
 
     /*
-     * Default load factor for a HashMap.
+     * Default initial capacity for a HashMap.
      */
-    private static final int DEFAULT_LOAD_FACTOR = 16;
+    private static final int DEFAULT_INITIAL_CAPACITY = 16;
 
     /**
      * Clear the reflection cache.
