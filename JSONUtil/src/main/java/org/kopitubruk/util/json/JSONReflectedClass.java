@@ -56,7 +56,7 @@ import java.util.Set;
  *   </li>
  * </ul>
  * <p>
- * You can also specify a customNames map so that field names are aliased
+ * You can also specify a fieldAliases map so that field names are aliased
  * in the JSON output to a custom name that you specify with the map.  Any
  * unmapped names will be left as is.
  *
@@ -70,7 +70,7 @@ public class JSONReflectedClass implements Cloneable
 
     // instance data.
     private Class<?> objClass;
-    private String[] fieldNames;
+    private Set<String> fieldNames;
     private Map<String,String> fieldAliases;
 
     /**
@@ -214,20 +214,13 @@ public class JSONReflectedClass implements Cloneable
      */
     public Set<String> getFieldNames()
     {
-        if ( fieldNames == null ){
-            return null;
-        }
-        Set<String> result = new LinkedHashSet<>(fieldNames.length);
-        for ( String fieldName : fieldNames ){
-            result.add(fieldName);
-        }
-        return result;
+        return fieldNames == null ? null : new LinkedHashSet<>(fieldNames);
     }
 
     /**
      * Package private version of {@link #getFieldNames()} that gives direct
      * access for performance. The methods that use this are smart enough to not
-     * modify the array, which is effectively internally immutable once it is
+     * modify the data, which is effectively internally immutable once it is
      * created. It can only be replaced entirely -- not modified. That way any
      * changes will have to go through validation to be changed while normal
      * performance is maximized because there is no need to revalidate the
@@ -235,7 +228,7 @@ public class JSONReflectedClass implements Cloneable
      *
      * @return the list of field names to reflect.
      */
-    String[] getFieldNamesRaw()
+    Set<String> getFieldNamesRaw()
     {
         return fieldNames;
     }
@@ -244,7 +237,9 @@ public class JSONReflectedClass implements Cloneable
      * Set the set of field names to reflect. This silently discards any names
      * that are not valid Java identifiers.
      *
-     * @param fieldNames The field names to include in reflected JSON output.
+     * @param fieldNames The field names to include in reflected JSON output. If
+     *            the {@link Collection} that you send to this method has a set
+     *            iteration order, that order will be preserved.
      */
     public void setFieldNames( Collection<String> fieldNames )
     {
@@ -263,7 +258,14 @@ public class JSONReflectedClass implements Cloneable
                 }
                 // else null is silently discarded.
             }
-            this.fieldNames = ids.size() > 0 ? ids.toArray(new String[ids.size()]) : null;
+            int size = ids.size();
+            if ( size < 1 ){
+                this.fieldNames = null;
+            }else if ( size == fieldNames.size() ){
+                this.fieldNames = ids;
+            }else{
+                this.fieldNames = new LinkedHashSet<>(ids);
+            }
         }
     }
 
@@ -280,7 +282,12 @@ public class JSONReflectedClass implements Cloneable
     /**
      * Set the custom names map. Makes a copy of the map, trimming the keys and
      * values and discarding keys that are not valid Java identifiers and values
-     * that don't have at least one character.
+     * that don't have at least one character. The names being mapped from have
+     * to be valid Java identifiers. This does no validation to see if the
+     * aliases are valid ECMAScript or JSON identifiers. It leaves that to
+     * {@link JSONUtil#toJSON(Object, JSONConfig, java.io.Writer)} and the
+     * methods that it calls according to the configuration options that you've
+     * set.
      *
      * @param fieldAliases the fieldAliases to set
      */
@@ -295,7 +302,7 @@ public class JSONReflectedClass implements Cloneable
                 String fieldName = key == null ? "" : key.trim();
                 if ( isValidJavaIdentifier(fieldName) ){
                     String value = entry.getValue();
-                    String alias = value == null ? "" : value;
+                    String alias = value == null ? "" : value.trim();
                     if ( alias.length() > 0 ){
                         aliases.put(fieldName, alias);
                     }
@@ -332,7 +339,7 @@ public class JSONReflectedClass implements Cloneable
      * @param id The identifier.
      * @return true if the given string is a valid Java identifier.
      */
-    private boolean isValidJavaIdentifier( String id )
+    static boolean isValidJavaIdentifier( String id )
     {
         int i = 0;
         int len = id.length();
