@@ -27,7 +27,8 @@ import java.util.Set;
 
 /**
  * This class wraps a class to be explicitly reflected and allows you to choose
- * the names of the fields to be reflected, regardless of privacy. This gives
+ * the names of the fields to be reflected, regardless of privacy as well as
+ * set up aliases for field names in the JSON output. This gives
  * you more precise control over what is shown. It should be created and then
  * sent to {@link JSONConfig#addReflectClass(Object)} or
  * {@link JSONConfig#addReflectClasses(java.util.Collection)} just like any
@@ -61,6 +62,7 @@ import java.util.Set;
  * unmapped names will be left as is.
  *
  * @author Bill Davidson
+ * @since 1.9
  */
 public class JSONReflectedClass implements Cloneable
 {
