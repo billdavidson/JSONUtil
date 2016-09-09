@@ -31,7 +31,7 @@ public class ReflectUtil
     private static ClassLoader classLoader = ReflectUtil.class.getClassLoader();
 
     /**
-     * Reflection will attempt to serialize all fields including private.
+     * Reflection will attempt to serialize all fields including private.  Value is 0.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -41,7 +41,7 @@ public class ReflectUtil
     /**
      * Reflection will attempt to serialize package private, protected and
      * public fields or fields that have package private, protected or public
-     * get methods that conform to JavaBean naming conventions.
+     * get methods that conform to JavaBean naming conventions.    Value is 1.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -51,7 +51,7 @@ public class ReflectUtil
     /**
      * Reflection will attempt to serialize protected and public fields or
      * fields that have protected or public get methods that conform to JavaBean
-     * naming conventions.
+     * naming conventions.  Value is 2.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -60,7 +60,7 @@ public class ReflectUtil
 
     /**
      * Reflection will attempt to serialize only fields that are public or have
-     * public get methods that conform to JavaBean naming conventions.
+     * public get methods that conform to JavaBean naming conventions.  Value is 3.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
