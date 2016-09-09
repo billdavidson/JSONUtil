@@ -15,6 +15,9 @@
  */
 package org.kopitubruk.util.json;
 
+import static org.kopitubruk.util.json.JSONConfigUtil.tableSizeFor;
+import static org.kopitubruk.util.json.JSONConfigUtil.DEFAULT_INITIAL_CAPACITY;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
@@ -319,7 +322,7 @@ public class JSONParser
             }
         }
         // minimize memory usage.
-        return new LinkedHashMap<>(map);
+        return tableSizeFor(map.size()) < DEFAULT_INITIAL_CAPACITY ? new LinkedHashMap<>(map) : map;
     }
 
     /**

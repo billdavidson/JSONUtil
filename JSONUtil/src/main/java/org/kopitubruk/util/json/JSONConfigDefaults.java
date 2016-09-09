@@ -15,6 +15,8 @@
  */
 package org.kopitubruk.util.json;
 
+import static org.kopitubruk.util.json.JSONConfigUtil.tableSizeFor;
+
 import java.io.Serializable;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
@@ -941,7 +943,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             numberFormatMap.remove(numericClass);
             if ( numberFormatMap.size() < 1 ){
                 numberFormatMap = null;
-            }else if ( numberFormatMap.size() < size ){
+            }else if ( tableSizeFor(size) > tableSizeFor(numberFormatMap.size()) ){
                 numberFormatMap = new HashMap<>(numberFormatMap);
             }
         }

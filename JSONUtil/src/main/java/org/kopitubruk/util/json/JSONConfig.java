@@ -15,6 +15,8 @@
  */
 package org.kopitubruk.util.json;
 
+import static org.kopitubruk.util.json.JSONConfigUtil.tableSizeFor;
+
 import java.io.Serializable;
 import java.text.DateFormat;
 import java.text.NumberFormat;
@@ -430,7 +432,7 @@ public class JSONConfig implements Serializable, Cloneable
             numberFormatMap.remove(numericClass);
             if ( numberFormatMap.size() < 1 ){
                 numberFormatMap = null;
-            }else if ( numberFormatMap.size() < size ){
+            }else if ( tableSizeFor(size) > tableSizeFor(numberFormatMap.size()) ){
                 // minimize memory usage.
                 numberFormatMap = new HashMap<>(numberFormatMap);
             }

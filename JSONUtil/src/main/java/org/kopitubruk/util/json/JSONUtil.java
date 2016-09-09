@@ -575,7 +575,7 @@ public class JSONUtil
         for ( String key : bundle.keySet() ){
             result.put(key, bundle.getObject(key));
         }
-        return new LinkedHashMap<>(result);
+        return result;
     }
 
     /**

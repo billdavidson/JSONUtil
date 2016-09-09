@@ -15,6 +15,8 @@
  */
 package org.kopitubruk.util.json;
 
+import static org.kopitubruk.util.json.JSONConfigUtil.tableSizeFor;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -22,8 +24,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.regex.Pattern;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * This class wraps a class to be explicitly reflected and allows you to choose
@@ -249,7 +251,8 @@ public class JSONReflectedClass implements Cloneable
             this.fieldNames = null;
         }else{
             // the LinkedHashSet preserves order and removes dups.
-            Set<String> ids = new LinkedHashSet<>(fieldNames.size());
+            int tableSize = tableSizeFor(fieldNames.size());
+            Set<String> ids = new LinkedHashSet<>(tableSize);
             for ( String id : fieldNames ){
                 if ( id != null ){
                     String tid = id.trim();     // ignore whitespace, if any.
@@ -263,10 +266,10 @@ public class JSONReflectedClass implements Cloneable
             int size = ids.size();
             if ( size < 1 ){
                 this.fieldNames = null;
-            }else if ( size == fieldNames.size() ){
-                this.fieldNames = ids;
-            }else{
+            }else if ( tableSize > tableSizeFor(size) ){
                 this.fieldNames = new LinkedHashSet<>(ids);
+            }else{
+                this.fieldNames = ids;
             }
         }
     }
@@ -298,7 +301,8 @@ public class JSONReflectedClass implements Cloneable
         if ( fieldAliases == null ){
             this.fieldAliases = null;
         }else{
-            Map<String,String> aliases = new LinkedHashMap<>(fieldAliases.size());
+            int tableSize = tableSizeFor(fieldAliases.size());
+            Map<String,String> aliases = new LinkedHashMap<>(tableSize);
             for ( Entry<String,String> entry : fieldAliases.entrySet() ){
                 String key = entry.getKey();
                 String fieldName = key == null ? "" : key.trim();
@@ -312,7 +316,7 @@ public class JSONReflectedClass implements Cloneable
             }
             if ( aliases.size() < 1 ){
                 this.fieldAliases = null;
-            }else if ( aliases.size() < fieldAliases.size() ){
+            }else if ( tableSize > tableSizeFor(aliases.size()) ){
                 this.fieldAliases = new LinkedHashMap<>(aliases);
             }else{
                 this.fieldAliases = aliases;

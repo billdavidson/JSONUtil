@@ -1,5 +1,7 @@
 package org.kopitubruk.util.json;
 
+import static org.kopitubruk.util.json.JSONConfigUtil.DEFAULT_INITIAL_CAPACITY;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
@@ -65,7 +67,8 @@ class ReflectedObjectMapBuilder
             if ( reflectionData == null ){
                 List<Member> attributeList = null;
                 List<String> nameList = null;
-                obj = new LinkedHashMap<>(Math.min(DEFAULT_INITIAL_CAPACITY, fieldNames.size()));
+                int tableSize = Math.min(DEFAULT_INITIAL_CAPACITY, fieldNames.size());
+                obj = new LinkedHashMap<>(tableSize);
                 if ( cacheReflectionData ){
                     attributeList = new ArrayList<>();
                     nameList = new ArrayList<>();
@@ -284,11 +287,6 @@ class ReflectedObjectMapBuilder
      * static cache for reflection information.
      */
     private static volatile Map<ReflectionData,ReflectionData> REFLECTION_DATA_CACHE;
-
-    /*
-     * Default initial capacity for a HashMap.
-     */
-    private static final int DEFAULT_INITIAL_CAPACITY = 16;
 
     /**
      * Clear the reflection cache.

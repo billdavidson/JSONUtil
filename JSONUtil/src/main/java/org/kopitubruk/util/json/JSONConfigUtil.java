@@ -22,7 +22,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -90,6 +90,7 @@ class JSONConfigUtil
         if ( src != null ){
             if ( result == null ){
                 result = new HashMap<>(src);
+                int tableSize = tableSizeFor(result.size());
                 List<Class<? extends Number>> badKeys = null;
                 // clone the formats.
                 for ( Entry<Class<? extends Number>,NumberFormat> entry : result.entrySet() ){
@@ -110,20 +111,16 @@ class JSONConfigUtil
                     }
                     if ( result.size() < 1 ){
                         result = null;
-                    }else{
+                    }else if ( tableSize > tableSizeFor(result.size()) ){
                         result = new HashMap<>(result);
                     }
                 }
             }else{
-                int size = result.size();
                 for ( Entry<Class<? extends Number>,NumberFormat> entry : src.entrySet() ){
                     // only use good entries.
                     if ( entry.getKey() != null && entry.getValue() != null ){
                         result.put(entry.getKey(), (NumberFormat)entry.getValue().clone());
                     }
-                }
-                if ( result.size() > size ){
-                    result = new HashMap<>(result);
                 }
             }
         }
@@ -143,7 +140,7 @@ class JSONConfigUtil
      */
     static Map<Class<?>,JSONReflectedClass> addReflectClass( Map<Class<?>,JSONReflectedClass> refClasses, Object obj )
     {
-        return obj == null ? refClasses : JSONConfigUtil.addReflectClasses(refClasses, getReflectObjCollection(obj));
+        return addReflectClassesSafe(refClasses, getReflectClassCollection(obj));
     }
 
     /**
@@ -156,26 +153,37 @@ class JSONConfigUtil
      */
     static Map<Class<?>,JSONReflectedClass> addReflectClasses( Map<Class<?>,JSONReflectedClass> refClasses, Collection<?> classes )
     {
-        if ( classes == null || classes.size() < 1 ){
+        return addReflectClassesSafe(refClasses, getReflectClassCollection(classes));
+    }
+
+    /**
+     * Add the given classes to the given list of automatically reflected classes.
+     *
+     * @param refClasses The current set of reflected classes.
+     * @param classes A collection of objects of the types to be added from the reflect set.
+     * @return The modified set of reflect classes or null if there are none.
+     * @since 1.9
+     */
+    private static Map<Class<?>,JSONReflectedClass> addReflectClassesSafe( Map<Class<?>,JSONReflectedClass> refClasses, Collection<?> classes )
+    {
+        if ( classes.size() < 1 ){
             return refClasses;
         }
 
-        boolean needTrim = false;
+        int tableSize;
         if ( refClasses == null ){
             refClasses = new HashMap<>();
-            needTrim = true;
+            tableSize = DEFAULT_INITIAL_CAPACITY;
+        }else{
+            tableSize = tableSizeFor(refClasses.size());
         }
 
         for ( Object obj : classes ){
-            if ( obj != null ){
-                JSONReflectedClass refClass = ReflectUtil.ensureReflectedClass(obj);
-                if ( refClasses.put(refClass.getObjClass(), refClass) == null ){
-                    needTrim = true;
-                }
-            }
+            JSONReflectedClass refClass = ReflectUtil.ensureReflectedClass(obj);
+            refClasses.put(refClass.getObjClass(), refClass);
         }
 
-        if ( needTrim ){
+        if ( tableSize > tableSizeFor(refClasses.size()) ){
             refClasses = trimClasses(refClasses);
         }
 
@@ -193,7 +201,7 @@ class JSONConfigUtil
      */
     static Map<Class<?>,JSONReflectedClass> removeReflectClass( Map<Class<?>,JSONReflectedClass> refClasses, Object obj )
     {
-        return obj == null ? refClasses : removeReflectClasses(refClasses, getReflectObjCollection(obj));
+        return removeReflectClassesSafe(refClasses, getReflectClassCollection(obj));
     }
 
     /**
@@ -207,18 +215,29 @@ class JSONConfigUtil
      */
     static Map<Class<?>,JSONReflectedClass> removeReflectClasses( Map<Class<?>,JSONReflectedClass> refClasses, Collection<?> classes )
     {
-        if ( classes == null || refClasses == null || classes.size() < 1 ){
+        return removeReflectClassesSafe(refClasses, getReflectClassCollection(classes));
+    }
+
+    /**
+     * Remove the given classes from the given list of automatically reflected
+     * classes.
+     *
+     * @param refClasses The current set of reflected classes.
+     * @param classes A collection objects of the types to be removed from the reflect set.
+     * @return The modified set of reflect classes or null if there are none left.
+     */
+    private static Map<Class<?>,JSONReflectedClass> removeReflectClassesSafe( Map<Class<?>,JSONReflectedClass> refClasses, Collection<?> classes )
+    {
+        if ( refClasses == null || classes.size() < 1 || refClasses.size() < 1 ){
             return refClasses;
         }
 
-        boolean needTrim = false;
+        int tableSize = tableSizeFor(refClasses.size());
         for ( Object obj : classes ){
-            if ( obj != null && refClasses.remove(ReflectUtil.getClass(obj)) != null ){
-                needTrim = true;
-            }
+            refClasses.remove(ReflectUtil.getClass(obj));
         }
 
-        if ( needTrim ){
+        if ( tableSize > tableSizeFor(refClasses.size()) ){
             refClasses = trimClasses(refClasses);
         }
 
@@ -239,28 +258,72 @@ class JSONConfigUtil
 
     /**
      * If the given object is an array, {@link Iterable} or {@link Enumeration},
-     * then make it into a collection and return it. Otherwise, create a List
-     * with just the one element and return it.
+     * then make it into a collection with any nested collections or arrays
+     * flattened out and return it. Otherwise, create a List with just the one
+     * element and return it.
      *
      * @param obj the object.
      * @return the list.
      */
-    private static Collection<?> getReflectObjCollection( Object obj )
+    private static Collection<?> getReflectClassCollection( Object obj )
     {
-        if ( obj instanceof Iterable || obj instanceof Enumeration || obj.getClass().isArray() ){
-            Set<Object> objs = new HashSet<>();
+        if ( obj == null ){
+            return new ArrayList<Object>(0);
+        }else if ( obj instanceof Class || obj instanceof JSONReflectedClass ){
+            return Arrays.asList(obj);
+        }else if ( isArrayType(obj) ){
+            Set<Object> objs = new LinkedHashSet<>();
             for ( Object element : new JSONArrayData(obj) ){
-                if ( element instanceof Class || element instanceof JSONReflectedClass ){
-                    objs.add(element);
-                }else if ( element != null ){
-                    objs.add(ReflectUtil.getClass(element));
+                if ( element != null ){
+                    if ( element instanceof Class || element instanceof JSONReflectedClass ){
+                        objs.add(element);
+                    }else if ( isArrayType(element) ){
+                        objs.addAll(getReflectClassCollection(element));
+                    }else{
+                        objs.add(ReflectUtil.getClass(element));
+                    }
                 }
             }
             return objs;
         }else{
-            return Arrays.asList(obj);
+            return Arrays.asList(ReflectUtil.getClass(obj));
         }
     }
+
+    /**
+     * Return true of the given object is an array type.
+     *
+     * @param obj the object to check
+     * @return true if it's an array type.
+     */
+    private static boolean isArrayType( Object obj )
+    {
+        return obj instanceof Iterable || obj instanceof Enumeration || obj.getClass().isArray();
+    }
+
+    /**
+     * Get the HashMap table size for the given map size.
+     *
+     * @param size the map size.
+     * @return the size of the table it needs.
+     */
+    static int tableSizeFor( int size )
+    {
+        if ( size > 0 ){
+            int tableSize = 1;
+            while ( tableSize < size ){
+                tableSize <<= 1;
+            }
+            return tableSize;
+        }else{
+            return 0;
+        }
+    }
+
+    /**
+     * Default initial capacity for a HashMap.
+     */
+    static final int DEFAULT_INITIAL_CAPACITY = 16;
 
     /**
      * This class should never be instantiated.
