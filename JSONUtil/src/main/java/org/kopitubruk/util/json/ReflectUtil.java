@@ -4,10 +4,8 @@ import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -68,15 +66,19 @@ public class ReflectUtil
     public static final int PUBLIC = 3;
 
     /**
-     * Getter name pattern.
+     * The minimum value for privacy level.
      */
-    static final Pattern GETTER = Pattern.compile("^(get|is)\\p{Lu}.*$");
+    private static final int MIN_PRIVACY_LEVEL = PRIVATE;
 
     /**
-     * A set of permissible levels for reflection privacy.
+     * The maximum value for privacy level.
      */
-    static final Set<Integer> PERMITTED_LEVELS =
-            new HashSet<>(Arrays.asList(PRIVATE, PACKAGE, PROTECTED, PUBLIC));
+    private static final int MAX_PRIVACY_LEVEL = PUBLIC;
+
+    /**
+     * Getter name pattern.
+     */
+    private static final Pattern GETTER = Pattern.compile("^(get|is)\\p{Lu}.*$");
 
     /**
      * Primitive number types and the number class which includes all number
@@ -168,7 +170,7 @@ public class ReflectUtil
      */
     static int confirmPrivacyLevel( int privacyLevel, JSONConfig cfg ) throws JSONReflectionException
     {
-        if ( PERMITTED_LEVELS.contains(privacyLevel) ){
+        if ( privacyLevel >= MIN_PRIVACY_LEVEL && privacyLevel <= MAX_PRIVACY_LEVEL ){
             return privacyLevel;
         }else{
             throw new JSONReflectionException(privacyLevel, cfg);
@@ -325,7 +327,7 @@ public class ReflectUtil
      * @param objTypes the type to check.
      * @return true if the given type is a {@link Number} type.
      */
-    static boolean isJSONNumber( Class<?>[] objTypes )
+    private static boolean isJSONNumber( Class<?>[] objTypes )
     {
         return isType(objTypes, NUMBERS);
     }
@@ -336,7 +338,7 @@ public class ReflectUtil
      * @param objTypes the type to check.
      * @return true if the given type is a {@link Boolean} type.
      */
-    static boolean isJSONBoolean( Class<?>[] objTypes )
+    private static boolean isJSONBoolean( Class<?>[] objTypes )
     {
         return isType(objTypes, BOOLEANS);
     }
@@ -347,7 +349,7 @@ public class ReflectUtil
      * @param objTypes the type to check.
      * @return true if the given type is a {@link CharSequence} type.
      */
-    static boolean isJSONString( Class<?>[] objTypes )
+    private static boolean isJSONString( Class<?>[] objTypes )
     {
         return isType(objTypes, STRINGS);
     }
@@ -358,7 +360,7 @@ public class ReflectUtil
      * @param objTypes the type to check.
      * @return true if the given type is a JSON array type.
      */
-    static boolean isJSONArray( Class<?>[] objTypes )
+    private static boolean isJSONArray( Class<?>[] objTypes )
     {
         if ( objTypes[0].isArray() ){
             return true;
@@ -372,7 +374,7 @@ public class ReflectUtil
      * @param objTypes the type to check.
      * @return true if the given type is a JSON map type.
      */
-    static boolean isJSONMap( Class<?>[] objTypes )
+    private static boolean isJSONMap( Class<?>[] objTypes )
     {
         return isType(objTypes, MAP_TYPES);
     }
@@ -385,7 +387,7 @@ public class ReflectUtil
      * @param type The type to check against.
      * @return true if there's a match.
      */
-    static boolean isType( Class<?>[] objTypes, Class<?> type )
+    private static boolean isType( Class<?>[] objTypes, Class<?> type )
     {
         Class<?>[] typeList = { type };
         return isType(objTypes, typeList);
@@ -423,7 +425,7 @@ public class ReflectUtil
      * @param objType the original type.
      * @return the type and all its super types and interfaces.
      */
-    static Class<?>[] getTypes( Class<?> objType )
+    private static Class<?>[] getTypes( Class<?> objType )
     {
         Set<Class<?>> types = new LinkedHashSet<>();
         Class<?> tmpClass = objType;
