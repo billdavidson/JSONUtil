@@ -863,12 +863,13 @@ public class JSONUtil
         }else if ( num instanceof Float ){
             isSafeJsonNumber = Float.isFinite((Float)num);
         }else if ( num instanceof BigDecimal || num instanceof BigInteger ){
-            BigDecimal bigDec = num instanceof BigInteger ? new BigDecimal((BigInteger)num) : (BigDecimal)num;
-            Double d = bigDec.doubleValue();
+            Double d = num.doubleValue();
 
             isSafeJsonNumber = Double.isFinite(d);
 
             if ( isSafeJsonNumber && cfg.isPreciseNumbers() ){
+                BigDecimal bigDec = num instanceof BigInteger ? new BigDecimal((BigInteger)num) : (BigDecimal)num;
+
                 // precise numbers requested.  return false if it loses precision in double.
                 isSafeJsonNumber = bigDec.compareTo(new BigDecimal(d.toString())) == 0;
             }
