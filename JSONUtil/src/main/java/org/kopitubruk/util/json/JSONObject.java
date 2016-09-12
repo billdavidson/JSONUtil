@@ -90,6 +90,29 @@ public class JSONObject
     }
 
     /**
+     * Return the JSON encoding of this object using the default configuration
+     * options.
+     *
+     * @return the JSON encoding of this object.
+     */
+    public String toString()
+    {
+        return JSONUtil.toJSON(this);
+    }
+
+    /**
+     * Return the JSON encoding of this object using given configuration
+     * options.
+     *
+     * @param cfg The config object.
+     * @return the JSON encoding of this object.
+     */
+    public String toString( JSONConfig cfg )
+    {
+        return JSONUtil.toJSON(this, cfg);
+    }
+
+    /**
      * Get the pseudo map that this is wrapping.
      *
      * @return the map.
