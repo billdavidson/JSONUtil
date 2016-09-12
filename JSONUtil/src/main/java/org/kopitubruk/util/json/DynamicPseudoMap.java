@@ -24,9 +24,9 @@ import java.util.Set;
 /**
  * This class implements a dynamically sized fake map that doesn't do any real
  * mapping. Its purpose is to provide an ordered collection of key-value pairs
- * via the entrySet() method so that it can be used to build JSON objects as
- * using the same code that builds them from real maps. It is meant to be faster
- * than doing normal put and iteration operations and to save memory compared to
+ * via the entrySet() method so that it can be used to build JSON objects using
+ * the same code that builds them from real maps. It is meant to be faster than
+ * doing normal put and iteration operations and to save memory compared to
  * normal maps. The gains tend to be effectively marginal but they are
  * measurable, especially with objects that have large numbers of fields to be
  * serialized.
@@ -38,7 +38,7 @@ class DynamicPseudoMap extends AbstractPseudoMap
     private List<Map.Entry<Object,Object>> entries;
 
     /**
-     * Make a dynamically sized PseudoMap
+     * Make a dynamically sized pseudo map
      */
     DynamicPseudoMap()
     {

@@ -22,9 +22,9 @@ import java.util.Set;
 /**
  * This class implements a fake map of fixed size that doesn't do any real
  * mapping. Its purpose is to provide an ordered collection of key-value pairs
- * via the entrySet() method so that it can be used to build JSON objects as
- * using the same code that builds them from real maps. It is meant to be faster
- * than doing normal put and iteration operations and to save memory compared to
+ * via the entrySet() method so that it can be used to build JSON objects using
+ * the same code that builds them from real maps. It is meant to be faster than
+ * doing normal put and iteration operations and to save memory compared to
  * normal maps. The gains tend to be effectively marginal but they are
  * measurable, especially with objects that have large numbers of fields to be
  * serialized.
@@ -37,7 +37,7 @@ class FixedPseudoMap extends AbstractPseudoMap
     private int size;
 
     /**
-     * Make a fixed size PesudoMap.
+     * Make a fixed size pseudo map.
      *
      * @param mapSize the size to make it.
      */
