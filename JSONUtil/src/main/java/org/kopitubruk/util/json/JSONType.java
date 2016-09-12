@@ -33,6 +33,7 @@ class JSONType
     private boolean isResourceBundle;
     private boolean isArrayType;
     private boolean isReflectType;
+    private boolean isJSONObject;
 
     /**
      * Create the JSONType.
@@ -44,10 +45,16 @@ class JSONType
     {
         isJSONAble = propertyValue instanceof JSONAble;
         if ( isJSONAble ){
-            isMapType = isResourceBundle = isArrayType = isReflectType = false;
+            isMapType = isResourceBundle = isJSONObject = isArrayType = isReflectType = false;
         }else{
             isResourceBundle = propertyValue instanceof ResourceBundle;
-            isMapType = isResourceBundle || propertyValue instanceof Map;
+            if ( isResourceBundle ){
+                isJSONObject = false;
+                isMapType = true;
+            }else{
+                isJSONObject = propertyValue instanceof JSONObject;
+                isMapType = isJSONObject || propertyValue instanceof Map;
+            }
             if ( isMapType ){
                 isArrayType = isReflectType = false;
             }else{
@@ -78,6 +85,16 @@ class JSONType
     boolean isResourceBundle()
     {
         return isResourceBundle;
+    }
+
+    /**
+     * Return true if the type is {@link JSONObject}
+     *
+     * @return true if the type is {@link JSONObject}
+     */
+    boolean isJSONObject()
+    {
+        return isJSONObject;
     }
 
     /**
