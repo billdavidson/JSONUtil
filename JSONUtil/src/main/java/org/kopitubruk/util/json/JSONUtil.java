@@ -862,16 +862,19 @@ public class JSONUtil
             }
         }else if ( num instanceof Float ){
             isSafeJsonNumber = Float.isFinite((Float)num);
-        }else if ( num instanceof BigDecimal || num instanceof BigInteger ){
-            Double d = num.doubleValue();
+        }else{
+            boolean isBigDecimal = num instanceof BigDecimal;
+            if ( isBigDecimal || num instanceof BigInteger ){
+                Double d = num.doubleValue();
 
-            isSafeJsonNumber = Double.isFinite(d);
+                isSafeJsonNumber = Double.isFinite(d);
 
-            if ( isSafeJsonNumber && cfg.isPreciseNumbers() ){
-                BigDecimal bigDec = num instanceof BigInteger ? new BigDecimal((BigInteger)num) : (BigDecimal)num;
+                if ( isSafeJsonNumber && cfg.isPreciseNumbers() ){
+                    BigDecimal bigDec = isBigDecimal ? (BigDecimal)num : new BigDecimal((BigInteger)num);
 
-                // precise numbers requested.  return false if it loses precision in double.
-                isSafeJsonNumber = bigDec.compareTo(new BigDecimal(d.toString())) == 0;
+                    // precise numbers requested.  return false if it loses precision in double.
+                    isSafeJsonNumber = bigDec.compareTo(new BigDecimal(d.toString())) == 0;
+                }
             }
         }
 
