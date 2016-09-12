@@ -93,7 +93,7 @@ public class ReflectUtil
     /**
      * Getter name pattern.
      */
-    private static final Pattern GETTER = Pattern.compile("^(get|is)\\p{Lu}.*$");
+    private static final Pattern GETTER_PAT = Pattern.compile("^(get|is)\\p{Lu}.*$");
 
     /**
      * Primitive number types and the number class which includes all number
@@ -120,7 +120,7 @@ public class ReflectUtil
     /**
      * Types that become maps/objects in JSON.
      */
-    private static final Class<?>[] MAP_TYPES = { Map.class, ResourceBundle.class };
+    private static final Class<?>[] MAP_TYPES = { Map.class, ResourceBundle.class, JSONObject.class };
 
     /**
      * Get the class of the given object or the object if it's a class object.
@@ -134,7 +134,7 @@ public class ReflectUtil
         if ( obj == null ){
             throw new JSONReflectionException();
         }
-        Class<?> result = null;
+        Class<?> result;
         if ( obj instanceof Class ){
             result = (Class<?>)obj;
         }else if ( obj instanceof JSONReflectedClass ){
@@ -245,8 +245,7 @@ public class ReflectUtil
     }
 
     /**
-     * Get the name of the setter for the given field of the given
-     * class.
+     * Get the name of the setter for the given field of the given class.
      *
      * @param clazz The class.
      * @param field The field.
@@ -303,7 +302,7 @@ public class ReflectUtil
      */
     static boolean isGetterName( String name, Class<?> retType )
     {
-        if ( GETTER.matcher(name).matches() ){
+        if ( GETTER_PAT.matcher(name).matches() ){
             if ( name.startsWith("is") ){
                 // "is" prefix only valid getter for booleans.
                 return isType(BOOLEANS, retType);
