@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.regex.Pattern;
 
 /**
@@ -75,7 +76,7 @@ public class JSONReflectedClass implements Cloneable
     // instance data.
     private Class<?> objClass;
     private Set<String> fieldNames;
-    private Map<String,String> fieldAliases;
+    private TreeMap<String,String> fieldAliases;
 
     /**
      * Create a new JSONReflectedClass
@@ -247,7 +248,7 @@ public class JSONReflectedClass implements Cloneable
      */
     public void setFieldNames( Collection<String> fieldNames )
     {
-        if ( fieldNames == null ){
+        if ( fieldNames == null || fieldNames.size() < 1 ){
             this.fieldNames = null;
         }else{
             // the LinkedHashSet preserves order and removes dups.
@@ -285,24 +286,40 @@ public class JSONReflectedClass implements Cloneable
     }
 
     /**
+     * Get the field aliases map.
+     *
+     * @return the fieldAliases
+     */
+    TreeMap<String,String> getFieldAliasesTreeMap()
+    {
+        return fieldAliases;
+    }
+
+    /**
      * Set the custom names map. Makes a copy of the map, trimming the keys and
      * values and discarding keys that are not valid Java identifiers and values
      * that don't have at least one character. The names being mapped from have
      * to be valid Java identifiers. This does no validation to see if the
-     * aliases are valid ECMAScript or JSON identifiers. It leaves that to
+     * aliases are valid ECMAScript or JSON identifiers other than to make sure
+     * that they have a length of at least one. It leaves validation to
      * {@link JSONUtil#toJSON(Object, JSONConfig, java.io.Writer)} and the
      * methods that it calls according to the configuration options that you've
-     * set.
+     * set.  Anything that appears invalid will be silently discarded.  If there
+     * are no valid aliases then the aliases map will be set to null.
      *
      * @param fieldAliases the fieldAliases to set
      */
     public void setFieldAliases( Map<String,String> fieldAliases )
     {
-        if ( fieldAliases == null ){
+        if ( fieldAliases == null || fieldAliases.size() < 1 ){
             this.fieldAliases = null;
         }else{
-            int tableSize = tableSizeFor(fieldAliases.size());
-            Map<String,String> aliases = new LinkedHashMap<>(tableSize);
+            /*
+             * TreeMap will iterate according to the sort order of its keys
+             * which allows uniform hashCode results even if the map is
+             * modified later.
+             */
+            this.fieldAliases = new TreeMap<>();
             for ( Entry<String,String> entry : fieldAliases.entrySet() ){
                 String key = entry.getKey();
                 String fieldName = key == null ? "" : key.trim();
@@ -310,16 +327,12 @@ public class JSONReflectedClass implements Cloneable
                     String value = entry.getValue();
                     String alias = value == null ? "" : value.trim();
                     if ( alias.length() > 0 ){
-                        aliases.put(fieldName, alias);
+                        this.fieldAliases.put(fieldName, alias);
                     }
                 }
             }
-            if ( aliases.size() < 1 ){
+            if ( this.fieldAliases.size() < 1 ){
                 this.fieldAliases = null;
-            }else if ( tableSize > tableSizeFor(aliases.size()) ){
-                this.fieldAliases = new LinkedHashMap<>(aliases);
-            }else{
-                this.fieldAliases = aliases;
             }
         }
     }
@@ -374,7 +387,7 @@ public class JSONReflectedClass implements Cloneable
         JSONReflectedClass result = new JSONReflectedClass();
         result.objClass = objClass;
         result.fieldNames = fieldNames;
-        result.fieldAliases = fieldAliases == null ? null : new LinkedHashMap<>(fieldAliases);
+        result.fieldAliases = fieldAliases == null ? null : new TreeMap<>(fieldAliases);
         return result;
     }
 
