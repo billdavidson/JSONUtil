@@ -22,6 +22,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Random;
 import java.util.Set;
 
@@ -55,13 +56,17 @@ public class GenerateBigObject
                 "\n" +
                 "package org.kopitubruk.util.json;\n" +
                 "\n" +
+                "/**\n" +
+                " */\n" +
                 "public class BigObject\n" +
                 "{");
 
         JSONConfig cfg = new JSONConfig();
         cfg.setEscapeNonAscii(true);
         Random rand = new Random();
-        Set<String> ids = new HashSet<String>();
+        Set<String> ids = new LinkedHashSet<String>();
+        String type = "String";
+        String value = "1";
 
         for ( int i = 0; i < MAX_FIELDS; i++ ){
             String id;
@@ -69,9 +74,19 @@ public class GenerateBigObject
                 id = getId(rand);
             }while ( ids.contains(id) || JSONUtil.isReservedWord(id) );
             ids.add(id);
-            String value = getValue(rand, cfg);
-            bigObj.println("    private String "+id+" = "+value+";");
-            //bigObj.println("    private Integer "+id+" = 1;");
+            value = getValue(rand, cfg);
+            bigObj.println("    private "+type+" "+id+" = "+value+";");
+        }
+
+        for ( String id : ids ){
+            String getterName = ReflectUtil.makeBeanMethodName(id, "get");
+            bigObj.println("    /**");
+            bigObj.println("     * @return the "+id);
+            bigObj.println("     */");
+            bigObj.println("    public "+type+" "+getterName+"()");
+            bigObj.println("    {");
+            bigObj.println("        return "+id+";");
+            bigObj.println("    }");
         }
 
         bigObj.println("}");
