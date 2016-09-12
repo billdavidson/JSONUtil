@@ -27,7 +27,6 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -423,7 +422,12 @@ public class JSONUtil
     private static void appendRecursiblePropertyValue( Object propertyValue, Writer json, JSONConfig cfg, JSONType jsonType ) throws IOException
     {
         // check for loops.
-        DataStructureLoopDetector loopDetector = new DataStructureLoopDetector(cfg, propertyValue);
+        DataStructureLoopDetector loopDetector = null;
+        boolean detectDataStructureLoops = cfg.isDetectDataStructureLoops();
+        if ( detectDataStructureLoops ){
+            loopDetector = new DataStructureLoopDetector(cfg, propertyValue);
+        }
+
 
         if ( jsonType.isJSONAble() ){
             JSONAble jsonAble = (JSONAble)propertyValue;
@@ -435,15 +439,22 @@ public class JSONUtil
             if ( jsonType.isResourceBundle() ){
                 ResourceBundle bundle = (ResourceBundle)propertyValue;
                 map = resourceBundleToMap(bundle);
+            }else if ( jsonType.isJSONObject() ){
+                JSONObject jsonObject = (JSONObject)propertyValue;
+                map = jsonObject.getMap();
             }else if ( jsonType.isMapType() ){
                 map = (Map<?,?>)propertyValue;
             }else if ( jsonType.isReflectType() ){
-                map = new ReflectedObjectMapBuilder(propertyValue, cfg).buildReflectedObjectMap();
+                ReflectedObjectMapBuilder builder = new ReflectedObjectMapBuilder(propertyValue, cfg);
+                builder.init();
+                map = builder.buildReflectedObjectMap();
             }
             appendObjectPropertyValue(map, json, cfg);
         }
 
-        loopDetector.popDataStructureStack();
+        if ( detectDataStructureLoops ){
+            loopDetector.popDataStructureStack();
+        }
     }
 
     /**
@@ -465,14 +476,18 @@ public class JSONUtil
         if ( propertyValue instanceof Number ){
             Number num = (Number)propertyValue;
             NumberFormat fmt = cfg.getNumberFormat(num);
-            String numericString = fmt == null ? num.toString()
-                                               : fmt.format(num, new StringBuffer(), new FieldPosition(0)).toString();
-            if ( isValidJSONNumber(numericString, cfg) ){
-                json.write(numericString);
+            if ( fmt == null && !(propertyValue instanceof BigDecimal || propertyValue instanceof BigInteger || propertyValue instanceof Long) ){
+                json.write(num.toString());
             }else{
-                // Something isn't a kosher number for JSON, which is more
-                // restrictive than ECMAScript for numbers.
-                writeString(numericString, json, cfg);
+                String numericString = fmt == null ? num.toString()
+                                                   : fmt.format(num, new StringBuffer(), new FieldPosition(0)).toString();
+                if ( isValidJSONNumber(numericString, cfg) ){
+                    json.write(numericString);
+                }else{
+                    // Something isn't a kosher number for JSON, which is more
+                    // restrictive than ECMAScript for numbers.
+                    writeString(numericString, json, cfg);
+                }
             }
         }else if ( propertyValue instanceof Boolean ){
             // boolean values go literal -- no quotes.
@@ -571,8 +586,9 @@ public class JSONUtil
     private static Map<?,?> resourceBundleToMap( ResourceBundle bundle )
     {
         // make it a map so that code can use an EntrySet.
-        Map<Object,Object> result = new LinkedHashMap<>();
-        for ( String key : bundle.keySet() ){
+        Set<String> keySet = bundle.keySet();
+        Map<Object,Object> result = new FixedPseudoMap(keySet.size());
+        for ( String key : keySet ){
             result.put(key, bundle.getObject(key));
         }
         return result;
@@ -747,7 +763,11 @@ public class JSONUtil
      */
     private static void writeString( String strValue, Writer json, JSONConfig cfg ) throws IOException
     {
-        if ( cfg.isEncodeNumericStringsAsNumbers() && isValidJSONNumber(strValue, cfg) ){
+        if ( cfg.isFastStrings() ){
+            json.write('"');
+            json.write(strValue);
+            json.write('"');
+        }else if ( cfg.isEncodeNumericStringsAsNumbers() && isValidJSONNumber(strValue, cfg) ){
             // no quotes.
             json.write(strValue);
         }else{

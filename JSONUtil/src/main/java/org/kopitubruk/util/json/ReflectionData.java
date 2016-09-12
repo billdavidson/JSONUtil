@@ -1,11 +1,24 @@
+/*
+ * Copyright 2016 Bill Davidson
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.kopitubruk.util.json;
 
 import java.lang.reflect.Member;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 
 /**
  * This class encapsulates cached reflection data for a given class when
@@ -24,9 +37,9 @@ class ReflectionData
      * These are used by hashCode and equals for Hashtable lookups.
      */
     private Class<?> clazz;
-    private Collection<String> fieldNames;
-    private Map<String,String> fieldAliases;
     private int privacyLevel;
+    private FastStringCollection fieldNames;
+    private TreeMap<String,String> fieldAliases;
 
     /*
      * These are used to reflect the class.
@@ -38,18 +51,15 @@ class ReflectionData
      * Create a new ReflectionData for storing reflection data.
      *
      * @param clazz the class being reflected.
+     * @param privacyLevel the privacy level for reflection.
      * @param fieldNames the fieldNames being reflected, if specified.
      * @param fieldAliases the aliases map, if any.
-     * @param privacyLevel the privacy level for reflection.
      * @param names the names for JSON output
      * @param attributes The list of methods and fields to use for reflection.
      */
-    ReflectionData( Class<?> clazz, Collection<String> fieldNames, Map<String,String> fieldAliases, int privacyLevel, String[] names, Member[] attributes )
+    ReflectionData( Class<?> clazz, int privacyLevel, FastStringCollection fieldNames, TreeMap<String,String> fieldAliases, String[] names, Member[] attributes )
     {
-        this.clazz = clazz;
-        this.fieldNames = fieldNames;
-        this.fieldAliases = fieldAliases;
-        this.privacyLevel = privacyLevel;
+        this(clazz, privacyLevel, fieldNames, fieldAliases);
         this.names = names;
         this.attributes = attributes;
     }
@@ -58,16 +68,16 @@ class ReflectionData
      * Create a new ReflectionData for looking up other reflection data objects.
      *
      * @param clazz the class being reflected.
+     * @param privacyLevel the privacy level for reflection.
      * @param fieldNames the fieldNames being reflected, if specified.
      * @param fieldAliases the aliases map, if any.
-     * @param privacyLevel the privacy level for reflection.
      */
-    ReflectionData( Class<?> clazz, Collection<String> fieldNames, Map<String,String> fieldAliases, int privacyLevel )
+    ReflectionData( Class<?> clazz, int privacyLevel, FastStringCollection fieldNames, TreeMap<String,String> fieldAliases )
     {
         this.clazz = clazz;
+        this.privacyLevel = privacyLevel;
         this.fieldNames = fieldNames;
         this.fieldAliases = fieldAliases;
-        this.privacyLevel = privacyLevel;
     }
 
     /**
@@ -98,46 +108,42 @@ class ReflectionData
     {
         final int prime = 31;
         int hashCode = 1;
-        hashCode = prime * hashCode + ((clazz == null) ? 0 : clazz.hashCode());
-        hashCode = prime * hashCode + fieldNamesHashCode();
-        hashCode = prime * hashCode + ((fieldAliases == null) ? 0 : fieldAliases.hashCode());
+        hashCode = prime * hashCode + clazz.hashCode();
         hashCode = prime * hashCode + privacyLevel;
+        hashCode = prime * hashCode + ((fieldNames == null) ? 0 : fieldNames.hashCode());
+        hashCode = prime * hashCode + aliasesHashCode();
         return hashCode;
     }
 
     /**
-     * Get hash code for field names.
+     * No null checks on the entries which should be faster than the
+     * AbstractMap.hashCode.
      *
-     * @param fieldNames An array of strings.
-     * @return the hash code.
+     * @return the hashCode.
      */
-    private int fieldNamesHashCode()
+    private int aliasesHashCode()
     {
-        if ( fieldNames == null ){
+        if ( fieldAliases == null ){
             return 0;
+        }else{
+            int result = 1;
+
+            for ( Entry<String,String> entry : fieldAliases.entrySet() ){
+                result = 31 * result + entry.getKey().hashCode();
+                result = 31 * result + entry.getValue().hashCode();
+            }
+
+            return result;
         }
-
-        int result = 1;
-
-        for ( Object element : fieldNames ){
-            result = 31 * result + element.hashCode();
-        }
-
-        return result;
     }
 
-    /* (non-Javadoc)
-     * @see java.lang.Object#equals(java.lang.Object)
+    /**
+     * This is only ever used in Hashtable lookups so certain assumptions can be
+     * made allowing some normal checks to be skipped.
      */
     @Override
     public boolean equals( Object obj )
     {
-        if ( this == obj )
-            return true;
-        if ( obj == null )
-            return false;
-        if ( getClass() != obj.getClass() )
-            return false;
         ReflectionData other = (ReflectionData)obj;
         if ( clazz != other.clazz )
             return false;
@@ -152,36 +158,20 @@ class ReflectionData
     }
 
     /**
-     * Slightly faster than {@link Arrays#equals(Object)} because it
-     * eliminates a null check.
+     * Check of the field names are equal.
      *
-     * @param fnames Second array of strings.
-     * @return true if the arrays are equal.
+     * @param fnames The other object's field names.
+     * @return true if they are equal.
      */
-    private boolean fieldNamesEqual( Collection<String> fnames )
+    private boolean fieldNamesEqual( FastStringCollection fnames )
     {
         if ( fieldNames == fnames ){
             return true;
-        }
-        if ( fieldNames == null || fnames == null ){
+        }else if ( fieldNames == null ){
             return false;
+        }else{
+            return fieldNames.equals(fnames);
         }
-
-        if ( fnames.size() != fieldNames.size() ){
-            return false;
-        }
-
-        Iterator<String> local = fieldNames.iterator();
-        Iterator<String> other = fnames.iterator();
-        while ( local.hasNext() ){
-            String lfn = local.next();
-            String ofn = other.next();
-            if ( ! lfn.equals(ofn) ){
-                return false;
-            }
-        }
-
-        return true;
     }
 
     /**
@@ -190,7 +180,7 @@ class ReflectionData
      * @param aliases the aliases from the other object.
      * @return true if they have the same key value pairs.
      */
-    private boolean aliasesEqual( Map<String,String> aliases )
+    private boolean aliasesEqual( TreeMap<String,String> aliases )
     {
         if ( fieldAliases == aliases ){
             return true;
@@ -201,18 +191,23 @@ class ReflectionData
         if ( fieldAliases.size() != aliases.size() ){
             return false;
         }
-        for ( Entry<String,String> entry : fieldAliases.entrySet() ){
-            String key0 = entry.getKey();
-            if ( ! aliases.containsKey(key0) ){
+
+        /*
+         * TreeMap allows certain assumptions.
+         *
+         * This should be faster than the AbstractMap.equals() which does lookups and null checks.
+         */
+        Iterator<Entry<String,String>> iter0 = fieldAliases.entrySet().iterator();
+        Iterator<Entry<String,String>> iter1 = aliases.entrySet().iterator();
+        while ( iter0.hasNext() ){
+            // TreeMap.Entry.equals() does null checks.  This doesn't.
+            Entry<String,String> entry0 = iter0.next();
+            Entry<String,String> entry1 = iter1.next();
+
+            if ( ! entry0.getKey().equals(entry1.getKey()) ){
                 return false;
             }
-            String value0 = entry.getValue();
-            String value1 = aliases.get(key0);
-            if ( value0 == value1 ){
-                // OK
-            }else if ( value0 == null ){
-                return false;
-            }else if ( ! value0.equals(value1) ){
+            if ( ! entry0.getValue().equals(entry1.getValue()) ){
                 return false;
             }
         }
