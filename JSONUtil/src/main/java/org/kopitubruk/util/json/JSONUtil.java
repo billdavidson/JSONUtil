@@ -189,11 +189,6 @@ public class JSONUtil
     private static final Pattern JSON_NUMBER_PAT = Pattern.compile("^-?(?:(?:\\d+(?:\\.\\d+)?)|(?:\\.\\d+))(?:[eE][-+]?\\d+)?$");
 
     /**
-     * Valid JSON integer pattern.
-     */
-    private static final Pattern JSON_INTEGER_PAT = Pattern.compile("^-?\\d+");
-
-    /**
      * Check for octal numbers, which aren't allowed in JSON.
      */
     private static final Pattern OCTAL_NUMBER_PAT = Pattern.compile("^-?0[0-7]+$");
@@ -474,21 +469,7 @@ public class JSONUtil
     private static void appendSimplePropertyValue( Object propertyValue, Writer json, JSONConfig cfg, JSONType jsonType ) throws IOException
     {
         if ( propertyValue instanceof Number ){
-            Number num = (Number)propertyValue;
-            NumberFormat fmt = cfg.getNumberFormat(num);
-            if ( fmt == null && !(propertyValue instanceof BigDecimal || propertyValue instanceof BigInteger || propertyValue instanceof Long) ){
-                json.write(num.toString());
-            }else{
-                String numericString = fmt == null ? num.toString()
-                                                   : fmt.format(num, new StringBuffer(), new FieldPosition(0)).toString();
-                if ( isValidJSONNumber(numericString, cfg) ){
-                    json.write(numericString);
-                }else{
-                    // Something isn't a kosher number for JSON, which is more
-                    // restrictive than ECMAScript for numbers.
-                    writeString(numericString, json, cfg);
-                }
-            }
+            appendNumber((Number)propertyValue, json, cfg);
         }else if ( propertyValue instanceof Boolean ){
             // boolean values go literal -- no quotes.
             json.write(propertyValue.toString());
@@ -496,18 +477,50 @@ public class JSONUtil
             if ( cfg.isEncodeDatesAsObjects() ){
                 json.write("new Date(");
             }
-            writeString(cfg.getDateGenFormat().format((Date)propertyValue), json, cfg);
+            boolean checkNum = false;
+            writeString(cfg.getDateGenFormat().format((Date)propertyValue), json, cfg, checkNum);
             if ( cfg.isEncodeDatesAsObjects() ){
                 json.write(')');
             }
         }else if ( propertyValue instanceof CharSequence || propertyValue instanceof Character ||
                    propertyValue.getClass().isEnum() || ! cfg.isReflectUnknownObjects() ){
             // Use the toString() method for the value and write it out as a string.
-            writeString(propertyValue.toString(), json, cfg);
+            boolean checkNum = true;
+            writeString(propertyValue.toString(), json, cfg, checkNum);
         }else{
             // unknown object and reflection requested.
             jsonType.forceReflectType();
             appendRecursiblePropertyValue(propertyValue, json, cfg, jsonType);
+        }
+    }
+
+    /**
+     * Append a number to the output.
+     *
+     * @param num The number to append.
+     * @param json Something to write the JSON data to.
+     * @param cfg A configuration object to use to set various options.
+     * @throws IOException If there is an error on output.
+     */
+    private static void appendNumber( Number num, Writer json, JSONConfig cfg ) throws IOException
+    {
+        NumberFormat fmt = cfg.getNumberFormat(num);
+        if ( fmt == null  ){
+            String numericString = num.toString();
+            if ( isSafeJsonNumber(num, null, cfg) ){
+                json.write(numericString);
+            }else{
+                fastWriteString(numericString, json);
+            }
+        }else{
+            String numericString = fmt.format(num, new StringBuffer(), new FieldPosition(0)).toString();
+            if ( isValidJSONNumber(numericString, cfg, num) ){
+                json.write(numericString);
+            }else{
+                // no way to know what the format did.
+                boolean checkNum = false;
+                writeString(numericString, json, cfg, checkNum);
+            }
         }
     }
 
@@ -759,15 +772,14 @@ public class JSONUtil
      * @param strValue The value to write.
      * @param json Something to write the JSON data to.
      * @param cfg A configuration object to use.
+     * @param checkNum if true, then check isEncodeNumericStringsAsNumbers()
      * @throws IOException If there is an error on output.
      */
-    private static void writeString( String strValue, Writer json, JSONConfig cfg ) throws IOException
+    private static void writeString( String strValue, Writer json, JSONConfig cfg, boolean checkNum ) throws IOException
     {
         if ( cfg.isFastStrings() ){
-            json.write('"');
-            json.write(strValue);
-            json.write('"');
-        }else if ( cfg.isEncodeNumericStringsAsNumbers() && isValidJSONNumber(strValue, cfg) ){
+            fastWriteString(strValue, json);
+        }else if ( checkNum && cfg.isEncodeNumericStringsAsNumbers() && isValidJSONNumber(strValue, cfg, null) ){
             // no quotes.
             json.write(strValue);
         }else{
@@ -791,54 +803,78 @@ public class JSONUtil
     }
 
     /**
+     * Write a string out with quotes but no checking or validation.
+     *
+     * @param strValue The string.
+     * @param json the writer.
+     * @throws IOException If there is an error on output.
+     */
+    private static void fastWriteString( String strValue, Writer json ) throws IOException
+    {
+        json.write('"');
+        json.write(strValue);
+        json.write('"');
+    }
+
+    /**
      * Return true if the input looks like a valid JSON number and can be
      * represented by a non-infinity double.
      *
      * @param numericString the string.
      * @param cfg the config object.
+     * @param num the number
      * @return true if the string can be treated as a number in JSON.
      */
-    private static boolean isValidJSONNumber( String numericString, JSONConfig cfg )
+    private static boolean isValidJSONNumber( String numericString, JSONConfig cfg, Number num )
     {
         return JSON_NUMBER_PAT.matcher(numericString).matches() &&
                ! OCTAL_NUMBER_PAT.matcher(numericString).matches() &&
-               isSafeJavascriptNumber(numericString, cfg);
+               isSafeJsonNumber(num, numericString, cfg);
     }
 
     /**
-     * Check range and precision of a JSON number according to flags.
+     * Return true if the given number can be represented as 64-bit floating point.
      *
-     * @param numericString The numeric string to check.
+     * @param num the number.
+     * @param numericString the number in string form.
      * @param cfg the config object.
-     * @return true if the number is valid for 64-bit floating point and flags.
+     * @return true if the number is OK for 64-bit floating point.
      */
-    private static boolean isSafeJavascriptNumber( String numericString, JSONConfig cfg )
+    private static boolean isSafeJsonNumber( Number num, String numericString, JSONConfig cfg )
     {
-        BigDecimal b = new BigDecimal(numericString);
-        Double d = b.doubleValue();
+        boolean isSafeJsonNumber = true;
 
-        // All valid JSON numbers must be representable as finite 64-bit floating point.
-        boolean isSafeJavascriptNumber = Double.isFinite(d);
+        if ( num == null ){
+            num = new BigDecimal(numericString);
+        }
 
-        if ( isSafeJavascriptNumber && cfg.isPreciseNumbers() ){
-            // precise numbers requested.  return false if it loses precision in double.
-            if ( JSON_INTEGER_PAT.matcher(numericString).matches() ){
-                // make sure that it stays the same when converted to double and back.
-                try{
-                    long x = new BigInteger(numericString).longValueExact();
-                    // check if any precision was lost.
-                    isSafeJavascriptNumber = x == d.longValue();
-                }catch ( ArithmeticException e ){
-                    // overflowed a long.
-                    isSafeJavascriptNumber = false;
-                }
-            }else{
-                // if they don't compare equal then precision was lost.
-                isSafeJavascriptNumber = b.compareTo(new BigDecimal(d.toString())) == 0;
+        if ( num instanceof Integer ){
+            // stop checking types.
+        }else if ( num instanceof Double ){
+            isSafeJsonNumber = Double.isFinite((Double)num);
+        }else if ( num instanceof Long ){
+            if ( cfg.isPreciseNumbers() ){
+                // precise numbers requested.  return false if it loses precision in double.
+                long x = (Long)num;
+                double d = x;
+                long y = (long)d;
+                isSafeJsonNumber = x == y;
+            }
+        }else if ( num instanceof Float ){
+            isSafeJsonNumber = Float.isFinite((Float)num);
+        }else if ( num instanceof BigDecimal || num instanceof BigInteger ){
+            BigDecimal bigDec = num instanceof BigInteger ? new BigDecimal((BigInteger)num) : (BigDecimal)num;
+            Double d = bigDec.doubleValue();
+
+            isSafeJsonNumber = Double.isFinite(d);
+
+            if ( isSafeJsonNumber && cfg.isPreciseNumbers() ){
+                // precise numbers requested.  return false if it loses precision in double.
+                isSafeJsonNumber = bigDec.compareTo(new BigDecimal(d.toString())) == 0;
             }
         }
 
-        return isSafeJavascriptNumber;
+        return isSafeJsonNumber;
     }
 
     /**
