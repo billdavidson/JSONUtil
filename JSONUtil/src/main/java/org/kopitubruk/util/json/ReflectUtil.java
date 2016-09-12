@@ -1,3 +1,18 @@
+/*
+ * Copyright 2016 Bill Davidson
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.kopitubruk.util.json;
 
 import java.lang.reflect.AccessibleObject;
@@ -280,6 +295,53 @@ public class ReflectUtil
     }
 
     /**
+     * Return true if the name looks like a getter.
+     *
+     * @param name the name
+     * @param retType the return type for checking "is" getters.
+     * @return true if it looks like a getter.
+     */
+    static boolean isGetterName( String name, Class<?> retType )
+    {
+        if ( GETTER.matcher(name).matches() ){
+            if ( name.startsWith("is") ){
+                // "is" prefix only valid getter for booleans.
+                return isType(BOOLEANS, retType);
+            }
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    /**
+     * Return true if it's OK to serialize this field.
+     *
+     * @param field the field.
+     * @return true if it's OK to serialize this field.
+     */
+    static boolean isSerializable( Field field )
+    {
+        int modifiers = field.getModifiers();
+        if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Make sure that the given object is accessible.
+     *
+     * @param obj the object
+     */
+    static void ensureAccessible( AccessibleObject obj )
+    {
+        if ( ! obj.isAccessible() ){
+            obj.setAccessible(true);
+        }
+    }
+
+    /**
      * Return true if the type returned by the method is compatible in JSON
      * with the type of the field.
      *
@@ -389,8 +451,12 @@ public class ReflectUtil
      */
     private static boolean isType( Class<?>[] objTypes, Class<?> type )
     {
-        Class<?>[] typeList = { type };
-        return isType(objTypes, typeList);
+        for ( Class<?> objType : objTypes ){
+            if ( objType == type ){
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -408,9 +474,9 @@ public class ReflectUtil
      */
     private static boolean isType( Class<?>[] objTypes, Class<?>[] types )
     {
-        for ( int i = 0; i < types.length; i++ ){
-            for ( int j = 0; j < objTypes.length; j++ ){
-                if ( objTypes[j] == types[i] ){
+        for ( Class<?> type : types ){
+            for ( Class<?> objType : objTypes ){
+                if ( objType == type ){
                     return true;
                 }
             }
@@ -456,53 +522,6 @@ public class ReflectUtil
                 }
             }
             tmpClass = tmpClass.getSuperclass();
-        }
-    }
-
-    /**
-     * Return true if the name looks like a getter.
-     *
-     * @param name the name
-     * @param retType the return type for checking "is" getters.
-     * @return true if it looks like a getter.
-     */
-    static boolean isGetterName( String name, Class<?> retType )
-    {
-        if ( GETTER.matcher(name).matches() ){
-            if ( name.startsWith("is") ){
-                // "is" prefix only valid getter for booleans.
-                return isType(BOOLEANS, retType);
-            }
-            return true;
-        }else{
-            return false;
-        }
-    }
-
-    /**
-     * Return true if it's OK to serialize this field.
-     *
-     * @param field the field.
-     * @return true if it's OK to serialize this field.
-     */
-    static boolean isSerializable( Field field )
-    {
-        int modifiers = field.getModifiers();
-        if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
-            return false;
-        }
-        return true;
-    }
-
-    /**
-     * Make sure that the given object is accessible.
-     *
-     * @param obj the object
-     */
-    static void ensureAccessible( AccessibleObject obj )
-    {
-        if ( ! obj.isAccessible() ){
-            obj.setAccessible(true);
         }
     }
 
