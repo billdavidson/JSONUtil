@@ -81,14 +81,14 @@ class CodePointData
     /**
      * Map characters to JSON character escapes.
      */
-    private static final Map<Character,String> JSON_ESC_MAP;
+    static final Map<Character,String> JSON_ESC_MAP;
 
     /**
      * These will break strings in eval() and so they need to be
      * escaped unless full JSON identifier code points is enabled
      * in which case the JSON should not be used with eval().
      */
-    private static final Set<Character> EVAL_ESC_SET;
+    static final Set<Character> EVAL_ESC_SET;
 
     /**
      * Maximum length of a ECMAScript 6 code point escape.
