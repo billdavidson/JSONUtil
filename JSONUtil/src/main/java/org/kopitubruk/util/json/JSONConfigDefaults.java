@@ -1524,9 +1524,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * If true, then string values will be copied to the output with no escaping
-     * If true, then string values will be copied to the output with no escaping
-     * or validation. It also effectively disables encodeNumericStringsAsNumbers
-     * for JSON output.
+     * or validation.
      * <p>
      * Only use this if you know that you have no characters in the range
      * U+0000-U+001F or backslash or forward slash or double quote in your
@@ -1535,7 +1533,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * U+2029 (paragraph separator).
      * <p>
      * That said, if you are encoding a lot of large strings, this can
-     * dramatically improve performance.
+     * improve performance by eliminating the check for characters that need
+     * to be escaped.
      *
      * @param dflt If true, then strings will be copied as is with no
      *            escaping or validation.
