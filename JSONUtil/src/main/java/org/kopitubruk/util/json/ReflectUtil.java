@@ -1,13 +1,26 @@
+/*
+ * Copyright 2016 Bill Davidson
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.kopitubruk.util.json;
 
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -31,7 +44,7 @@ public class ReflectUtil
     private static ClassLoader classLoader = ReflectUtil.class.getClassLoader();
 
     /**
-     * Reflection will attempt to serialize all fields including private.
+     * Reflection will attempt to serialize all fields including private.  Value is 0.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -41,7 +54,7 @@ public class ReflectUtil
     /**
      * Reflection will attempt to serialize package private, protected and
      * public fields or fields that have package private, protected or public
-     * get methods that conform to JavaBean naming conventions.
+     * get methods that conform to JavaBean naming conventions.    Value is 1.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -51,7 +64,7 @@ public class ReflectUtil
     /**
      * Reflection will attempt to serialize protected and public fields or
      * fields that have protected or public get methods that conform to JavaBean
-     * naming conventions.
+     * naming conventions.  Value is 2.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -60,7 +73,7 @@ public class ReflectUtil
 
     /**
      * Reflection will attempt to serialize only fields that are public or have
-     * public get methods that conform to JavaBean naming conventions.
+     * public get methods that conform to JavaBean naming conventions.  Value is 3.
      *
      * @see JSONConfig#setReflectionPrivacy(int)
      * @see JSONConfigDefaults#setReflectionPrivacy(int)
@@ -68,15 +81,19 @@ public class ReflectUtil
     public static final int PUBLIC = 3;
 
     /**
-     * Getter name pattern.
+     * The minimum value for privacy level.
      */
-    static final Pattern GETTER = Pattern.compile("^(get|is)\\p{Lu}.*$");
+    private static final int MIN_PRIVACY_LEVEL = PRIVATE;
 
     /**
-     * A set of permissible levels for reflection privacy.
+     * The maximum value for privacy level.
      */
-    private static final Set<Integer> PERMITTED_LEVELS =
-            new HashSet<Integer>(Arrays.asList(PRIVATE, PACKAGE, PROTECTED, PUBLIC));
+    private static final int MAX_PRIVACY_LEVEL = PUBLIC;
+
+    /**
+     * Getter name pattern.
+     */
+    private static final Pattern GETTER_PAT = Pattern.compile("^(get|is)\\p{Lu}.*$");
 
     /**
      * Primitive number types and the number class which includes all number
@@ -103,7 +120,7 @@ public class ReflectUtil
     /**
      * Types that become maps/objects in JSON.
      */
-    private static final Class<?>[] MAP_TYPES = { Map.class, ResourceBundle.class };
+    private static final Class<?>[] MAP_TYPES = { Map.class, ResourceBundle.class, JsonObject.class };
 
     /**
      * Get the class of the given object or the object if it's a class object.
@@ -117,7 +134,7 @@ public class ReflectUtil
         if ( obj == null ){
             throw new JSONReflectionException();
         }
-        Class<?> result = null;
+        Class<?> result;
         if ( obj instanceof Class ){
             result = (Class<?>)obj;
         }else if ( obj instanceof JSONReflectedClass ){
@@ -168,7 +185,7 @@ public class ReflectUtil
      */
     static int confirmPrivacyLevel( int privacyLevel, JSONConfig cfg ) throws JSONReflectionException
     {
-        if ( PERMITTED_LEVELS.contains(privacyLevel) ){
+        if ( privacyLevel >= MIN_PRIVACY_LEVEL && privacyLevel <= MAX_PRIVACY_LEVEL ){
             return privacyLevel;
         }else{
             throw new JSONReflectionException(privacyLevel, cfg);
@@ -228,8 +245,7 @@ public class ReflectUtil
     }
 
     /**
-     * Get the name of the setter for the given field of the given
-     * class.
+     * Get the name of the setter for the given field of the given class.
      *
      * @param clazz The class.
      * @param field The field.
@@ -275,6 +291,53 @@ public class ReflectUtil
             buf.append(fieldName.substring(charCount));
         }
         return buf.toString();
+    }
+
+    /**
+     * Return true if the name looks like a getter.
+     *
+     * @param name the name
+     * @param retType the return type for checking "is" getters.
+     * @return true if it looks like a getter.
+     */
+    static boolean isGetterName( String name, Class<?> retType )
+    {
+        if ( GETTER_PAT.matcher(name).matches() ){
+            if ( name.startsWith("is") ){
+                // "is" prefix only valid getter for booleans.
+                return isType(BOOLEANS, retType);
+            }
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    /**
+     * Return true if it's OK to serialize this field.
+     *
+     * @param field the field.
+     * @return true if it's OK to serialize this field.
+     */
+    static boolean isSerializable( Field field )
+    {
+        int modifiers = field.getModifiers();
+        if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Make sure that the given object is accessible.
+     *
+     * @param obj the object
+     */
+    static void ensureAccessible( AccessibleObject obj )
+    {
+        if ( ! obj.isAccessible() ){
+            obj.setAccessible(true);
+        }
     }
 
     /**
@@ -325,7 +388,7 @@ public class ReflectUtil
      * @param objTypes the type to check.
      * @return true if the given type is a {@link Number} type.
      */
-    static boolean isJSONNumber( Class<?>[] objTypes )
+    private static boolean isJSONNumber( Class<?>[] objTypes )
     {
         return isType(objTypes, NUMBERS);
     }
@@ -336,7 +399,7 @@ public class ReflectUtil
      * @param objTypes the type to check.
      * @return true if the given type is a {@link Boolean} type.
      */
-    static boolean isJSONBoolean( Class<?>[] objTypes )
+    private static boolean isJSONBoolean( Class<?>[] objTypes )
     {
         return isType(objTypes, BOOLEANS);
     }
@@ -347,7 +410,7 @@ public class ReflectUtil
      * @param objTypes the type to check.
      * @return true if the given type is a {@link CharSequence} type.
      */
-    static boolean isJSONString( Class<?>[] objTypes )
+    private static boolean isJSONString( Class<?>[] objTypes )
     {
         return isType(objTypes, STRINGS);
     }
@@ -358,7 +421,7 @@ public class ReflectUtil
      * @param objTypes the type to check.
      * @return true if the given type is a JSON array type.
      */
-    static boolean isJSONArray( Class<?>[] objTypes )
+    private static boolean isJSONArray( Class<?>[] objTypes )
     {
         if ( objTypes[0].isArray() ){
             return true;
@@ -372,7 +435,7 @@ public class ReflectUtil
      * @param objTypes the type to check.
      * @return true if the given type is a JSON map type.
      */
-    static boolean isJSONMap( Class<?>[] objTypes )
+    private static boolean isJSONMap( Class<?>[] objTypes )
     {
         return isType(objTypes, MAP_TYPES);
     }
@@ -385,10 +448,14 @@ public class ReflectUtil
      * @param type The type to check against.
      * @return true if there's a match.
      */
-    static boolean isType( Class<?>[] objTypes, Class<?> type )
+    private static boolean isType( Class<?>[] objTypes, Class<?> type )
     {
-        Class<?>[] typeList = { type };
-        return isType(objTypes, typeList);
+        for ( Class<?> objType : objTypes ){
+            if ( objType == type ){
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -406,9 +473,9 @@ public class ReflectUtil
      */
     private static boolean isType( Class<?>[] objTypes, Class<?>[] types )
     {
-        for ( int i = 0; i < types.length; i++ ){
-            for ( int j = 0; j < objTypes.length; j++ ){
-                if ( objTypes[j] == types[i] ){
+        for ( Class<?> type : types ){
+            for ( Class<?> objType : objTypes ){
+                if ( objType == type ){
                     return true;
                 }
             }
@@ -423,7 +490,7 @@ public class ReflectUtil
      * @param objType the original type.
      * @return the type and all its super types and interfaces.
      */
-    static Class<?>[] getTypes( Class<?> objType )
+    private static Class<?>[] getTypes( Class<?> objType )
     {
         Set<Class<?>> types = new LinkedHashSet<Class<?>>();
         Class<?> tmpClass = objType;
@@ -454,53 +521,6 @@ public class ReflectUtil
                 }
             }
             tmpClass = tmpClass.getSuperclass();
-        }
-    }
-
-    /**
-     * Return true if the name looks like a getter.
-     *
-     * @param name the name
-     * @param retType the return type for checking "is" getters.
-     * @return true if it looks like a getter.
-     */
-    static boolean isGetterName( String name, Class<?> retType )
-    {
-        if ( GETTER.matcher(name).matches() ){
-            if ( name.startsWith("is") ){
-                // "is" prefix only valid getter for booleans.
-                return isType(BOOLEANS, retType);
-            }
-            return true;
-        }else{
-            return false;
-        }
-    }
-
-    /**
-     * Return true if it's OK to serialize this field.
-     *
-     * @param field the field.
-     * @return true if it's OK to serialize this field.
-     */
-    static boolean isSerializable( Field field )
-    {
-        int modifiers = field.getModifiers();
-        if ( Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) ){
-            return false;
-        }
-        return true;
-    }
-
-    /**
-     * Make sure that the given object is accessible.
-     *
-     * @param obj the object
-     */
-    static void ensureAccessible( AccessibleObject obj )
-    {
-        if ( ! obj.isAccessible() ){
-            obj.setAccessible(true);
         }
     }
 

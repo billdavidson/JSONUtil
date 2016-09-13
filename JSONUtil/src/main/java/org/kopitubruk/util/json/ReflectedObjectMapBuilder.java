@@ -1,3 +1,18 @@
+/*
+ * Copyright 2016 Bill Davidson
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.kopitubruk.util.json;
 
 import java.lang.reflect.Field;
@@ -8,10 +23,10 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * This class builds a map of a reflected object.
@@ -27,7 +42,9 @@ class ReflectedObjectMapBuilder
     private JSONConfig cfg;
     private JSONReflectedClass refClass = null;
     private Class<?> clazz;
-    private Collection<String> fieldNames;
+    private Collection<String> fieldNameList;
+    private Set<String> fieldNames;
+    private FastStringCollection fnames;
     private Map<String,Field> fields;
     private Map<String,Method> getterMethods;
     private ReflectionData reflectionData;
@@ -54,25 +71,24 @@ class ReflectedObjectMapBuilder
      *
      * @return A map representing the object's fields.
      */
-    Map<String,Object> buildReflectedObjectMap()
+    Map<Object,Object> buildReflectedObjectMap()
     {
         String name = "buildReflectedObjectMap()";
 
         try {
-            init();
-            Map<String,Object> obj;
+            Map<Object,Object> obj;
 
             if ( reflectionData == null ){
                 List<Member> attributeList = null;
                 List<String> nameList = null;
-                obj = new LinkedHashMap<String,Object>(Math.min(DEFAULT_INITIAL_CAPACITY, fieldNames.size()));
+                obj = new DynamicPseudoMap();
                 if ( cacheReflectionData ){
                     attributeList = new ArrayList<Member>();
                     nameList = new ArrayList<String>();
                 }
 
                 // populate the object map.
-                for ( String fieldName : fieldNames ){
+                for ( String fieldName : fieldNameList ){
                     name = refClass.getFieldAlias(fieldName);
                     Field field = fields.get(fieldName);
                     // prefer getter if possible.
@@ -102,16 +118,10 @@ class ReflectedObjectMapBuilder
                     addReflectionData(attributeList, nameList);
                 }
             }else{
-                /*
-                 * Use cached reflection data for better performance. At this
-                 * point, all getter availability and privacy level filtration
-                 * has been done.  Only have to apply the reflection to the
-                 * object with the list of attributes, which have all been made
-                 * accessible by the first run that created the cached data.
-                 */
+                // Use cached reflection data for better performance.
                 String[] names = reflectionData.getNames();
                 Member[] attributes = reflectionData.getAttributes();
-                obj = new LinkedHashMap<String,Object>(attributes.length);
+                obj = new FixedPseudoMap(attributes.length);
 
                 // populate the object map.
                 for ( int i = 0; i < attributes.length; i++ ){
@@ -135,47 +145,46 @@ class ReflectedObjectMapBuilder
     /**
      * Initialize data for the reflection.
      */
-    private void init()
+    void init()
     {
-        if ( refClass != null ){
-            return;     // already ran
-        }
-        refClass = cfg.ensureReflectedClass(propertyValue);
-        clazz = refClass.getObjClass();
-        fieldNames = refClass.getFieldNamesRaw();
-        isFieldsSpecified = fieldNames != null;
-        privacyLevel = isFieldsSpecified ? ReflectUtil.PRIVATE : cfg.getReflectionPrivacy();
-        cacheReflectionData = cfg.isCacheReflectionData();
-        if ( cacheReflectionData ){
-            Map<String,String> fieldAliases = refClass.getFieldAliases();
-            reflectionDataCache = getReflectionDataCache();
-            reflectionData = reflectionDataCache.get(new ReflectionData(clazz, fieldNames, fieldAliases, privacyLevel));
-        }else{
-            reflectionData = null;
-        }
-        if ( reflectionData == null ){
-            // data needed if caching is disabled or hasn't happened yet.
-            isPrivate = privacyLevel == ReflectUtil.PRIVATE;
-            initFields();
-            initGetterMethods();
+        try {
+            refClass = cfg.ensureReflectedClass(propertyValue);
+            clazz = refClass.getObjClass();
+            fieldNames = refClass.getFieldNamesRaw();
+            isFieldsSpecified = fieldNames != null;
+            privacyLevel = isFieldsSpecified ? ReflectUtil.PRIVATE : cfg.getReflectionPrivacy();
+            cacheReflectionData = cfg.isCacheReflectionData();
+            if ( cacheReflectionData ){
+                fnames = isFieldsSpecified ? new FastStringCollection(fieldNames) : null;
+                TreeMap<String,String> fieldAliases = refClass.getFieldAliasesTreeMap();
+                reflectionDataCache = getReflectionDataCache();
+                reflectionData = reflectionDataCache.get(new ReflectionData(clazz, privacyLevel, fnames, fieldAliases));
+            }else{
+                reflectionData = null;
+            }
+            if ( reflectionData == null ){
+                // data needed if caching is disabled or hasn't happened yet.
+                isPrivate = privacyLevel == ReflectUtil.PRIVATE;
+                if ( isFieldsSpecified ){
+                    initSpecifiedFields();
+                }else{
+                    initFields();
+                }
+                initGetterMethods();
+            }
+        }catch ( Exception e ){
+            throw new JSONReflectionException(propertyValue, "init()", e, cfg);
         }
     }
 
     /**
-     * Initialize the map of the fields for the class and fieldNames
-     * if they were not specified.
+     * Initialize the map of the specified fields for the class.
      */
-    private void initFields()
+    private void initSpecifiedFields()
     {
-        fields = new HashMap<String,Field>();
-
         Set<String> allFieldNames = new HashSet<String>();
-        Set<String> fieldNameSet = null;
-        if ( isFieldsSpecified ){
-            fieldNameSet = (Set<String>)fieldNames;
-        }else{
-            fieldNames = new ArrayList<String>();
-        }
+        fields = new HashMap<String, Field>(fieldNames.size());
+        fieldNameList = cacheReflectionData ? fnames : fieldNames;
 
         Class<?> tmpClass = clazz;
         while ( tmpClass != null ){
@@ -183,13 +192,33 @@ class ReflectedObjectMapBuilder
                 String name = field.getName();
                 if ( ! allFieldNames.contains(name) ){
                     allFieldNames.add(name);
-                    if ( isFieldsSpecified ){
-                        if ( fieldNameSet.contains(name) ){
-                            // only get the fields that were specified.
-                            fields.put(name, field);
-                        }
-                    }else if ( ReflectUtil.isSerializable(field) ){
-                        fieldNames.add(name);
+                    if ( fieldNames.contains(name) ){
+                        // only get the fields that were specified.
+                        fields.put(name, field);
+                    }
+                }
+            }
+            tmpClass = tmpClass.getSuperclass();
+        }
+    }
+
+    /**
+     * Initialize the map of the fields for the class and fieldNames.
+     */
+    private void initFields()
+    {
+        Set<String> allFieldNames = new HashSet<String>();
+        fieldNameList = new ArrayList<String>();
+        fields = new HashMap<String,Field>();
+
+        Class<?> tmpClass = clazz;
+        while ( tmpClass != null ){
+            for ( Field field : tmpClass.getDeclaredFields() ){
+                String name = field.getName();
+                if ( ! allFieldNames.contains(name) ){
+                    allFieldNames.add(name);
+                    if ( ReflectUtil.isSerializable(field) ){
+                        fieldNameList.add(name);
                         fields.put(name, field);    // direct access or check against getter return type.
                     }
                 }
@@ -267,16 +296,15 @@ class ReflectedObjectMapBuilder
      */
     private void addReflectionData( List<Member> attributeList, List<String> nameList )
     {
-        // save the reflection data so that it can be used later for fast operation.
-        List<String> fnames = isFieldsSpecified ? new ArrayList<String>(fieldNames) : null;
-        Map<String,String> fieldAliases = refClass.getFieldAliases();
+        FastStringCollection cachedFieldNames = isFieldsSpecified ? fnames : null;
+        TreeMap<String,String> fieldAliases = refClass.getFieldAliasesTreeMap();
         if ( fieldAliases != null ){
-            fieldAliases = new HashMap<String,String>(fieldAliases);
+            fieldAliases = new TreeMap<String,String>(fieldAliases); // make sure it can't be changed.
         }
         String[] names = nameList.toArray(new String[nameList.size()]);
         Member[] attributes = attributeList.toArray(new Member[attributeList.size()]);
 
-        reflectionData = new ReflectionData(clazz, fnames, fieldAliases, privacyLevel, names, attributes);
+        reflectionData = new ReflectionData(clazz, privacyLevel, cachedFieldNames, fieldAliases, names, attributes);
         reflectionDataCache.put(reflectionData, reflectionData);
     }
 
@@ -284,11 +312,6 @@ class ReflectedObjectMapBuilder
      * static cache for reflection information.
      */
     private static volatile Map<ReflectionData,ReflectionData> REFLECTION_DATA_CACHE;
-
-    /*
-     * Default initial capacity for a HashMap.
-     */
-    private static final int DEFAULT_INITIAL_CAPACITY = 16;
 
     /**
      * Clear the reflection cache.

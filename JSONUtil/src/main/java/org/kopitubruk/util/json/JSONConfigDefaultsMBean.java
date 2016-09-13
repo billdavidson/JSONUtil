@@ -248,6 +248,32 @@ public interface JSONConfigDefaultsMBean
     public void setFullJSONIdentifierCodePoints( boolean dflt );
 
     /**
+     * Get the fastStrings policy.
+     *
+     * @return the fastStrings policy
+     */
+    public boolean isFastStrings();
+
+    /**
+     * If true, then string values will be copied to the output with no escaping
+     * or validation. It also effectively disables encodeNumericStringsAsNumbers
+     * for JSON output.
+     * <p>
+     * Only use this if you know that you have no characters in the range
+     * U+0000-U+001F or backslash or forward slash or double quote in your
+     * strings. If you want your JSON to be parsable by Javascript eval() then
+     * you also need to make sure that you don't have U+2028 (line separator) or
+     * U+2029 (paragraph separator).
+     * <p>
+     * That said, if you are encoding a lot of large strings, this can
+     * dramatically improve performance.
+     *
+     * @param dflt If true, then strings will be copied as is with no escaping
+     *            or validation.
+     */
+    public void setFastStrings( boolean dflt );
+
+    /**
      * Get the default encode numeric strings as numbers policy.
      *
      * @return The default encode numeric strings as numbers policy.

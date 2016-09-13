@@ -15,6 +15,9 @@
  */
 package org.kopitubruk.util.json;
 
+import static org.kopitubruk.util.json.JSONConfigUtil.tableSizeFor;
+import static org.kopitubruk.util.json.JSONConfigUtil.DEFAULT_INITIAL_CAPACITY;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
@@ -328,7 +331,7 @@ public class JSONParser
             }
         }
         // minimize memory usage.
-        return new LinkedHashMap<String,Object>(map);
+        return tableSizeFor(map.size()) < DEFAULT_INITIAL_CAPACITY ? new LinkedHashMap<String,Object>(map) : map;
     }
 
     /**
@@ -537,26 +540,38 @@ public class JSONParser
         if ( haveLong && (haveFloat || haveDouble) ){
             haveFloat = false;
             haveDouble = false;
+            // try to convert to long
             for ( int i = 0, len = workList.size(); i < len && ! haveDouble; i++ ){
                 Number num = workList.get(i);
-                if ( num instanceof Float || num instanceof Double ){
-                    // try to convert floats and doubles to all longs if possible
-                    try{
-                        num = Long.valueOf(new BigDecimal(num.toString()).longValueExact());
-                        workList.set(i, num);
-                    }catch ( ArithmeticException e ){
+                if ( num instanceof Float ){
+                    float f = (Float)num;
+                    long x = (long)f;
+                    float y = (float)x;
+                    if ( f == y ){
+                        workList.set(i, x);
+                    }else{
+                        haveDouble = true;
+                    }
+                }else if ( num instanceof Double ){
+                    double d = (Double)num;
+                    long x = (long)d;
+                    double y = (double)x;
+                    if ( d == y ){
+                        workList.set(i, x);
+                    }else{
                         haveDouble = true;
                     }
                 }
             }
             if ( haveDouble ){
-                // conversion to long failed.  check conversion to double.
+                // conversion to long failed.  try conversion to double.
                 for ( int i = 0, len = workList.size(); i < len; i++ ){
                     Number num = workList.get(i);
                     if ( num instanceof Long ){
-                        BigDecimal bigDec = new BigDecimal(num.toString());
-                        Double d = bigDec.doubleValue();
-                        if ( bigDec.compareTo(new BigDecimal(d.toString())) == 0 ){
+                        long x = (Long)num;
+                        double d = x;
+                        long y = (long)d;
+                        if ( x == y ){
                             workList.set(i, d);
                         }else{
                             return null;    // data loss.  abort.
@@ -570,9 +585,10 @@ public class JSONParser
             for ( int i = 0, len = workList.size(); i < len && ! haveDouble; i++ ){
                 Number num = workList.get(i);
                 if ( num instanceof Integer ){
-                    BigDecimal bigDec = new BigDecimal(num.toString());
-                    Float f = bigDec.floatValue();
-                    haveDouble = bigDec.compareTo(new BigDecimal(f.toString())) != 0;
+                    int x = (Integer)num;
+                    float f = x;
+                    int y = (int)f;
+                    haveDouble = x != y;
                 }
             }
         }

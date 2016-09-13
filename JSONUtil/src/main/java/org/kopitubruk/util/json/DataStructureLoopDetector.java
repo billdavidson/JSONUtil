@@ -29,7 +29,6 @@ class DataStructureLoopDetector
     private Object propertyValue;
     private List<Object> objStack;
     private int stackIndex;
-    private boolean detectDataStructureLoops;
 
     /**
      * Make a DataStructureLoopDetector
@@ -39,20 +38,17 @@ class DataStructureLoopDetector
      */
     DataStructureLoopDetector( JSONConfig cfg, Object propertyValue )
     {
-        detectDataStructureLoops = cfg.isDetectDataStructureLoops();
-        if ( detectDataStructureLoops ){
-            this.cfg = cfg;
-            this.propertyValue = propertyValue;
-            objStack = cfg.getObjStack();
-            for ( Object o : objStack ){
-                // reference comparison.
-                if ( o == propertyValue ){
-                    throw new DataStructureLoopException(propertyValue, cfg);
-                }
+        this.cfg = cfg;
+        this.propertyValue = propertyValue;
+        objStack = cfg.getObjStack();
+        for ( Object o : objStack ){
+            // reference comparison.
+            if ( o == propertyValue ){
+                throw new DataStructureLoopException(propertyValue, cfg);
             }
-            stackIndex = objStack.size();
-            objStack.add(propertyValue);
         }
+        stackIndex = objStack.size();
+        objStack.add(propertyValue);
     }
 
     /**
@@ -61,15 +57,13 @@ class DataStructureLoopDetector
      */
     void popDataStructureStack()
     {
-        if ( detectDataStructureLoops ){
-            // remove this value from the stack.
-            if ( objStack.size() == (stackIndex+1) && objStack.get(stackIndex) == propertyValue ){
-                // current propertyValue is the last value in the list.
-                objStack.remove(stackIndex);
-            }else{
-                // this should never happen.
-                throw new LoopDetectionFailureException(stackIndex, cfg);
-            }
+        // remove this value from the stack.
+        if ( objStack.size() == (stackIndex+1) && objStack.get(stackIndex) == propertyValue ){
+            // current propertyValue is the last value in the list.
+            objStack.remove(stackIndex);
+        }else{
+            // this should never happen.
+            throw new LoopDetectionFailureException(stackIndex, cfg);
         }
     }
 }
