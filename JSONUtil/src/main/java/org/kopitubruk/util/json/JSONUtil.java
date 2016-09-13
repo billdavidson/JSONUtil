@@ -423,7 +423,6 @@ public class JSONUtil
             loopDetector = new DataStructureLoopDetector(cfg, propertyValue);
         }
 
-
         if ( jsonType.isJSONAble() ){
             JSONAble jsonAble = (JSONAble)propertyValue;
             jsonAble.toJSON(cfg, json);
@@ -434,9 +433,6 @@ public class JSONUtil
             if ( jsonType.isResourceBundle() ){
                 ResourceBundle bundle = (ResourceBundle)propertyValue;
                 map = resourceBundleToMap(bundle);
-            }else if ( jsonType.isJSONObject() ){
-                JSONObject jsonObject = (JSONObject)propertyValue;
-                map = jsonObject.getMap();
             }else if ( jsonType.isMapType() ){
                 map = (Map<?,?>)propertyValue;
             }else if ( jsonType.isReflectType() ){
@@ -474,14 +470,7 @@ public class JSONUtil
             // boolean values go literal -- no quotes.
             json.write(propertyValue.toString());
         }else if ( propertyValue instanceof Date && cfg.isFormatDates() ){
-            if ( cfg.isEncodeDatesAsObjects() ){
-                json.write("new Date(");
-            }
-            boolean checkNum = false;
-            writeString(cfg.getDateGenFormat().format((Date)propertyValue), json, cfg, checkNum);
-            if ( cfg.isEncodeDatesAsObjects() ){
-                json.write(')');
-            }
+            appendDate((Date)propertyValue, json, cfg);
         }else if ( propertyValue instanceof CharSequence || propertyValue instanceof Character ||
                    propertyValue.getClass().isEnum() || ! cfg.isReflectUnknownObjects() ){
             // Use the toString() method for the value and write it out as a string.
@@ -521,6 +510,28 @@ public class JSONUtil
                 boolean checkNum = false;
                 writeString(numericString, json, cfg, checkNum);
             }
+        }
+    }
+
+    /**
+     * Append a date value to the given JSON buffer.
+     *
+     * @param propertyValue The value to append.
+     * @param json Something to write the JSON data to.
+     * @param cfg A configuration object to use to set various options.
+     * @throws IOException If there is an error on output.
+     */
+    private static void appendDate( Date date, Writer json, JSONConfig cfg ) throws IOException
+    {
+        if ( cfg.isEncodeDatesAsObjects() ){
+            json.write("new Date(");
+        }
+
+        boolean checkNum = false;
+        writeString(cfg.getDateGenFormat().format(date), json, cfg, checkNum);
+
+        if ( cfg.isEncodeDatesAsObjects() ){
+            json.write(')');
         }
     }
 
@@ -777,11 +788,11 @@ public class JSONUtil
      */
     private static void writeString( String strValue, Writer json, JSONConfig cfg, boolean checkNum ) throws IOException
     {
-        if ( cfg.isFastStrings() ){
-            fastWriteString(strValue, json);
-        }else if ( checkNum && cfg.isEncodeNumericStringsAsNumbers() && isValidJSONNumber(strValue, cfg, null) ){
+        if ( checkNum && cfg.isEncodeNumericStringsAsNumbers() && isValidJSONNumber(strValue, cfg, null) ){
             // no quotes.
             json.write(strValue);
+        }else if ( cfg.isFastStrings() ){
+            fastWriteString(strValue, json);
         }else{
             boolean useSingleLetterEscapes = true;
             boolean processInlineEscapes = cfg.isPassThroughEscapes();

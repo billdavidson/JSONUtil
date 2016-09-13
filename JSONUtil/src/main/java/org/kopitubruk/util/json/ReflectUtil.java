@@ -120,7 +120,7 @@ public class ReflectUtil
     /**
      * Types that become maps/objects in JSON.
      */
-    private static final Class<?>[] MAP_TYPES = { Map.class, ResourceBundle.class, JSONObject.class };
+    private static final Class<?>[] MAP_TYPES = { Map.class, ResourceBundle.class, JsonObject.class };
 
     /**
      * Get the class of the given object or the object if it's a class object.
