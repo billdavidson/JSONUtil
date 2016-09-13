@@ -106,6 +106,16 @@ class CodePointData
     private static final int MAX_JS_ESC_LENGTH = 4;
 
     /**
+     * Unicode line separator - breaks Javascript eval().
+     */
+    private static final char LINE_SEPARATOR = 0x2028;
+
+    /**
+     * Unicode paragraph separator - breaks Javascript eval().
+     */
+    private static final char PARAGRAPH_SEPARATOR = 0x2029;
+
+    /**
      * Initialize JSON_ESC_MAP, JAVASCRIPT_ESC_MAP and EVAL_ESC_SET.
      */
     static {
@@ -129,9 +139,7 @@ class CodePointData
         javascriptEscMap.put("\\v", (char)0xB);
         JAVASCRIPT_ESC_MAP = new HashMap<>(javascriptEscMap);
 
-        EVAL_ESC_SET = new HashSet<>(Arrays.asList(
-                                        (char)0x2028,       // line separator
-                                        (char)0x2029));     // paragraph separator
+        EVAL_ESC_SET = new HashSet<>(Arrays.asList(LINE_SEPARATOR, PARAGRAPH_SEPARATOR));
     }
 
     // private data and flags.
@@ -145,6 +153,7 @@ class CodePointData
     private boolean supportEval;
     private boolean escapeNonAscii;
     private boolean escapeSurrogates;
+    private boolean noEscapes;
 
     /**
      * If this is not null after a run of {@link #nextReady()} then it means
@@ -193,9 +202,82 @@ class CodePointData
         escapeNonAscii = cfg.isEscapeNonAscii();
         escapeSurrogates = cfg.isEscapeSurrogates();
 
-        haveSlash = processInlineEscapes && strValue.indexOf('\\') >= 0;
+
+        haveSlash = strValue.indexOf('\\') >= 0;
         if ( haveSlash ){
-            handler = new EscapeHandler(cfg);
+            noEscapes = false;
+            if ( processInlineEscapes ){
+                handler = new EscapeHandler(cfg);
+            }else{
+                handler = null;
+                haveSlash = false;
+            }
+        }else if ( useSingleLetterEscapes || escapeNonAscii || escapeSurrogates ){
+            // check if there is any escaping to be done.
+            char[] charList = strValue.toCharArray();
+            noEscapes = true;
+            if ( escapeNonAscii ){
+                checkForNonAscii(charList);
+            }
+            if ( escapeSurrogates ){
+                checkForSurrogates(charList);
+            }
+            if ( useSingleLetterEscapes && noEscapes ){
+                checkForEscapes(charList);
+            }
+        }
+    }
+
+    /**
+     * Check the list for non-ASCII
+     *
+     * @param charList the list of chars.
+     */
+    private void checkForNonAscii( char[] charList )
+    {
+        for ( int i = 0; noEscapes && i < charList.length; i++ ){
+            if ( charList[i] > 127 ){
+                noEscapes = false;
+            }
+        }
+    }
+
+    /**
+     * Check the list for surrogates.
+     *
+     * @param charList the list of chars.
+     */
+    private void checkForSurrogates( char[] charList )
+    {
+        for ( int i = 0; noEscapes && i < charList.length; i++ ){
+            if ( Character.isSurrogate(charList[i]) ){
+                noEscapes = false;
+            }
+        }
+    }
+
+    /**
+     * Check if the string contains any characters that need to be escaped.
+     * Backslash is not checked for because if there is one, this method will
+     * never be called.
+     *
+     * @param The list of chars.
+     */
+    private void checkForEscapes( char[] charList )
+    {
+        for ( int i = 0; noEscapes && i < charList.length; i++ ){
+            if ( charList[i] < ' ' ){
+                noEscapes = false;
+            }else{
+                switch ( charList[i] ){
+                    case '"':
+                    case '/':
+                    case LINE_SEPARATOR:
+                    case PARAGRAPH_SEPARATOR:
+                        noEscapes = false;
+                        break;
+                }
+            }
         }
     }
 
@@ -268,6 +350,16 @@ class CodePointData
     String getEsc()
     {
         return esc;
+    }
+
+    /**
+     * If true, then there are no escapes in this string.
+     *
+     * @return If true, then there are no escapes in this string.
+     */
+    boolean isNoEscapes()
+    {
+        return noEscapes;
     }
 
     /**
