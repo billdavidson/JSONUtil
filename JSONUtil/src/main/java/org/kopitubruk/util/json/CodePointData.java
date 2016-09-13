@@ -202,14 +202,12 @@ class CodePointData
         escapeNonAscii = cfg.isEscapeNonAscii();
         escapeSurrogates = cfg.isEscapeSurrogates();
 
-
         haveSlash = strValue.indexOf('\\') >= 0;
         if ( haveSlash ){
             noEscapes = false;
             if ( processInlineEscapes ){
                 handler = new EscapeHandler(cfg);
             }else{
-                handler = null;
                 haveSlash = false;
             }
         }else if ( useSingleLetterEscapes || escapeNonAscii || escapeSurrogates ){
@@ -224,59 +222,6 @@ class CodePointData
             }
             if ( useSingleLetterEscapes && noEscapes ){
                 checkForEscapes(charList);
-            }
-        }
-    }
-
-    /**
-     * Check the list for non-ASCII
-     *
-     * @param charList the list of chars.
-     */
-    private void checkForNonAscii( char[] charList )
-    {
-        for ( int i = 0; noEscapes && i < charList.length; i++ ){
-            if ( charList[i] > 127 ){
-                noEscapes = false;
-            }
-        }
-    }
-
-    /**
-     * Check the list for surrogates.
-     *
-     * @param charList the list of chars.
-     */
-    private void checkForSurrogates( char[] charList )
-    {
-        for ( int i = 0; noEscapes && i < charList.length; i++ ){
-            if ( Character.isSurrogate(charList[i]) ){
-                noEscapes = false;
-            }
-        }
-    }
-
-    /**
-     * Check if the string contains any characters that need to be escaped.
-     * Backslash is not checked for because if there is one, this method will
-     * never be called.
-     *
-     * @param The list of chars.
-     */
-    private void checkForEscapes( char[] charList )
-    {
-        for ( int i = 0; noEscapes && i < charList.length; i++ ){
-            if ( charList[i] < ' ' ){
-                noEscapes = false;
-            }else{
-                switch ( charList[i] ){
-                    case '"':
-                    case '/':
-                    case LINE_SEPARATOR:
-                    case PARAGRAPH_SEPARATOR:
-                        noEscapes = false;
-                        break;
-                }
             }
         }
     }
@@ -474,6 +419,74 @@ class CodePointData
     int end( int regionLength )
     {
         return Math.min(index+regionLength, len);
+    }
+
+    /**
+     * Check the list for non-ASCII
+     *
+     * @param charList the list of chars.
+     */
+    private void checkForNonAscii( char[] charList )
+    {
+        for ( int i = 0; noEscapes && i < charList.length; i++ ){
+            if ( charList[i] > 127 ){
+                noEscapes = false;
+            }
+        }
+    }
+
+    /**
+     * Check the list for surrogates.
+     *
+     * @param charList the list of chars.
+     */
+    private void checkForSurrogates( char[] charList )
+    {
+        for ( int i = 0; noEscapes && i < charList.length; i++ ){
+            if ( Character.isSurrogate(charList[i]) ){
+                noEscapes = false;
+            }
+        }
+    }
+
+    /**
+     * Check if the string contains any characters that need to be escaped.
+     * Backslash is not checked for because if there is one, this method will
+     * never be called.
+     *
+     * @param The list of chars.
+     */
+    private void checkForEscapes( char[] charList )
+    {
+        if ( supportEval ){
+            for ( int i = 0; noEscapes && i < charList.length; i++ ){
+                if ( charList[i] < ' ' ){
+                    noEscapes = false;
+                }else{
+                    switch ( charList[i] ){
+                        case '"':
+                        case '/':
+                        case LINE_SEPARATOR:
+                        case PARAGRAPH_SEPARATOR:
+                            noEscapes = false;
+                            break;
+                    }
+                }
+            }
+        }else{
+            for ( int i = 0; noEscapes && i < charList.length; i++ ){
+                if ( charList[i] < ' ' ){
+                    noEscapes = false;
+                }else{
+                    switch ( charList[i] ){
+                        case '"':
+                        case '/':
+                            noEscapes = false;
+                            break;
+                    }
+                }
+            }
+        }
     }
 
     /**
