@@ -288,7 +288,7 @@ public class TestJSONUtil
         int partIndex = 0;
         int nameIndex = 0;
 
-        Map<String,Object> jsonObj = new HashMap<>(2);
+        JsonObject jsonObj = new JsonObject(1);
 
         int startSize = validStart.size();
         int partSize = validPart.size();
@@ -298,8 +298,8 @@ public class TestJSONUtil
             propertyName[nameIndex++] = validPart.get(partIndex++);
             if ( nameIndex == MAX_LENGTH ){
                 jsonObj.clear();
-                jsonObj.put(new String(propertyName,0,nameIndex), 0);
-                String json = JSONUtil.toJSON(jsonObj, cfg);
+                jsonObj.add(new String(propertyName,0,nameIndex), 0);
+                String json = jsonObj.toJSON(cfg);
                 validateJSON(json);    // this makes this test take a long time to run.
                 nameIndex = 0;
                 if ( startIndex < startSize ){
@@ -331,7 +331,7 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
         cfg.setFullJSONIdentifierCodePoints(true);
 
-        Map<String,Object> jsonObj = new HashMap<>(2);
+        JsonObject jsonObj = new JsonObject(1);
         int[] normalIdent = new int[1];
         int[] escName = new int[2];
         escName[0] = '\\';
@@ -341,8 +341,8 @@ public class TestJSONUtil
             if ( JSONUtil.isValidIdentifierStart(i, cfg) && ! JSONUtil.isValidIdentifierPart(i, jcfg) ){
                 normalIdent[0] = i;
                 jsonObj.clear();
-                jsonObj.put(new String(normalIdent,0,1), 0);
-                String json = JSONUtil.toJSON(jsonObj, cfg);
+                jsonObj.add(new String(normalIdent,0,1), 0);
+                String json = jsonObj.toJSON(cfg);
                 // these would fail eval().
                 parseJSON(json);
                 ++jsonOnlyCount;
@@ -361,7 +361,7 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
         cfg.setFullJSONIdentifierCodePoints(true);
 
-        Map<String,Object> jsonObj = new HashMap<>(2);
+        JsonObject jsonObj = new JsonObject(1);
         int[] codePoints = new int[256];
         int j = 0;
 
@@ -385,7 +385,7 @@ public class TestJSONUtil
     @Test
     public void testBadStartPropertyNames()
     {
-        Map<String,Object> jsonObj = new HashMap<>(2);
+        JsonObject jsonObj = new JsonObject(1);
         int[] codePoints = new int[1];
         JSONConfig cfg = new JSONConfig();
 
@@ -406,7 +406,7 @@ public class TestJSONUtil
         int[] codePoints = new int[256];
         int j = 1;
         codePoints[0] = '_';
-        Map<String,Object> jsonObj = new HashMap<>(2);
+        JsonObject jsonObj = new JsonObject(1);
         JSONConfig cfg = new JSONConfig();
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
@@ -433,14 +433,14 @@ public class TestJSONUtil
      * @param end The index just after the last code point to check for.
      * @param jsonObj A jsonObj to use for the test.
      */
-    private void testBadIdentifier( int[] codePoints, int start, int end, Map<String,Object> jsonObj, JSONConfig cfg )
+    private void testBadIdentifier( int[] codePoints, int start, int end, JsonObject jsonObj, JSONConfig cfg )
     {
         // clear in order to avoid memory abuse.
         // didn't create the object here because it would have to be recreated millions of times.
         jsonObj.clear();
         try{
-            jsonObj.put(new String(codePoints,0,end), 0);
-            JSONUtil.toJSON(jsonObj, cfg);
+            jsonObj.add(new String(codePoints,0,end), 0);
+            jsonObj.toJSON(cfg);
             fail(String.format("Expected a BadPropertyNameException to be thrown for U+%04X", codePoints[start]));
         }catch ( BadPropertyNameException e ){
             String message = e.getMessage();
@@ -460,7 +460,7 @@ public class TestJSONUtil
     public void testValidStrings() throws ScriptException, NoSuchMethodException
     {
         int[] codePoints = new int[32768];
-        Map<String,Object> jsonObj = new HashMap<>(2);
+        JsonObject jsonObj = new JsonObject(1);
         JSONConfig cfg = new JSONConfig();
         int j = 0;
 
@@ -469,15 +469,17 @@ public class TestJSONUtil
                 // 247650 code points, the last time I checked.
                 codePoints[j++] = i;
                 if ( j == codePoints.length ){
-                    jsonObj.put("x", new String(codePoints,0,j));
-                    validateJSON(JSONUtil.toJSON(jsonObj, cfg));
+                    jsonObj.clear();
+                    jsonObj.add("x", new String(codePoints,0,j));
+                    validateJSON(jsonObj.toJSON(cfg));
                     j = 0;
                 }
             }
         }
         if ( j > 0 ){
-            jsonObj.put("x", new String(codePoints,0,j));
-            validateJSON(JSONUtil.toJSON(jsonObj, cfg));
+            jsonObj.clear();
+            jsonObj.add("x", new String(codePoints,0,j));
+            validateJSON(jsonObj.toJSON(cfg));
         }
     }
 
@@ -490,13 +492,13 @@ public class TestJSONUtil
     @Test
     public void testUnicodeEscapeInIdentifier() throws ScriptException, NoSuchMethodException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
+        JsonObject jsonObj = new JsonObject(1);
         String[] ids = { "a\\u1234", "\\u1234x" };
         for ( String id : ids ){
             jsonObj.clear();
-            jsonObj.put(id, 0);
+            jsonObj.add(id, 0);
 
-            String json = JSONUtil.toJSON(jsonObj);
+            String json = jsonObj.toJSON();
             validateJSON(json);
             assertThat(json, is("{\""+id+"\":0}"));
         }
@@ -775,7 +777,7 @@ public class TestJSONUtil
             assertThat(json, is("{\"a"+r+"\":0,\"b"+r+"\":0,\"c"+r+"\":0}"));
         }
 
-        int maxLen = 1024;
+        int maxLen = 512;
         buf.setLength(0);
         buf.append("c");
         cmpBuf.setLength(0);
@@ -1415,12 +1417,12 @@ public class TestJSONUtil
     @Test
     public void testDuplicateKeys()
     {
-        Map<Object,Object> jsonObj = new HashMap<>();
-        jsonObj.put(new DupStr(1), 0);
-        jsonObj.put(new DupStr(2), 1);
+        JsonObject jsonObj = new JsonObject(2)
+                                    .add(new DupStr(1), 0)
+                                    .add(new DupStr(2), 1);
         JSONConfig cfg = new JSONConfig();
         try{
-            JSONUtil.toJSON(jsonObj, cfg);
+            jsonObj.toJSON(cfg);
             fail("Expected a DuplicatePropertyNameException to be thrown");
         }catch ( DuplicatePropertyNameException e ){
             assertThat(e.getMessage(), is("Property x occurs twice in the same object."));
@@ -1495,37 +1497,41 @@ public class TestJSONUtil
     @Test
     public void testReflect()
     {
-        Map<Object,Object> jsonObj = new HashMap<>();
-        jsonObj.put("f", new ReflectTestClass());
+        JsonObject jsonObj = new JsonObject(1);
+        jsonObj.add("f", new ReflectTestClass());
         JSONConfig cfg = new JSONConfig();
+        cfg.setValidatePropertyNames(false);
+        cfg.setDetectDataStructureLoops(false);
+        cfg.setFastStrings(true);
         cfg.setCacheReflectionData(false);
-        //ReflectedObjectMapBuilder.clearReflectionCache();
+
+        ReflectedObjectMapBuilder.clearReflectionCache();
 
         // JNDI set up to only show fields a and e.
-        String json = JSONUtil.toJSON(jsonObj, cfg);
+        String json = jsonObj.toJSON(cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"k\":25.0}}"));
 
         cfg.clearReflectClasses();
         cfg.addReflectClass(ReflectTestClass.class);
 
         cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
-        json = JSONUtil.toJSON(jsonObj, cfg);
+        json = jsonObj.toJSON(cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[],\"d\":null,\"f\":true}}"));
 
         cfg.setReflectionPrivacy(ReflectUtil.PACKAGE);
-        json = JSONUtil.toJSON(jsonObj, cfg);
+        json = jsonObj.toJSON(cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[],\"f\":true}}"));
 
         cfg.setReflectionPrivacy(ReflectUtil.PROTECTED);
-        json = JSONUtil.toJSON(jsonObj, cfg);
+        json = jsonObj.toJSON(cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"f\":true}}"));
 
         cfg.setReflectionPrivacy(ReflectUtil.PUBLIC);
-        json = JSONUtil.toJSON(jsonObj, cfg);
+        json = jsonObj.toJSON(cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"f\":true}}"));
 
         cfg = new JSONConfig(); // reload defaults.
-        json = JSONUtil.toJSON(jsonObj, cfg);
+        json = jsonObj.toJSON(cfg);
         assertThat(json, is("{\"f\":{\"a\":1,\"k\":25.0}}"));
 
         JSONConfigDefaults.getInstance().clearReflectClasses();
@@ -1535,10 +1541,10 @@ public class TestJSONUtil
         cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
         cfg.addReflectClass(ReflectTestClass.class);
 
-        //int interations = 100000;
-        int interations = 100;
-        //int interations = 0;
-        long start, end;
+        //int iterations = 1000000;
+        //int iterations = 100000;
+        int iterations = 100;
+        //int iterations = 0;
 
         /*
          * These timings get a little funky due to the way that the JVM cache's
@@ -1546,73 +1552,74 @@ public class TestJSONUtil
          * repeatedly.  Initially, it seems like maps are slow but eventually, as
          * the JVM does its optimization thing, they are faster.
          */
-
         ReflectTestClass r = new ReflectTestClass();
-        start = System.currentTimeMillis();
-        for ( int i = 0; i < interations; i++ ){
-            Map<String,Object> mapObj = new LinkedHashMap<>();
-            mapObj.put("a", r.getA());
-            mapObj.put("b", r.getB());
-            mapObj.put("c", r.getC());
-            mapObj.put("d", null);  // no getter and private
-            jsonObj.put("f", mapObj);
-            json = JSONUtil.toJSON(jsonObj, cfg);
+        runMapTiming(iterations, r, cfg);
+        runReflectionTiming(iterations, r, cfg, false);
+        runReflectionTiming(iterations, r, cfg, true);
+
+        runMapTiming(iterations, r, cfg);
+        runReflectionTiming(iterations, r, cfg, false);
+        runReflectionTiming(iterations, r, cfg, true);
+
+        // BigObject
+        //iterations = 100000;
+
+        cfg.clearReflectClasses();
+        cfg.addReflectClass(BigObject.class);
+        cfg.setFastStrings(true);
+        BigObject bigObj = new BigObject();
+
+        runReflectionTiming(iterations, bigObj, cfg, false);
+        runReflectionTiming(iterations, bigObj, cfg, true);
+
+        runReflectionTiming(iterations, bigObj, cfg, false);
+        runReflectionTiming(iterations, bigObj, cfg, true);
+    }
+
+    private String runMapTiming( int iterations, ReflectTestClass obj, JSONConfig cfg )
+    {
+        JsonObject jsonObj = new JsonObject(1);
+        String json = null;
+
+        long start = System.currentTimeMillis();
+        for ( int i = 0; i < iterations; i++ ){
+            JsonObject mapObj = new JsonObject(4)
+                                        .add("a", obj.getA())
+                                        .add("b", obj.getB())
+                                        .add("c", obj.getC())
+                                        .add("d", null);  // no getter and private
+            jsonObj.clear();
+            jsonObj.add("f", mapObj);
+            json = jsonObj.toJSON(cfg);
         }
-        end = System.currentTimeMillis();
+        long end = System.currentTimeMillis();
         s_log.debug("map: "+((end-start)/1000.0)+"s");
+        return json;
+    }
 
-        cfg.setCacheReflectionData(false);
-        start = System.currentTimeMillis();
-        for ( int i = 0; i < interations; i++ ){
-            jsonObj.put("f", new ReflectTestClass());
-            json = JSONUtil.toJSON(jsonObj, cfg);
-        }
-        end = System.currentTimeMillis();
-        s_log.debug("uncached: "+((end-start)/1000.0)+"s");
+    private String runReflectionTiming( int iterations, Object obj, JSONConfig cfg, boolean doCaching )
+    {
+        JsonObject jsonObj = new JsonObject(1).add("f", obj);
+        String json = null;
 
-        ReflectedObjectMapBuilder.clearReflectionCache();
-        cfg.setCacheReflectionData(true);
-        start = System.currentTimeMillis();
-        for ( int i = 0; i < interations; i++ ){
-            jsonObj.put("f", new ReflectTestClass());
-            json = JSONUtil.toJSON(jsonObj, cfg);
+        String tag;
+        if ( doCaching ){
+            ReflectedObjectMapBuilder.clearReflectionCache();
+            cfg.setCacheReflectionData(true);
+            tag = "cached: ";
+        }else{
+            cfg.setCacheReflectionData(false);
+            tag = "uncached: ";
         }
-        end = System.currentTimeMillis();
-        s_log.debug("cached: "+((end-start)/1000.0)+"s");
-        ReflectedObjectMapBuilder.clearReflectionCache();
-
-        r = new ReflectTestClass();
-        start = System.currentTimeMillis();
-        for ( int i = 0; i < interations; i++ ){
-            Map<String,Object> mapObj = new LinkedHashMap<>();
-            mapObj.put("a", r.getA());
-            mapObj.put("b", r.getB());
-            mapObj.put("c", r.getC());
-            mapObj.put("d", null);  // no getter and private
-            jsonObj.put("f", mapObj);
-            json = JSONUtil.toJSON(jsonObj, cfg);
+        long start = System.currentTimeMillis();
+        for ( int i = 0; i < iterations; i++ ){
+            json = jsonObj.toJSON(cfg);
         }
-        end = System.currentTimeMillis();
-        s_log.debug("map: "+((end-start)/1000.0)+"s");
-
-        cfg.setCacheReflectionData(false);
-        start = System.currentTimeMillis();
-        for ( int i = 0; i < interations; i++ ){
-            jsonObj.put("f", new ReflectTestClass());
-            json = JSONUtil.toJSON(jsonObj, cfg);
+        long end = System.currentTimeMillis();
+        s_log.debug(tag+((end-start)/1000.0)+"s");
+        if ( doCaching ){
+            ReflectedObjectMapBuilder.clearReflectionCache();
         }
-        end = System.currentTimeMillis();
-        s_log.debug("uncached: "+((end-start)/1000.0)+"s");
-
-        ReflectedObjectMapBuilder.clearReflectionCache();
-        cfg.setCacheReflectionData(true);
-        start = System.currentTimeMillis();
-        for ( int i = 0; i < interations; i++ ){
-            jsonObj.put("f", new ReflectTestClass());
-            json = JSONUtil.toJSON(jsonObj, cfg);
-        }
-        end = System.currentTimeMillis();
-        s_log.debug("cached: "+((end-start)/1000.0)+"s");
-        ReflectedObjectMapBuilder.clearReflectionCache();
+        return json;
     }
 }

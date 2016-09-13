@@ -81,14 +81,14 @@ class CodePointData
     /**
      * Map characters to JSON character escapes.
      */
-    private static final Map<Character,String> JSON_ESC_MAP;
+    static final Map<Character,String> JSON_ESC_MAP;
 
     /**
      * These will break strings in eval() and so they need to be
      * escaped unless full JSON identifier code points is enabled
      * in which case the JSON should not be used with eval().
      */
-    private static final Set<Character> EVAL_ESC_SET;
+    static final Set<Character> EVAL_ESC_SET;
 
     /**
      * Maximum length of a ECMAScript 6 code point escape.
@@ -195,7 +195,7 @@ class CodePointData
 
         haveSlash = processInlineEscapes && strValue.indexOf('\\') >= 0;
         if ( haveSlash ){
-            handler = new EscapeHandler(this, cfg);
+            handler = new EscapeHandler(cfg);
         }
     }
 
@@ -538,13 +538,12 @@ class CodePointData
      * {@link JSONUtil#writeString(String,Writer,JSONConfig)} and
      * {@link JSONUtil#escapeBadIdentiferCodePoints(String,JSONConfig)}
      */
-    private static class EscapeHandler
+    private class EscapeHandler
     {
         // various matching variables.
         private Matcher passThroughMatcher;
         private Matcher jsEscMatcher;
         private Matcher codePointMatcher;
-        private CodePointData cp;
         private int passThroughRegionLength;
         private int lastBackSlash;
         private boolean useECMA5;
@@ -552,28 +551,26 @@ class CodePointData
         /**
          * Make an EscapeHandler.
          *
-         * @param cp reference to the CodePointData
          * @param cfg the config object.
          * @param passThroughOnly if true, only do pass throughs.
          */
-        private EscapeHandler( CodePointData cp, JSONConfig cfg )
+        private EscapeHandler( JSONConfig cfg )
         {
-            this.cp = cp;
-            lastBackSlash = cp.strValue.lastIndexOf('\\');
+            lastBackSlash = strValue.lastIndexOf('\\');
 
             // set up the pass through matcher.
-            Pattern escapePassThroughPat = getEscapePassThroughPattern(cfg, cp.useSingleLetterEscapes);
-            passThroughMatcher = escapePassThroughPat.matcher(cp.strValue);
+            Pattern escapePassThroughPat = getEscapePassThroughPattern(cfg, useSingleLetterEscapes);
+            passThroughMatcher = escapePassThroughPat.matcher(strValue);
             passThroughRegionLength = getEscapePassThroughRegionLength(cfg);
 
             // set up the javascript character escape matcher.
-            jsEscMatcher = JAVASCRIPT_ESC_PAT.matcher(cp.strValue);
+            jsEscMatcher = JAVASCRIPT_ESC_PAT.matcher(strValue);
 
             useECMA5 = ! cfg.isUseECMA6();
             if ( useECMA5 ){
                 // set up the ECMAScript 6 code point matcher,
                 // because those will not be matched by the pass through.
-                codePointMatcher = CODE_POINT_PAT.matcher(cp.strValue);
+                codePointMatcher = CODE_POINT_PAT.matcher(strValue);
             }
         }
 
@@ -583,36 +580,36 @@ class CodePointData
         private void doMatches()
         {
             // check for escapes.
-            if ( gotMatch(passThroughMatcher, cp.index, cp.end(passThroughRegionLength)) ){
+            if ( gotMatch(passThroughMatcher, index, end(passThroughRegionLength)) ){
                 // pass it through unchanged.
-                cp.esc = passThroughMatcher.group(1);
-                cp.index += cp.esc.length() - cp.charCount;
-            }else if ( gotMatch(jsEscMatcher, cp.index, cp.end(MAX_JS_ESC_LENGTH)) ){
+                esc = passThroughMatcher.group(1);
+                index += esc.length() - charCount;
+            }else if ( gotMatch(jsEscMatcher, index, end(MAX_JS_ESC_LENGTH)) ){
                 // Any Javascript escapes that didn't make it through the pass through are not allowed.
                 String jsEsc = jsEscMatcher.group(1);
-                cp.codePoint = cp.chars[0] = getEscapeChar(jsEsc);
-                cp.index += jsEsc.length() - cp.charCount;
-            }else if ( useECMA5 && gotMatch(codePointMatcher, cp.index, cp.end(MAX_CODE_POINT_ESC_LENGTH)) ){
+                codePoint = chars[0] = getEscapeChar(jsEsc);
+                index += jsEsc.length() - charCount;
+            }else if ( useECMA5 && gotMatch(codePointMatcher, index, end(MAX_CODE_POINT_ESC_LENGTH)) ){
                 /*
                  * Only get here if it wasn't passed through => useECMA6 is
                  * false.  Convert it to an inline codepoint.  Maybe something
                  * later will escape it legally.
                  */
-                cp.codePoint = Integer.parseInt(codePointMatcher.group(2),16);
-                if ( cp.codePoint > 0xFFFF ){
-                    cp.charCount = 2;
-                    cp.chars[0] = Character.highSurrogate(cp.codePoint);
-                    cp.chars[1] = Character.lowSurrogate(cp.codePoint);
+                codePoint = Integer.parseInt(codePointMatcher.group(2),16);
+                if ( codePoint > 0xFFFF ){
+                    charCount = 2;
+                    chars[0] = Character.highSurrogate(codePoint);
+                    chars[1] = Character.lowSurrogate(codePoint);
                 }else{
-                    cp.chars[0] = (char)cp.codePoint;
+                    chars[0] = (char)codePoint;
                 }
-                cp.index += codePointMatcher.group(1).length() - cp.charCount;
+                index += codePointMatcher.group(1).length() - charCount;
             }
 
-            if ( cp.index >= lastBackSlash ){
+            if ( index >= lastBackSlash ){
                 // this handler is no longer needed.
-                cp.haveSlash = false;
-                cp.handler = null;
+                haveSlash = false;
+                handler = null;
             }
         }
     } // class EscapeHandler

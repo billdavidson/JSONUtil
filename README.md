@@ -34,7 +34,8 @@ and controlling the way that the JSON is generated.
 [Report Issues](https://github.com/billdavidson/JSONUtil/issues)
 
 ### What's New
-* Aug 24 - [JSONUtil 1.9.2](https://github.com/billdavidson/JSONUtil/releases/tag/JSONUtil-1.9.2) released.
+* Sep 08 - [JSONUtil 1.9.3](https://github.com/billdavidson/JSONUtil/releases/tag/JSONUtil-1.9.3) released.
+* Aug 24 - JSONUtil 1.9.2 released.
 * Aug 17 - JSONUtil 1.9.1 released to fix bugs.
 * Aug 17 - [JMX MBean Wiki page updated with images](https://github.com/billdavidson/JSONUtil/wiki/Viewing-and-Modifying-Configuration-Defaults-Using-a-JMX-MBean-Client)
 * Aug 15 - JSONUtil 1.9 released to [support object reflection](https://github.com/billdavidson/JSONUtil/wiki/Using-Reflection-to-Encode-Objects-as-JSON), arbitrary precision numbers and parsing to primitive arrays.
