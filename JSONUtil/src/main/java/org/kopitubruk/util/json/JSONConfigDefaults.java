@@ -15,6 +15,8 @@
  */
 package org.kopitubruk.util.json;
 
+import static org.kopitubruk.util.json.JSONConfigUtil.tableSizeFor;
+
 import java.io.Serializable;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
@@ -29,10 +31,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 import java.util.Map.Entry;
 import java.util.ResourceBundle;
 import java.util.regex.Matcher;
@@ -102,6 +106,7 @@ import org.apache.commons.logging.LogFactory;
  *   <li>detectDataStructureLoops = true</li>
  *   <li>escapeBadIdentifierCodePoints = false</li>
  *   <li>fullJSONIdentifierCodePoints = false</li>
+ *   <li>fastStrings = false</li>
  * </ul>
  * <h3>Safe alternate encoding options.</h3>
  * <ul>
@@ -208,6 +213,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static volatile boolean detectDataStructureLoops;
     private static volatile boolean escapeBadIdentifierCodePoints;
     private static volatile boolean fullJSONIdentifierCodePoints;
+    private static volatile boolean fastStrings;
 
     private static volatile boolean encodeNumericStringsAsNumbers;
     private static volatile boolean escapeNonAscii;
@@ -516,6 +522,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      */
     private static void initMBean( String appName )
     {
+        if ( appName == null ){
+            appName = String.format("%X", new Random().nextLong());
+        }
+
         try{
             // Register an instance with MBean server if one is available.
             MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
@@ -584,6 +594,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         cfg.setDetectDataStructureLoops(detectDataStructureLoops);
         cfg.setEscapeBadIdentifierCodePoints(escapeBadIdentifierCodePoints);
         cfg.setFullJSONIdentifierCodePoints(fullJSONIdentifierCodePoints);
+        cfg.setFastStrings(fastStrings);
 
         // various alternate encoding options.
         cfg.setEncodeNumericStringsAsNumbers(encodeNumericStringsAsNumbers);
@@ -755,6 +766,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             detectDataStructureLoops = true;
             escapeBadIdentifierCodePoints = false;
             fullJSONIdentifierCodePoints = false;
+            fastStrings = false;
 
             encodeNumericStringsAsNumbers = false;
             escapeNonAscii = false;
@@ -945,7 +957,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             numberFormatMap.remove(numericClass);
             if ( numberFormatMap.size() < 1 ){
                 numberFormatMap = null;
-            }else if ( numberFormatMap.size() < size ){
+            }else if ( tableSizeFor(size) > tableSizeFor(numberFormatMap.size()) ){
                 numberFormatMap = new HashMap<Class<? extends Number>,NumberFormat>(numberFormatMap);
             }
         }
@@ -1205,7 +1217,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     /**
      * Add the class of the given object to the set of classes that
      * automatically get reflected. Note that default reflected classes can also
-     * be added via JNDI.
+     * be added via JNDI. If the object is an array, {@link Iterable} or
+     * {@link Enumeration}, then all objects in it will be added.
      *
      * @param obj The object whose class to add to the reflect list.
      * @since 1.9
@@ -1273,7 +1286,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Remove the given class from the list of automatically reflected
-     * classes.
+     * classes.  If the object is an array, {@link Iterable} or {@link Enumeration},
+     * then all objects in it will be removed.
      *
      * @param obj An object of the type to be removed from the reflect list.
      * @since 1.9
@@ -1475,6 +1489,41 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             if ( fullJSONIdentifierCodePoints ){
                 quoteIdentifier = true;
             }
+        }
+    }
+
+    /**
+     * Get the fastStrings policy.
+     *
+     * @return the fastStrings policy
+     */
+    public boolean isFastStrings()
+    {
+        return fastStrings;
+    }
+
+    /**
+     * If true, then string values will be copied to the output with no escaping
+     * If true, then string values will be copied to the output with no escaping
+     * or validation. It also effectively disables encodeNumericStringsAsNumbers
+     * for JSON output.
+     * <p>
+     * Only use this if you know that you have no characters in the range
+     * U+0000-U+001F or backslash or forward slash or double quote in your
+     * strings. If you want your JSON to be parsable by Javascript eval() then
+     * you also need to make sure that you don't have U+2028 (line separator) or
+     * U+2029 (paragraph separator).
+     * <p>
+     * That said, if you are encoding a lot of large strings, this can
+     * dramatically improve performance.
+     *
+     * @param dflt If true, then strings will be copied as is with no
+     *            escaping or validation.
+     */
+    public void setFastStrings( boolean dflt )
+    {
+        synchronized ( getClass() ){
+            fastStrings = dflt;
         }
     }
 
