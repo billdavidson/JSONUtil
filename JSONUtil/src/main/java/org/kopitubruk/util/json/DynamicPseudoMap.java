@@ -28,8 +28,7 @@ import java.util.Set;
  * the same code that builds them from real maps. It is meant to be faster than
  * doing normal put and iteration operations and to save memory compared to
  * normal maps. The gains tend to be effectively marginal but they are
- * measurable, especially with objects that have large numbers of fields to be
- * serialized.
+ * measurable with objects that have large numbers of fields to be serialized.
  *
  * @author Bill Davidson
  */
@@ -47,6 +46,10 @@ class DynamicPseudoMap extends AbstractPseudoMap
 
     /**
      * Create an entry for this key-value pair and add it to the list.
+     *
+     * @param key The key
+     * @param value The value
+     * @return null because this isn't a real map.
      */
     @Override
     public Object put( Object key, Object value )
@@ -56,8 +59,9 @@ class DynamicPseudoMap extends AbstractPseudoMap
     }
 
     /**
-     * Get the entry set. If this map is dynamic, then it will be converted to
-     * fixed and no more put operations will be allowed.
+     * Get the entry set.
+     *
+     * @return The entry set.
      */
     @Override
     public Set<Map.Entry<Object,Object>> entrySet()
@@ -66,7 +70,9 @@ class DynamicPseudoMap extends AbstractPseudoMap
     }
 
     /**
-     * Get the number of entries in this map.
+     * Get the number of entries in this pseudo map.
+     *
+     * @return the number of entries in this pseudo map.
      */
     @Override
     public int size()
