@@ -36,7 +36,7 @@ public class GenerateBigObject
 {
     private static final int BOUND = 0x10000;
     private static final int MAX_ID_LENGTH = 2;
-    private static final int MAX_VAL_LENGTH = 1;
+    private static final int MAX_VAL_LENGTH = 1024;
     private static final int MAX_FIELDS = 1024;
 
     /**
