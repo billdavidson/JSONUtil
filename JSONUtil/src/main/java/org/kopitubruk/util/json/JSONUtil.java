@@ -731,7 +731,7 @@ public class JSONUtil
         StringBuilder buf = new StringBuilder(str.length());
         CodePointData cp = new CodePointData(str, cfg);
         while ( cp.nextReady() ){
-            if ( cp.getCodePoint() > 127 ){
+            if ( cp.getCodePoint() > CodePointData.MAX_ASCII ){
                 buf.append(cp.getEscapeString());
             }else{
                 cp.appendChars(buf);

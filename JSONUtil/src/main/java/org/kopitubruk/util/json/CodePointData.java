@@ -17,11 +17,8 @@ package org.kopitubruk.util.json;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -84,13 +81,6 @@ class CodePointData
     static final Map<Character,String> JSON_ESC_MAP;
 
     /**
-     * These will break strings in eval() and so they need to be
-     * escaped unless full JSON identifier code points is enabled
-     * in which case the JSON should not be used with eval().
-     */
-    static final Set<Character> EVAL_ESC_SET;
-
-    /**
      * Maximum length of a ECMAScript 6 code point escape.
      */
     private static final int MAX_CODE_POINT_ESC_LENGTH = 10;
@@ -108,25 +98,30 @@ class CodePointData
     /**
      * Unicode line separator - breaks Javascript eval().
      */
-    private static final char LINE_SEPARATOR = 0x2028;
+    static final char LINE_SEPARATOR = 0x2028;
 
     /**
      * Unicode paragraph separator - breaks Javascript eval().
      */
-    private static final char PARAGRAPH_SEPARATOR = 0x2029;
+    static final char PARAGRAPH_SEPARATOR = 0x2029;
+
+    /**
+     * Maximum valid ASCII code point.
+     */
+    static final char MAX_ASCII = 0x7F;
 
     /**
      * Initialize JSON_ESC_MAP, JAVASCRIPT_ESC_MAP and EVAL_ESC_SET.
      */
     static {
         Map<Character,String> jsonEscMap = new HashMap<>();
+        jsonEscMap.put('\b', "\\b");
+        jsonEscMap.put('\t', "\\t");
+        jsonEscMap.put('\n', "\\n");
+        jsonEscMap.put('\f', "\\f");
+        jsonEscMap.put('\r', "\\r");
         jsonEscMap.put('"', "\\\"");
         jsonEscMap.put('/', "\\/");
-        jsonEscMap.put('\b', "\\b");
-        jsonEscMap.put('\f', "\\f");
-        jsonEscMap.put('\n', "\\n");
-        jsonEscMap.put('\r', "\\r");
-        jsonEscMap.put('\t', "\\t");
         jsonEscMap.put('\\', "\\\\");
         JSON_ESC_MAP = new HashMap<>(jsonEscMap);
 
@@ -135,11 +130,9 @@ class CodePointData
             javascriptEscMap.put(entry.getValue(), entry.getKey());
         }
         // these two are valid in Javascript but not JSON.
-        javascriptEscMap.put("\\'", '\'');
         javascriptEscMap.put("\\v", (char)0xB);
+        javascriptEscMap.put("\\'", '\'');
         JAVASCRIPT_ESC_MAP = new HashMap<>(javascriptEscMap);
-
-        EVAL_ESC_SET = new HashSet<>(Arrays.asList(LINE_SEPARATOR, PARAGRAPH_SEPARATOR));
     }
 
     // private data and flags.
@@ -154,6 +147,7 @@ class CodePointData
     private boolean escapeNonAscii;
     private boolean escapeSurrogates;
     private boolean noEscapes;
+    private boolean checkDefined;
 
     /**
      * If this is not null after a run of {@link #nextReady()} then it means
@@ -201,6 +195,7 @@ class CodePointData
         supportEval = ! cfg.isFullJSONIdentifierCodePoints();
         escapeNonAscii = cfg.isEscapeNonAscii();
         escapeSurrogates = cfg.isEscapeSurrogates();
+        checkDefined = true;
 
         haveSlash = strValue.indexOf('\\') >= 0;
         if ( haveSlash ){
@@ -210,10 +205,10 @@ class CodePointData
             }else{
                 haveSlash = false;
             }
-        }else if ( useSingleLetterEscapes || escapeNonAscii || escapeSurrogates ){
+        }else{
             // check if there is any escaping to be done.
-            noEscapes = true;
-            checkForEscapes(strValue);
+            noEscapes = haveNoEscapes(strValue);
+            //noEscapes = false;
         }
     }
 
@@ -369,12 +364,14 @@ class CodePointData
         }
 
         // any other escapes requested or required.
-        if ( esc == null && ((escapeNonAscii && codePoint > 127) ||
-                             (escapeSurrogates && charCount > 1) ||
-                             codePoint < 0x20 ||
-                             ! Character.isDefined(codePoint) ||
-                             (supportEval && EVAL_ESC_SET.contains(chars[0]))) ){
-            esc = getEscapeString();
+        if ( esc == null && needEscape(codePoint, chars[0]) ){
+            if ( charCount == 1 ){
+                if ( needEscape(chars[0]) ){
+                    esc = getEscapeString();
+                }
+            }else if ( needEscape(codePoint, chars[0]) ){
+                esc = getEscapeString();
+            }
         }
     }
 
@@ -414,194 +411,64 @@ class CodePointData
 
     /**
      * Check if the string contains any characters that need to be escaped.
-     * Backslash is not checked for because if there is one, this method will
+     * Backslash is not checked because if there is one, this method will
      * never be called.
      *
      * @param strValue The string
      */
-    private void checkForEscapes( String strValue )
-    {
-        if ( useSingleLetterEscapes ){
-            if ( escapeNonAscii ){
-                checkForEscapesAndNonAscii(strValue);
-            }else if ( escapeSurrogates ){
-                checkForEscapesAndSurrogates(strValue);
-            }else{
-                checkForEscapesOnly(strValue);
-            }
-        }else if ( escapeNonAscii ){
-            checkForNonAscii(strValue);
-        }else{
-            checkForSurrogates(strValue);
-        }
-    }
-
-    /**
-     * Check for escapes and non-ASCII
-     *
-     * @param strValue the string.
-     */
-    private void checkForEscapesAndNonAscii( String strValue )
-    {
-        if ( supportEval ){
-            for ( int i = 0, len = strValue.length(); i < len; i++ ){
-                char ch = strValue.charAt(i);
-                if ( ch > 127 ){
-                    noEscapes = false;
-                    return;
-                }else if ( ch < ' ' ){
-                    noEscapes = false;
-                    return;
-                }else{
-                    switch ( ch ){
-                        case '"':
-                        case '/':
-                        case LINE_SEPARATOR:
-                        case PARAGRAPH_SEPARATOR:
-                            noEscapes = false;
-                            return;
-                    }
-                }
-            }
-        }else{
-            for ( int i = 0, len = strValue.length(); i < len; i++ ){
-                char ch = strValue.charAt(i);
-                if ( ch > 127 ){
-                    noEscapes = false;
-                    return;
-                }else if ( ch < ' ' ){
-                    noEscapes = false;
-                    return;
-                }else{
-                    switch ( ch ){
-                        case '"':
-                        case '/':
-                            noEscapes = false;
-                            return;
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Check for escapes and surrogates.
-     *
-     * @param strValue the string.
-     */
-    private void checkForEscapesAndSurrogates( String strValue )
-    {
-        if ( supportEval ){
-            for ( int i = 0, len = strValue.length(); i < len; i++ ){
-                char ch = strValue.charAt(i);
-                if ( Character.isSurrogate(ch) ){
-                    noEscapes = false;
-                    return;
-                }else if ( ch < ' ' ){
-                    noEscapes = false;
-                    return;
-                }else{
-                    switch ( ch ){
-                        case '"':
-                        case '/':
-                        case LINE_SEPARATOR:
-                        case PARAGRAPH_SEPARATOR:
-                            noEscapes = false;
-                            return;
-                    }
-                }
-            }
-        }else{
-            for ( int i = 0, len = strValue.length(); i < len; i++ ){
-                char ch = strValue.charAt(i);
-                if ( Character.isSurrogate(ch) ){
-                    noEscapes = false;
-                    return;
-                }else if ( ch < ' ' ){
-                    noEscapes = false;
-                    return;
-                }else{
-                    switch ( ch ){
-                        case '"':
-                        case '/':
-                            noEscapes = false;
-                            return;
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Check for escapes only.
-     *
-     * @param strValue the string.
-     */
-    private void checkForEscapesOnly( String strValue )
-    {
-        if ( supportEval ){
-            for ( int i = 0, len = strValue.length(); i < len; i++ ){
-                char ch = strValue.charAt(i);
-                if ( ch < ' ' ){
-                    noEscapes = false;
-                    return;
-                }else{
-                    switch ( ch ){
-                        case '"':
-                        case '/':
-                        case LINE_SEPARATOR:
-                        case PARAGRAPH_SEPARATOR:
-                            noEscapes = false;
-                            return;
-                    }
-                }
-            }
-        }else{
-            for ( int i = 0, len = strValue.length(); i < len; i++ ){
-                char ch = strValue.charAt(i);
-                if ( ch < ' ' ){
-                    noEscapes = false;
-                    return;
-                }else{
-                    switch ( ch ){
-                        case '"':
-                        case '/':
-                            noEscapes = false;
-                            return;
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Check for non-ASCII
-     *
-     * @param strValue the string.
-     */
-    private void checkForNonAscii( String strValue )
+    private boolean haveNoEscapes( String strValue )
     {
         for ( int i = 0, len = strValue.length(); i < len; i++ ){
-            if ( strValue.charAt(i) > 127 ){
-                noEscapes = false;
-                return;
+            char ch = strValue.charAt(i);
+            if ( Character.isHighSurrogate(ch) ){
+                if ( needEscape(strValue.codePointAt(i),ch) ){
+                    return false;
+                }
+                ++i;
+            }else if ( needEscape(ch) ){
+                return false;
             }
         }
+        // these won't need to be checked again.
+        checkDefined = escapeNonAscii = escapeSurrogates = supportEval = false;
+        return true;
     }
 
     /**
-     * Check for surrogates.
+     * Return true if the given character needs to be escaped.
      *
-     * @param strValue the string.
+     * @param cp the code point.
+     * @param ch the char
+     * @return true if the character needs to be escaped.
      */
-    private void checkForSurrogates( String strValue )
+    private boolean needEscape( int cp, char ch )
     {
-        for ( int i = 0, len = strValue.length(); i < len; i++ ){
-            if ( Character.isSurrogate(strValue.charAt(i)) ){
-                noEscapes = false;
-                return;
-            }
-        }
+        return needEscapeChar(ch) || (checkDefined && ! Character.isDefined(cp));
+    }
+
+    /**
+     * Return true if the given character needs to be escaped.
+     *
+     * @param ch the char
+     * @return true if the character needs to be escaped.
+     */
+    private boolean needEscape( char ch )
+    {
+        return needEscapeChar(ch) || (checkDefined && ! Character.isDefined(ch));
+    }
+
+    /**
+     * Return true if the given character needs to be escaped.
+     *
+     * @param ch the char
+     * @return true if the character needs to be escaped.
+     */
+    private boolean needEscapeChar( char ch )
+    {
+        return ch < ' ' || ch == '"' || ch == '/' || ch == '\\' ||
+                (escapeNonAscii && ch > MAX_ASCII) ||
+                (escapeSurrogates && Character.isSurrogate(ch)) ||
+                (supportEval && (ch == LINE_SEPARATOR || ch == PARAGRAPH_SEPARATOR));
     }
 
     /**
