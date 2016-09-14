@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Random;
@@ -108,7 +109,7 @@ public class GenerateBigObject
     {
         char[] value = new char[MAX_VAL_LENGTH];
         Set<Character> badChars = new HashSet<>(CodePointData.JSON_ESC_MAP.keySet());
-        badChars.addAll(CodePointData.EVAL_ESC_SET);
+        badChars.addAll(Arrays.asList(CodePointData.LINE_SEPARATOR, CodePointData.PARAGRAPH_SEPARATOR));
         for ( int i = 0; i < MAX_VAL_LENGTH; i++ ){
             char ch;
 
