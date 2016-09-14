@@ -94,7 +94,7 @@ public final class BadPropertyNameException extends JSONException
                 // check for valid escapes.
                 if ( gotMatch(passThroughMatcher, cp.getIndex(), cp.end(passThroughRegionLength)) ){
                     // Skip the escape.
-                    cp.setIndex(passThroughMatcher.group(1).length() - cp.getCharCount());
+                    cp.setIndex(passThroughMatcher.group(1).length());
                 }else{
                     // bad backslash.
                     badCodePoints.add(cp.getCodePoint());
