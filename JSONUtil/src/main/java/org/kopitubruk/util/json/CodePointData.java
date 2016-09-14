@@ -212,17 +212,8 @@ class CodePointData
             }
         }else if ( useSingleLetterEscapes || escapeNonAscii || escapeSurrogates ){
             // check if there is any escaping to be done.
-            char[] charList = strValue.toCharArray();
             noEscapes = true;
-            if ( escapeNonAscii ){
-                checkForNonAscii(charList);
-            }
-            if ( escapeSurrogates ){
-                checkForSurrogates(charList);
-            }
-            if ( useSingleLetterEscapes && noEscapes ){
-                checkForEscapes(charList);
-            }
+            checkForEscapes(strValue);
         }
     }
 
@@ -422,69 +413,193 @@ class CodePointData
     }
 
     /**
-     * Check the list for non-ASCII
-     *
-     * @param charList the list of chars.
-     */
-    private void checkForNonAscii( char[] charList )
-    {
-        for ( int i = 0; noEscapes && i < charList.length; i++ ){
-            if ( charList[i] > 127 ){
-                noEscapes = false;
-            }
-        }
-    }
-
-    /**
-     * Check the list for surrogates.
-     *
-     * @param charList the list of chars.
-     */
-    private void checkForSurrogates( char[] charList )
-    {
-        for ( int i = 0; noEscapes && i < charList.length; i++ ){
-            if ( Character.isSurrogate(charList[i]) ){
-                noEscapes = false;
-            }
-        }
-    }
-
-    /**
      * Check if the string contains any characters that need to be escaped.
      * Backslash is not checked for because if there is one, this method will
      * never be called.
      *
-     * @param The list of chars.
+     * @param strValue The string
      */
-    private void checkForEscapes( char[] charList )
+    private void checkForEscapes( String strValue )
+    {
+        if ( useSingleLetterEscapes ){
+            if ( escapeNonAscii ){
+                checkForEscapesAndNonAscii(strValue);
+            }else if ( escapeSurrogates ){
+                checkForEscapesAndSurrogates(strValue);
+            }else{
+                checkForEscapesOnly(strValue);
+            }
+        }else if ( escapeNonAscii ){
+            checkForNonAscii(strValue);
+        }else{
+            checkForSurrogates(strValue);
+        }
+    }
+
+    /**
+     * Check for escapes and non-ASCII
+     *
+     * @param strValue the string.
+     */
+    private void checkForEscapesAndNonAscii( String strValue )
     {
         if ( supportEval ){
-            for ( int i = 0; noEscapes && i < charList.length; i++ ){
-                if ( charList[i] < ' ' ){
+            for ( int i = 0, len = strValue.length(); i < len; i++ ){
+                char ch = strValue.charAt(i);
+                if ( ch > 127 ){
                     noEscapes = false;
+                    return;
+                }else if ( ch < ' ' ){
+                    noEscapes = false;
+                    return;
                 }else{
-                    switch ( charList[i] ){
+                    switch ( ch ){
                         case '"':
                         case '/':
                         case LINE_SEPARATOR:
                         case PARAGRAPH_SEPARATOR:
                             noEscapes = false;
-                            break;
+                            return;
                     }
                 }
             }
         }else{
-            for ( int i = 0; noEscapes && i < charList.length; i++ ){
-                if ( charList[i] < ' ' ){
+            for ( int i = 0, len = strValue.length(); i < len; i++ ){
+                char ch = strValue.charAt(i);
+                if ( ch > 127 ){
                     noEscapes = false;
+                    return;
+                }else if ( ch < ' ' ){
+                    noEscapes = false;
+                    return;
                 }else{
-                    switch ( charList[i] ){
+                    switch ( ch ){
                         case '"':
                         case '/':
                             noEscapes = false;
-                            break;
+                            return;
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Check for escapes and surrogates.
+     *
+     * @param strValue the string.
+     */
+    private void checkForEscapesAndSurrogates( String strValue )
+    {
+        if ( supportEval ){
+            for ( int i = 0, len = strValue.length(); i < len; i++ ){
+                char ch = strValue.charAt(i);
+                if ( Character.isSurrogate(ch) ){
+                    noEscapes = false;
+                    return;
+                }else if ( ch < ' ' ){
+                    noEscapes = false;
+                    return;
+                }else{
+                    switch ( ch ){
+                        case '"':
+                        case '/':
+                        case LINE_SEPARATOR:
+                        case PARAGRAPH_SEPARATOR:
+                            noEscapes = false;
+                            return;
+                    }
+                }
+            }
+        }else{
+            for ( int i = 0, len = strValue.length(); i < len; i++ ){
+                char ch = strValue.charAt(i);
+                if ( Character.isSurrogate(ch) ){
+                    noEscapes = false;
+                    return;
+                }else if ( ch < ' ' ){
+                    noEscapes = false;
+                    return;
+                }else{
+                    switch ( ch ){
+                        case '"':
+                        case '/':
+                            noEscapes = false;
+                            return;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Check for escapes only.
+     *
+     * @param strValue the string.
+     */
+    private void checkForEscapesOnly( String strValue )
+    {
+        if ( supportEval ){
+            for ( int i = 0, len = strValue.length(); i < len; i++ ){
+                char ch = strValue.charAt(i);
+                if ( ch < ' ' ){
+                    noEscapes = false;
+                    return;
+                }else{
+                    switch ( ch ){
+                        case '"':
+                        case '/':
+                        case LINE_SEPARATOR:
+                        case PARAGRAPH_SEPARATOR:
+                            noEscapes = false;
+                            return;
+                    }
+                }
+            }
+        }else{
+            for ( int i = 0, len = strValue.length(); i < len; i++ ){
+                char ch = strValue.charAt(i);
+                if ( ch < ' ' ){
+                    noEscapes = false;
+                    return;
+                }else{
+                    switch ( ch ){
+                        case '"':
+                        case '/':
+                            noEscapes = false;
+                            return;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Check for non-ASCII
+     *
+     * @param strValue the string.
+     */
+    private void checkForNonAscii( String strValue )
+    {
+        for ( int i = 0, len = strValue.length(); i < len; i++ ){
+            if ( strValue.charAt(i) > 127 ){
+                noEscapes = false;
+                return;
+            }
+        }
+    }
+
+    /**
+     * Check for surrogates.
+     *
+     * @param strValue the string.
+     */
+    private void checkForSurrogates( String strValue )
+    {
+        for ( int i = 0, len = strValue.length(); i < len; i++ ){
+            if ( Character.isSurrogate(strValue.charAt(i)) ){
+                noEscapes = false;
+                return;
             }
         }
     }
