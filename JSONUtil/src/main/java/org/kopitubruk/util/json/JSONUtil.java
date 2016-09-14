@@ -705,8 +705,9 @@ public class JSONUtil
 
         CodePointData cp = new CodePointData(propertyName, cfg, useSingleLetterEscapes, processInlineEscapes);
         while ( cp.nextReady() ){
-            if ( cp.getEsc() != null ){
-                buf.append(cp.getEsc());                     // have valid escape
+            String esc = cp.getEsc();
+            if ( esc != null ){
+                buf.append(esc);                        // have valid escape
             }else if ( cp.getIndex() > 0 && isValidIdentifierPart(cp.getCodePoint(), cfg) ){
                 cp.appendChars(buf);
             }else if ( cp.getIndex() == 0 && isValidIdentifierStart(cp.getCodePoint(), cfg) ){
@@ -806,8 +807,9 @@ public class JSONUtil
             }else{
                 json.write('"');
                 while ( cp.nextReady() ){
-                    if ( cp.getEsc() != null ){
-                        json.write(cp.getEsc());    // valid escape.
+                    String esc = cp.getEsc();
+                    if ( esc != null ){
+                        json.write(esc);            // valid escape.
                     }else{
                         cp.writeChars(json);        // Pass it through -- usual case.
                     }
