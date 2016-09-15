@@ -878,7 +878,7 @@ public class JSONUtil
         }
 
         if ( num instanceof Integer ){
-            // stop checking types.
+            // Don't need any checking.
         }else if ( num instanceof Double ){
             isSafeJsonNumber = Double.isFinite((Double)num);
         }else if ( num instanceof Long ){
@@ -906,6 +906,7 @@ public class JSONUtil
                 }
             }
         }
+        // else Byte or Short which don't need any checking
 
         return isSafeJsonNumber;
     }
