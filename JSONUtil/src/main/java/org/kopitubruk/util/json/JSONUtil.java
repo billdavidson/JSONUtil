@@ -814,20 +814,16 @@ public class JSONUtil
             }
 
             CodePointData cp = new CodePointData(strValue, cfg, useSingleLetterEscapes, processInlineEscapes);
-            if ( cp.isNoEscapes() ){
-                fastWriteString(strValue, json);
-            }else{
-                json.write('"');
-                while ( cp.nextReady() ){
-                    String esc = cp.getEsc();
-                    if ( esc != null ){
-                        json.write(esc);                // valid escape.
-                    }else{
-                        cp.writeCharsOrFinish(json);    // Pass it through -- usual case.
-                    }
+            json.write('"');
+            while ( cp.nextReady() ){
+                String esc = cp.getEsc();
+                if ( esc != null ){
+                    json.write(esc);                // valid escape.
+                }else{
+                    cp.writeCharsOrFinish(json);    // Pass it through -- usual case.
                 }
-                json.write('"');
             }
+            json.write('"');
         }
     }
 

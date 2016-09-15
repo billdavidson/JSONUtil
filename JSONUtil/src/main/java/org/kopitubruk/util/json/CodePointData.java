@@ -220,7 +220,6 @@ class CodePointData
         escapeSurrogates = cfg.isEscapeSurrogates();
 
         // check if there is any escaping to be done.
-        lastEscIndex = len;
         noEscapes = haveNoEscapes(strValue);
         handleEscaping = ! noEscapes;
 
@@ -332,16 +331,16 @@ class CodePointData
     void writeCharsOrFinish( Writer json ) throws IOException
     {
         if ( noEscapes ){
-            if ( nextIndex >= len ){
-                // on last code point anyway.
-                json.write(chars, 0, charCount);
-            }else if ( index == 0 ){
+            if ( index == 0 ){
                 // at the start
                 json.write(strValue);
                 nextIndex = len;
+            }else if ( nextIndex >= len ){
+                // on last code point anyway.
+                json.write(chars, 0, charCount);
             }else{
                 // the rest of the string.
-                json.write(strValue.substring(index));
+                json.write(strValue, index, len-index);
                 nextIndex = len;
             }
         }else{
@@ -488,32 +487,29 @@ class CodePointData
     private boolean haveNoEscapes( String strValue )
     {
         escChecker = getEscapeChecker();
-        int i = len;
-        while ( i > 0 ){
-            --i;
-            char ch1 = strValue.charAt(i);
+        lastEscIndex = len;
+        while ( lastEscIndex > 0 ){
+            --lastEscIndex;
+            char ch1 = strValue.charAt(lastEscIndex);
             if ( Character.isSurrogate(ch1) ){
                 boolean malformed = true;
-                if ( --i >= 0 ){
-                    char ch0 = strValue.charAt(i);
+                if ( --lastEscIndex >= 0 ){
+                    char ch0 = strValue.charAt(lastEscIndex);
                     if ( Character.isSurrogatePair(ch0, ch1) ){
                         malformed = false;
                         if ( escChecker.needEscape(Character.toCodePoint(ch0, ch1), ch0) ){
-                            lastEscIndex = i;
                             return false;
                         }
                     }
                 }
                 if ( malformed ){
-                    lastEscIndex = ++i;
+                    ++lastEscIndex;
                     return false;
                 }
             }else if ( escChecker.needEscape(ch1) ){
-                lastEscIndex = i;
                 return false;
             }
         }
-        escChecker = null;
         return true;
     }
 
