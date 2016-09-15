@@ -110,6 +110,16 @@ class CodePointData
      */
     static final char MAX_ASCII = 0x7F;
 
+    /**
+     * This gets used a lot and the encoding is ugly.
+     */
+    private static final char BACKSLASH = '\\';
+
+    /**
+     * Maximum char that corresponds to single letter escapes.
+     */
+    private static final char MAX_SINGLE_ESC_CHAR = BACKSLASH;
+
     /*
      * Various escape checkers.
      */
@@ -132,7 +142,7 @@ class CodePointData
         jsonEscMap.put('\r', "\\r");
         jsonEscMap.put('"', "\\\"");
         jsonEscMap.put('/', "\\/");
-        jsonEscMap.put('\\', "\\\\");
+        jsonEscMap.put(BACKSLASH, "\\\\");
         JSON_ESC_MAP = new HashMap<>(jsonEscMap);
 
         Map<String,Character> javascriptEscMap = new HashMap<>();
@@ -151,6 +161,7 @@ class CodePointData
     private EscapeChecker escChecker;
     private int nextIndex;
     private int len;
+    private int lastEscIndex;
     private boolean handleEscaping;
     private boolean haveSlash;
     private boolean useECMA6;
@@ -209,7 +220,8 @@ class CodePointData
         escapeSurrogates = cfg.isEscapeSurrogates();
         escChecker = null;
 
-        haveSlash = strValue.indexOf('\\') >= 0;
+        lastEscIndex = len;
+        haveSlash = strValue.indexOf(BACKSLASH) >= 0;
         if ( haveSlash ){
             noEscapes = false;
             if ( processInlineEscapes ){
@@ -390,11 +402,17 @@ class CodePointData
     {
         esc = null;
 
-        if ( haveSlash && codePoint == '\\' ){
+        if ( index > lastEscIndex ){
+            handler = null;
+            handleEscaping = false;
+            return;
+        }
+
+        if ( haveSlash && chars[0] == BACKSLASH ){
             handler.doMatches();            // check for escapes.
         }
 
-        if ( useSingleLetterEscapes && esc == null && codePoint <= '\\' ){
+        if ( useSingleLetterEscapes && esc == null && chars[0] <= MAX_SINGLE_ESC_CHAR ){
             esc = getEscape(chars[0]);      // single letter escapes for JSON.
         }
 
@@ -448,36 +466,38 @@ class CodePointData
 
     /**
      * Check if the string contains any characters that need to be escaped.
-     * Backslash is not checked because if there is one, this method will
-     * never be called.
+     * This searches this string from the end so that it can record the
+     * index of the last character that needs to be escaped.
      *
      * @param strValue The string
      */
     private boolean haveNoEscapes( String strValue )
     {
         escChecker = getEscapeChecker();
-        int i = 0;
-        int len = strValue.length();
-        while ( i < len ){
-            char ch0 = strValue.charAt(i);
-            if ( Character.isSurrogate(ch0) ){
+        int i = len;
+        while ( i > 0 ){
+            --i;
+            char ch1 = strValue.charAt(i);
+            if ( Character.isSurrogate(ch1) ){
                 boolean malformed = true;
-                if ( ++i < len ){
-                    char ch1 = strValue.charAt(i);
+                if ( --i >= 0 ){
+                    char ch0 = strValue.charAt(i);
                     if ( Character.isSurrogatePair(ch0, ch1) ){
                         malformed = false;
                         if ( escChecker.needEscape(Character.toCodePoint(ch0, ch1), ch0) ){
+                            lastEscIndex = i;
                             return false;
                         }
                     }
                 }
                 if ( malformed ){
+                    lastEscIndex = ++i;
                     return false;
                 }
-            }else if ( escChecker.needEscape(ch0) ){
+            }else if ( escChecker.needEscape(ch1) ){
+                lastEscIndex = i;
                 return false;
             }
-            ++i;
         }
         escChecker = null;
         return true;
@@ -638,7 +658,7 @@ class CodePointData
         switch ( ch ){
             case '"':
             case '/':
-            case '\\':
+            case BACKSLASH:
                 return true;
         }
         return false;
@@ -656,7 +676,7 @@ class CodePointData
         switch ( ch ){
             case '"':
             case '/':
-            case '\\':
+            case BACKSLASH:
             case LINE_SEPARATOR:
             case PARAGRAPH_SEPARATOR:
                 return true;
@@ -676,7 +696,7 @@ class CodePointData
      */
     static String unEscape( String strValue, JSONConfig cfg )
     {
-        if ( strValue.indexOf('\\') < 0 ){
+        if ( strValue.indexOf(BACKSLASH) < 0 ){
             // nothing to do.
             return strValue;
         }
@@ -685,11 +705,11 @@ class CodePointData
         Matcher codeUnitMatcher = CODE_UNIT_PAT.matcher(strValue);
         Matcher codePointMatcher = CODE_POINT_PAT.matcher(strValue);
 
-        int lastBackSlash = strValue.lastIndexOf('\\');
+        int lastBackSlash = strValue.lastIndexOf(BACKSLASH);
         StringBuilder buf = new StringBuilder();
         CodePointData cp = new CodePointData(strValue, cfg);
         while ( cp.nextReady() ){
-            if ( cp.codePoint == '\\' ){
+            if ( cp.codePoint == BACKSLASH ){
                 if ( gotMatch(jsEscMatcher, cp.index, cp.end(MAX_JS_ESC_LENGTH)) ){
                     String esc = jsEscMatcher.group(1);
                     buf.append(getEscapeChar(esc));
@@ -740,7 +760,7 @@ class CodePointData
          */
         private EscapeHandler( JSONConfig cfg )
         {
-            lastBackSlash = strValue.lastIndexOf('\\');
+            lastBackSlash = strValue.lastIndexOf(BACKSLASH);
 
             // set up the pass through matcher.
             Pattern escapePassThroughPat = getEscapePassThroughPattern(cfg, useSingleLetterEscapes);
