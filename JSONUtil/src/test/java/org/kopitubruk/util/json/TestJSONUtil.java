@@ -479,6 +479,12 @@ public class TestJSONUtil
             jsonObj.add("x", new String(codePoints,0,j));
             validateJSON(jsonObj.toJSON(cfg));
         }
+
+        jsonObj.clear();
+        jsonObj.add("x", "Some data\nSome other data.");
+        String json = jsonObj.toJSON(cfg);
+        validateJSON(json);
+        assertThat(json, is("{\"x\":\"Some data\\nSome other data.\"}"));
     }
 
     /**
@@ -775,7 +781,7 @@ public class TestJSONUtil
             assertThat(json, is("{\"a"+r+"\":0,\"b"+r+"\":0,\"c"+r+"\":0}"));
         }
 
-        int maxLen = 1024;
+        int maxLen = 512;
         buf.setLength(0);
         buf.append("c");
         cmpBuf.setLength(0);
@@ -1034,6 +1040,18 @@ public class TestJSONUtil
         String json = JSONUtil.toJSON(jsonObj);
         validateJSON(json);
         assertThat(json, is("{\"x\":68719476735}"));
+
+        l = 9007199254740993L;
+        jsonObj.put("x", l);
+        JSONConfig cfg = new JSONConfig();
+
+        cfg.setPreciseNumbers(false);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"x\":9007199254740993}"));
+
+        cfg.setPreciseNumbers(true);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"x\":\"9007199254740993\"}"));
     }
 
     /**
@@ -1085,6 +1103,18 @@ public class TestJSONUtil
         String json = JSONUtil.toJSON(jsonObj);
         validateJSON(json);
         assertThat(json, is("{\"x\":1234567890}"));
+
+        bi = new BigInteger("9007199254740993");
+        jsonObj.put("x", bi);
+        JSONConfig cfg = new JSONConfig();
+
+        cfg.setPreciseNumbers(false);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"x\":9007199254740993}"));
+
+        cfg.setPreciseNumbers(true);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"x\":\"9007199254740993\"}"));
     }
 
     /**
@@ -1102,6 +1132,18 @@ public class TestJSONUtil
         String json = JSONUtil.toJSON(jsonObj);
         validateJSON(json);
         assertThat(json, is("{\"x\":12345.67890}"));
+
+        bd = new BigDecimal("9007199254740993");
+        jsonObj.put("x", bd);
+        JSONConfig cfg = new JSONConfig();
+
+        cfg.setPreciseNumbers(false);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"x\":9007199254740993}"));
+
+        cfg.setPreciseNumbers(true);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"x\":\"9007199254740993\"}"));
     }
 
     /**
@@ -1518,11 +1560,11 @@ public class TestJSONUtil
         runReflectionTiming(iterations, r, cfg, true);
 
         // BigObject
-        //iterations = 100000;
+        //iterations = 10000;
 
         cfg.clearReflectClasses();
         cfg.addReflectClass(BigObject.class);
-        cfg.setFastStrings(true);
+        cfg.setFastStrings(false);
         BigObject bigObj = new BigObject();
 
         runReflectionTiming(iterations, bigObj, cfg, false);
