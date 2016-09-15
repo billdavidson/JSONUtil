@@ -221,11 +221,12 @@ class CodePointData
         escChecker = null;
 
         lastEscIndex = len;
-        haveSlash = strValue.indexOf(BACKSLASH) >= 0;
+        int lastBackSlash = strValue.lastIndexOf(BACKSLASH);
+        haveSlash = lastBackSlash >= 0;
         if ( haveSlash ){
             noEscapes = false;
             if ( processInlineEscapes ){
-                handler = new EscapeHandler(cfg);
+                handler = new EscapeHandler(cfg, lastBackSlash);
             }else{
                 haveSlash = false;
             }
@@ -756,11 +757,12 @@ class CodePointData
          * Make an EscapeHandler.
          *
          * @param cfg the config object.
+         * @param lastBackSlash the index of the last backslash in the string.
          * @param passThroughOnly if true, only do pass throughs.
          */
-        private EscapeHandler( JSONConfig cfg )
+        private EscapeHandler( JSONConfig cfg, int lastBackSlash )
         {
-            lastBackSlash = strValue.lastIndexOf(BACKSLASH);
+            this.lastBackSlash = lastBackSlash;
 
             // set up the pass through matcher.
             Pattern escapePassThroughPat = getEscapePassThroughPattern(cfg, useSingleLetterEscapes);
