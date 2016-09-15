@@ -48,7 +48,7 @@ import java.util.TimeZone;
  *   <li>detectDataStructureLoops = true</li>
  *   <li>escapeBadIdentifierCodePoints = false</li>
  *   <li>fullJSONIdentifierCodePoints = false</li>
- *   <li>fastStrings</li>
+ *   <li>fastStrings = false</li>
  * </ul>
  * <h3>Safe alternate encoding options.</h3>
  * <ul>
