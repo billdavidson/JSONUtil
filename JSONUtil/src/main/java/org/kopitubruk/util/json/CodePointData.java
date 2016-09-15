@@ -337,12 +337,14 @@ class CodePointData
                 json.write(chars, 0, charCount);
             }else if ( index == 0 ){
                 // at the start
-                json.write(strValue);
                 nextIndex = len;
+                json.write(strValue);
             }else{
                 // the rest of the string.
-                json.write(strValue.substring(index));
                 nextIndex = len;
+                char[] remainingChars = new char[len-index];
+                strValue.getChars(index, len, remainingChars, 0);
+                json.write(remainingChars, 0, remainingChars.length);
             }
         }else{
             json.write(chars, 0, charCount);
