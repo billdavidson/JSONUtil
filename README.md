@@ -34,7 +34,7 @@ and controlling the way that the JSON is generated.
 [Report Issues](https://github.com/billdavidson/JSONUtil/issues)
 
 ### What's New
-* Sep 14 - [JSONUtil 1.10.0](https://github.com/billdavidson/JSONUtil/releases/tag/JSONUtil-1.10.0) released.
+* Sep 14 - [JSONUtil 1.10.0](https://github.com/billdavidson/JSONUtil/releases/tag/JSONUtil-1.10.0) released with major speed enhancements for encoding strings and numbers.
 * Sep 08 - JSONUtil 1.9.3 released.
 * Aug 24 - JSONUtil 1.9.2 released.
 * Aug 17 - JSONUtil 1.9.1 released to fix bugs.
