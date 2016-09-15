@@ -323,17 +323,6 @@ class CodePointData
     }
 
     /**
-     * Write the current code point out as chars to the given writer.
-     *
-     * @param json the writer.
-     * @throws IOException If there's an I/O problem.
-     */
-    void writeChars( Writer json ) throws IOException
-    {
-        json.write(chars, 0, charCount);
-    }
-
-    /**
      * Write the current code point out as chars to the given writer
      * or finish if there are no escapes left to process.
      *
@@ -355,7 +344,6 @@ class CodePointData
                 json.write(strValue.substring(index));
                 nextIndex = len;
             }
-            index = nextIndex - 1;
         }else{
             json.write(chars, 0, charCount);
         }
