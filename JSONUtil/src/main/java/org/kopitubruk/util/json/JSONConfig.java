@@ -747,6 +747,7 @@ public class JSONConfig implements Serializable, Cloneable
      * or {@link Enumeration}, then all objects in it will be added.
      *
      * @param obj The object whose class to add to the reflect list.
+     * @see JSONReflectedClass
      * @since 1.9
      */
     public void addReflectClass( Object obj )
@@ -787,6 +788,7 @@ public class JSONConfig implements Serializable, Cloneable
      * that automatically get reflected.
      *
      * @param classes The objects to reflect.
+     * @see JSONReflectedClass
      * @since 1.9
      */
     public void addReflectClasses( Collection<?> classes )

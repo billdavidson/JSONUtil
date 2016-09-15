@@ -104,7 +104,9 @@ import java.util.regex.Pattern;
  *     These are objects that know how to convert themselves to JSON. This just
  *     calls their {@link JSONAble#toJSON(JSONConfig,Writer)} method. It is possible
  *     to use these as top level objects or as values inside other objects but it's
- *     kind of redundant to use them as top level.
+ *     kind of redundant to use them as top level.  A class called {@link JsonObject}
+ *     is included with this package that implements {@link JSONAble} and provides
+ *     a few conveniences for creating JSON object data.
  *   </dd>
  *   <dt>Reflected Objects</dt>
  *   <dd>

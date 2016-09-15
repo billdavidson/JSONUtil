@@ -1224,6 +1224,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * {@link Enumeration}, then all objects in it will be added.
      *
      * @param obj The object whose class to add to the reflect list.
+     * @see JSONReflectedClass
      * @since 1.9
      */
     public static synchronized void addReflectClass( Object obj )
@@ -1237,6 +1238,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * be added via JNDI.
      *
      * @param classes The objects to reflect.
+     * @see JSONReflectedClass
      * @since 1.9
      */
     public static synchronized void addReflectClasses( Collection<?> classes )
