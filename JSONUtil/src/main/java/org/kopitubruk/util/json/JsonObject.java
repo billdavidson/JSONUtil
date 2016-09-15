@@ -38,8 +38,8 @@ import java.util.Map;
  * Properties are merely added to a list. If you use the fixed size constructor
  * then the list is backed by an array. If you use the other constructor then
  * the list is backed by an {@link ArrayList}. With the fixed size version there
- * is no size checking so if you try to add more properties than you the size
- * you gave to the constructor, then you will get an
+ * is no size checking so if you try to add more properties than the size you
+ * gave to the constructor, then you will get an
  * {@link ArrayIndexOutOfBoundsException}.
  * <p>
  * The performance gain vs. a {@link Map} is admittedly small and difficult to
@@ -124,7 +124,7 @@ public class JsonObject implements JSONAble
     }
 
     /**
-     * Write this JSON encoding of this object to the given {@link Writer} using
+     * Write the JSON encoding of this object to the given {@link Writer} using
      * the given configuration options.
      *
      * @param jsonConfig A configuration object to use to optionally set encoding options.
