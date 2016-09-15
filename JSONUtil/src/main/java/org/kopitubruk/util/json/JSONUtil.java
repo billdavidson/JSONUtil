@@ -679,14 +679,11 @@ public class JSONUtil
                                 hasSurrogates(propertyName);
 
         if ( doQuote ){
-            json.write('"');
+            fastWriteString(propertyName, json);
+        }else{
+            json.write(propertyName);
         }
 
-        json.write(propertyName);
-
-        if ( doQuote ){
-            json.write('"');
-        }
         json.write(':');
     }
 
