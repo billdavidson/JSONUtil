@@ -729,16 +729,24 @@ public class JSONUtil
      */
     private static String escapeNonAscii( String str, JSONConfig cfg )
     {
-        StringBuilder buf = new StringBuilder(str.length());
-        CodePointData cp = new CodePointData(str, cfg);
-        while ( cp.nextReady() ){
-            if ( cp.getCodePoint() > CodePointData.MAX_ASCII ){
-                buf.append(cp.getEscapeString());
-            }else{
-                cp.appendChars(buf);
-            }
+        boolean noNonAscii = true;
+        for ( int i = 0, len = str.length(); noNonAscii && i < len; i++ ){
+            noNonAscii = str.charAt(i) <= CodePointData.MAX_ASCII;;
         }
-        return buf.toString();
+        if ( noNonAscii ){
+            return str;
+        }else{
+            StringBuilder buf = new StringBuilder(str.length()+20);
+            CodePointData cp = new CodePointData(str, cfg);
+            while ( cp.nextReady() ){
+                if ( cp.getCodePoint() > CodePointData.MAX_ASCII ){
+                    buf.append(cp.getEscapeString());
+                }else{
+                    cp.appendChars(buf);
+                }
+            }
+            return buf.toString();
+        }
     }
 
     /**
@@ -750,16 +758,20 @@ public class JSONUtil
      */
     private static String escapeSurrogates( String str, JSONConfig cfg )
     {
-        StringBuilder buf = new StringBuilder(str.length());
-        CodePointData cp = new CodePointData(str, cfg);
-        while ( cp.nextReady() ){
-            if ( cp.getCharCount() > 1 ){
-                buf.append(cp.getEscapeString());
-            }else{
-                cp.appendChars(buf);
+        if ( hasSurrogates(str) ){
+            StringBuilder buf = new StringBuilder(str.length());
+            CodePointData cp = new CodePointData(str, cfg);
+            while ( cp.nextReady() ){
+                if ( cp.getCharCount() > 1 ){
+                    buf.append(cp.getEscapeString());
+                }else{
+                    cp.appendChars(buf);
+                }
             }
+            return buf.toString();
+        }else{
+            return str;
         }
-        return buf.toString();
     }
 
     /**
