@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 import java.util.TimeZone;
 
 /**
@@ -116,6 +117,11 @@ public class JSONConfig implements Serializable, Cloneable
      * Used by JSONUtil to detect data structure loops.
      */
     private List<Object> objStack;
+
+    /**
+     * The property name validation pattern.
+     */
+    private Pattern validationPat = null;
 
     /**
      * Optional number formats mapped from different number types.
@@ -310,6 +316,20 @@ public class JSONConfig implements Serializable, Cloneable
             objStack.clear();
         }
     }
+
+    /**
+     * Get the propertyName validation pattern appropriate to the current flags.
+     *
+     * @return the propertyName validation pattern appropriate to the current flags.
+     */
+    Pattern getPropertyNameValidationPattern()
+    {
+        if ( validationPat == null ){
+            validationPat = JSONUtil.getPropertyNameValidationPattern(this);
+        }
+        return validationPat;
+    }
+
 
     /**
      * Get the locale for this instance.
@@ -927,6 +947,7 @@ public class JSONConfig implements Serializable, Cloneable
         if ( fullJSONIdentifierCodePoints ){
             quoteIdentifier = true;
         }
+        validationPat = null;
     }
 
     /**
@@ -1306,6 +1327,7 @@ public class JSONConfig implements Serializable, Cloneable
     public void setUseECMA6( boolean useECMA6 )
     {
         this.useECMA6 = useECMA6;
+        validationPat = null;
     }
 
     /**

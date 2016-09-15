@@ -657,7 +657,7 @@ public class JSONUtil
                 // have to produce identical toString() results.
                 throw new DuplicatePropertyNameException(propertyName, cfg);
             }
-            checkValidJavascriptPropertyName(propertyName, cfg);
+            checkValidJavascriptPropertyNameImpl(propertyName, cfg);
             propertyNames.add(propertyName);
         }
 
@@ -696,11 +696,14 @@ public class JSONUtil
      */
     private static String escapeBadIdentifierCodePoints( String propertyName, JSONConfig cfg )
     {
-        StringBuilder buf = new StringBuilder(propertyName.length());
         boolean useSingleLetterEscapes = cfg.isFullJSONIdentifierCodePoints();
         boolean processInlineEscapes = true;
 
         CodePointData cp = new CodePointData(propertyName, cfg, useSingleLetterEscapes, processInlineEscapes);
+        if ( cp.isNoEscapes() && isValidJavascriptPropertyNameImpl(propertyName, cfg) ){
+            return propertyName;
+        }
+        StringBuilder buf = new StringBuilder(propertyName.length()+20);
         while ( cp.nextReady() ){
             String esc = cp.getEsc();
             if ( esc != null ){
@@ -806,9 +809,9 @@ public class JSONUtil
                 while ( cp.nextReady() ){
                     String esc = cp.getEsc();
                     if ( esc != null ){
-                        json.write(esc);            // valid escape.
+                        json.write(esc);                // valid escape.
                     }else{
-                        cp.writeChars(json);        // Pass it through -- usual case.
+                        cp.writeCharsOrFinish(json);    // Pass it through -- usual case.
                     }
                 }
                 json.write('"');
@@ -983,24 +986,71 @@ public class JSONUtil
     public static void checkValidJavascriptPropertyName( String propertyName, JSONConfig cfg ) throws BadPropertyNameException
     {
         JSONConfig jcfg = cfg != null ? cfg : new JSONConfig();
-        Pattern validationPat = getPropertyNameValidationPattern(jcfg);
-
-        if ( propertyName == null ||
-                (isReservedWord(propertyName) && !jcfg.isAllowReservedWordsInIdentifiers()) ||
-                ! validationPat.matcher(propertyName).matches() ){
-            throw new BadPropertyNameException(propertyName, jcfg);
-        }
+        checkValidJavascriptPropertyNameImpl(propertyName, jcfg);
     }
 
     /**
-     * Checks if the input string represents a valid Javascript property name.
+     * Checks if the input string represents a valid Javascript property name
+     * using default identifier options.
      *
      * @param propertyName A Javascript property name to check.
      * @throws BadPropertyNameException If the propertyName is not a valid Javascript property name.
      */
     public static void checkValidJavascriptPropertyName( String propertyName ) throws BadPropertyNameException
     {
-        checkValidJavascriptPropertyName(propertyName, null);
+        checkValidJavascriptPropertyNameImpl(propertyName, new JSONConfig());
+    }
+
+    /**
+     * Checks if the input string represents a valid Javascript property name.
+     *
+     * @param propertyName A Javascript property name to check.
+     * @param cfg A JSONConfig to use for locale and identifier options.
+     * @throws BadPropertyNameException If the propertyName is not a valid Javascript property name.
+     */
+    private static void checkValidJavascriptPropertyNameImpl( String propertyName, JSONConfig cfg ) throws BadPropertyNameException
+    {
+        if ( ! isValidJavascriptPropertyNameImpl(propertyName, cfg) ){
+            throw new BadPropertyNameException(propertyName, cfg);
+        }
+    }
+
+    /**
+     * Return true if the input string is a valid Javascript property name.
+     *
+     * @param propertyName A Javascript property name to check.
+     * @param cfg A JSONConfig to use for locale and identifier options.  If null, defaults will be used.
+     * @return true if the input string represents a valid Javascript property name.
+     */
+    public static boolean isValidJavascriptPropertyName( String propertyName, JSONConfig cfg )
+    {
+        JSONConfig jcfg = cfg != null ? cfg : new JSONConfig();
+        return isValidJavascriptPropertyNameImpl(propertyName, jcfg);
+    }
+
+    /**
+     * Return true if the input string is a valid Javascript property name
+     * using default identifier options.
+     *
+     * @param propertyName A Javascript property name to check.
+     * @return true if the input string represents a valid Javascript property name.
+     */
+    public static boolean isValidJavascriptPropertyName( String propertyName )
+    {
+        return isValidJavascriptPropertyNameImpl(propertyName, new JSONConfig());
+    }
+
+    /**
+     * Return true if the input string is a valid Javascript property name.
+     *
+     * @param propertyName A Javascript property name to check.
+     * @param cfg A JSONConfig to use for locale and identifier options.
+     * @return true if the input string represents a valid Javascript property name.
+     */
+    private static boolean isValidJavascriptPropertyNameImpl( String propertyName, JSONConfig cfg )
+    {
+        return (!(propertyName == null || (isReservedWord(propertyName) && ! cfg.isAllowReservedWordsInIdentifiers()))) &&
+                cfg.getPropertyNameValidationPattern().matcher(propertyName).matches();
     }
 
     /**
@@ -1009,7 +1059,7 @@ public class JSONUtil
      * @param cfg A JSONConfig to use to decide which validation pattern to use.
      * @return A Pattern used for validating property names.
      */
-    private static Pattern getPropertyNameValidationPattern( JSONConfig cfg )
+    static Pattern getPropertyNameValidationPattern( JSONConfig cfg )
     {
         Pattern validationPat;
 

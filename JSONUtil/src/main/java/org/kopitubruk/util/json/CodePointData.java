@@ -218,26 +218,21 @@ class CodePointData
         supportEval = ! cfg.isFullJSONIdentifierCodePoints();
         escapeNonAscii = cfg.isEscapeNonAscii();
         escapeSurrogates = cfg.isEscapeSurrogates();
-        escChecker = null;
 
+        // check if there is any escaping to be done.
         lastEscIndex = len;
-        int lastBackSlash = strValue.lastIndexOf(BACKSLASH);
-        haveSlash = lastBackSlash >= 0;
-        if ( haveSlash ){
-            noEscapes = false;
-            if ( processInlineEscapes ){
-                handler = new EscapeHandler(cfg, lastBackSlash);
-            }else{
-                haveSlash = false;
-            }
-        }else{
-            // check if there is any escaping to be done.
-            noEscapes = haveNoEscapes(strValue);
-        }
+        noEscapes = haveNoEscapes(strValue);
         handleEscaping = ! noEscapes;
+
         if ( handleEscaping  ){
-            if ( escChecker == null ){
-                escChecker = getEscapeChecker();
+            int lastBackSlash = strValue.lastIndexOf(BACKSLASH);
+            haveSlash = lastBackSlash >= 0;
+            if ( haveSlash ){
+                if ( processInlineEscapes ){
+                    handler = new EscapeHandler(cfg, lastBackSlash);
+                }else{
+                    haveSlash = false;
+                }
             }
         }else{
             esc = null;
@@ -339,6 +334,34 @@ class CodePointData
     }
 
     /**
+     * Write the current code point out as chars to the given writer
+     * or finish if there are no escapes left to process.
+     *
+     * @param json the writer.
+     * @throws IOException If there's an I/O problem.
+     */
+    void writeCharsOrFinish( Writer json ) throws IOException
+    {
+        if ( noEscapes ){
+            if ( nextIndex >= len ){
+                // on last code point anyway.
+                json.write(chars, 0, charCount);
+            }else if ( index == 0 ){
+                // at the start
+                json.write(strValue);
+                nextIndex = len;
+            }else{
+                // the rest of the string.
+                json.write(strValue.substring(index));
+                nextIndex = len;
+            }
+            index = nextIndex - 1;
+        }else{
+            json.write(chars, 0, charCount);
+        }
+    }
+
+    /**
      * Append the current code point out as chars to the given string builder.
      *
      * @param buf the string builder.
@@ -404,7 +427,8 @@ class CodePointData
         esc = null;
 
         if ( index > lastEscIndex ){
-            handler = null;
+            // past last escape -- disable escape checking.
+            noEscapes = true;
             handleEscaping = false;
             return;
         }
