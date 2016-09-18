@@ -809,22 +809,14 @@ public class JSONUtil
         }else if ( cfg.isFastStrings() ){
             fastWriteString(strValue, json);
         }else{
-            boolean useSingleLetterEscapes = true;
             boolean processInlineEscapes = cfg.isPassThroughEscapes();
             if ( cfg.isUnEscapeWherePossible() ){
                 strValue = CodePointData.unEscape(strValue, cfg);
             }
 
-            CodePointData cp = new CodePointData(strValue, cfg, useSingleLetterEscapes, processInlineEscapes);
             json.write('"');
-            while ( cp.nextReady() ){
-                String esc = cp.getEsc();
-                if ( esc != null ){
-                    json.write(esc);                // valid escape.
-                }else{
-                    cp.writeCharsOrFinish(json);    // Pass it through -- usual case.
-                }
-            }
+            CodePointData cp = new CodePointData(strValue, cfg, processInlineEscapes);
+            cp.writeString(json);
             json.write('"');
         }
     }
