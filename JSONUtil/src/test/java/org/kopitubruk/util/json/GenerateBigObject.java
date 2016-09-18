@@ -21,9 +21,11 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
@@ -34,7 +36,8 @@ import java.util.Set;
  */
 public class GenerateBigObject
 {
-    private static final int BOUND = 0x10000;
+    //private static final int BOUND = Character.MAX_CODE_POINT+1;
+    private static final int BOUND = Character.MIN_SUPPLEMENTARY_CODE_POINT;
     private static final int MAX_ID_LENGTH = 2;
     private static final int MAX_VAL_LENGTH = 1024;
     private static final int MAX_FIELDS = 1024;
@@ -58,6 +61,8 @@ public class GenerateBigObject
                 "package org.kopitubruk.util.json;\n" +
                 "\n" +
                 "/**\n" +
+                " * Generated code - Do not modify.\n" +
+                " * Used for performance testing.\n" +
                 " */\n" +
                 "public class BigObject\n" +
                 "{");
@@ -93,6 +98,24 @@ public class GenerateBigObject
         bigObj.println("}");
 
         bigObj.close();
+
+        Arrays.sort(escCounts);
+        System.err.println("min:" +escCounts[0]);
+        System.err.println("max:" +escCounts[escIndex-1]);
+        System.err.println("median: " +escCounts[escIndex/2]);    // cheap and close enough
+        double mean = 0;
+        for ( int i = 0; i < escIndex; i++ ){
+            mean += escCounts[i];
+        }
+        mean /= escIndex;
+        System.err.println("mean: " +mean);
+        double variance = 0;
+        for ( int i = 0; i < escIndex; i++ ){
+            double diff = mean-escCounts[i];
+            variance += diff*diff;
+        }
+        variance /= escIndex;
+        System.err.println("standard deviation: " +Math.sqrt(variance));
     }
 
     private static String getId( Random rand )
@@ -105,20 +128,46 @@ public class GenerateBigObject
         return id.toString();
     }
 
+    private static int escCounts[] = new int[MAX_FIELDS];
+    private static int escIndex = 0;
+
     private static String getValue( Random rand, JSONConfig cfg )
     {
-        char[] value = new char[MAX_VAL_LENGTH];
         Set<Character> badChars = new HashSet<>(CodePointData.JSON_ESC_MAP.keySet());
+        List<Character> escs = new ArrayList<>(badChars);
+        escs.remove(Character.valueOf('/'));
         badChars.addAll(Arrays.asList(CodePointData.LINE_SEPARATOR, CodePointData.PARAGRAPH_SEPARATOR));
-        for ( int i = 0; i < MAX_VAL_LENGTH; i++ ){
-            char ch;
 
-            do{
-                ch = (char)rand.nextInt(BOUND);
-            }while ( ch < ' ' || Character.isSurrogate(ch) || badChars.contains(ch) || ! Character.isDefined(ch) );
+        int[] value = new int[MAX_VAL_LENGTH];
+        int escBnd = 48;
+        char ch0 = 0;
+        int escCount = 0;
+        int nextEsc = rand.nextInt(escBnd);
+        for ( int i = 0; i < MAX_VAL_LENGTH; i++ ){
+            int ch;
+
+            if ( i == nextEsc ){
+                ch = escs.get(rand.nextInt(escs.size()));
+                nextEsc = i + 1 + rand.nextInt(escBnd);
+                ++escCount;
+            }else{
+                do{
+                    ch = rand.nextInt(BOUND);
+                    if ( ch < Character.MIN_SUPPLEMENTARY_CODE_POINT ){
+                        ch0 = (char)ch;
+                        if ( Character.isSurrogate(ch0) ){
+                            ch = 0;
+                        }
+                    }else{
+                        ch0 = 0;
+                    }
+                }while ( ch < ' ' || badChars.contains(ch0) || ! Character.isDefined(ch) );
+            }
 
             value[i] = ch;
         }
+        escCounts[escIndex++] = escCount;
+        System.err.println(escCount);
         return JSONUtil.toJSON(new String(value,0,MAX_VAL_LENGTH), cfg);
     }
 
