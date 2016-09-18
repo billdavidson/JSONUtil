@@ -147,7 +147,7 @@ class CodePointData
     /**
      * Maximum initial queue size.
      */
-    private static final int MAX_INITIAL_QUEUE_SIZE = 1024;
+    private static final int MAX_INITIAL_QUEUE_SIZE = 64;
 
     /**
      * Initial queue size for keeping track of escapes.
