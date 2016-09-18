@@ -469,7 +469,8 @@ public class TestJSONUtil
                 if ( j == codePoints.length ){
                     jsonObj.clear();
                     jsonObj.add("x", new String(codePoints,0,j));
-                    validateJSON(jsonObj.toJSON());
+                    String json = jsonObj.toJSON();
+                    validateJSON(json);
                     j = 0;
                 }
             }
@@ -477,7 +478,8 @@ public class TestJSONUtil
         if ( j > 0 ){
             jsonObj.clear();
             jsonObj.add("x", new String(codePoints,0,j));
-            validateJSON(jsonObj.toJSON());
+            String json = jsonObj.toJSON();
+            validateJSON(json);
         }
 
         jsonObj.clear();
@@ -579,14 +581,10 @@ public class TestJSONUtil
 
             String json = JSONUtil.toJSON(jsonObj, cfg);
             char firstChar = str.charAt(0);
-            if ( firstChar != 'd' ){
-                // Nashorn doesn't understand EMCAScript 6 code point escapes.
-                validateJSON(json);
-            }
-            // \v unescaped will be re-escaped as a Unicode code unit.
             String result;
             switch ( firstChar ){
                 case 'e':
+                    // \v unescaped will be re-escaped as a Unicode code unit.
                     result = firstChar + "\\u000B";
                     break;
                 case 'f':
@@ -1560,7 +1558,7 @@ public class TestJSONUtil
         runReflectionTiming(iterations, r, cfg, true);
 
         // BigObject
-        //iterations = 10000;
+        iterations = 1;
 
         cfg.clearReflectClasses();
         cfg.addReflectClass(BigObject.class);
