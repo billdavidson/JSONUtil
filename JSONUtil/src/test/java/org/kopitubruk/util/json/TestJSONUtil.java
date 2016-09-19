@@ -512,12 +512,10 @@ public class TestJSONUtil
     }
 
     /**
-     * Test that ECMAScript 6 code point escapes.
-     *
-     * @throws ScriptException if the JSON doesn't evaluate properly.
+     * Test ECMAScript 6 code point escapes.
      */
     @Test
-    public void testECMA6UnicodeEscapeInString() throws ScriptException
+    public void testECMA6UnicodeEscapeInString()
     {
         JSONConfig cfg = new JSONConfig().setUseECMA6(true).setEscapeNonAscii(true);
         StringBuilder buf = new StringBuilder();
@@ -533,6 +531,38 @@ public class TestJSONUtil
             buf.setLength(0);
             buf.appendCodePoint(cp);
             String result = '"' + String.format("\\u{%X}", cp) + '"';
+            String json = JSONUtil.toJSON(buf, cfg);
+            assertThat(json, is(result));
+        }
+    }
+
+    /**
+     * Test code unit escapes.
+     */
+    @Test
+    public void testEscapeGenerator()
+    {
+        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setEscapeNonAscii(true);
+        StringBuilder buf = new StringBuilder();
+        Set<Character> singles = new HashSet<>(Arrays.asList('\b','\t','\n','\f','\r'));
+        Random rand = new Random();
+        int bound = Character.MAX_CODE_POINT+1;
+        int min = Character.MIN_SUPPLEMENTARY_CODE_POINT;
+        for ( int i = 0; i < 4096; i++ ){
+            int cp;
+            do{
+                cp = rand.nextInt(bound);
+            }while ( (cp >= ' ' && cp < 128) || (cp < 0xF && singles.contains((char)cp)) || ! Character.isDefined(cp) );
+            buf.setLength(0);
+            buf.appendCodePoint(cp);
+            String result;
+            if ( cp >= min ){
+                int high = Character.highSurrogate(cp);
+                int low = Character.lowSurrogate(cp);
+                result = '"' + String.format("\\u%04X\\u%04X", high, low) + '"';
+            }else{
+                result = '"' + String.format("\\u%04X", cp) + '"';
+            }
             String json = JSONUtil.toJSON(buf, cfg);
             assertThat(json, is(result));
         }

@@ -755,9 +755,9 @@ class CodePointData
         }else{
             // Use normal escape.
             if ( isSurrogatePair != 0 ){
-                return makeEscape(chars, 2);
+                return makeEscape(chars);
             }else{
-                return makeEscape(chars, 1);
+                return makeEscape(chars[0]);
             }
         }
     }
@@ -765,35 +765,65 @@ class CodePointData
     /**
      * Make a code unit escape.
      *
-     * @param ch the char array.
-     * @param ct the count (1 or 2) of chars in the array to include.
+     * @param ch the char.
      * @return the escape.
      */
-    private String makeEscape( char[] ch, int ci )
+    private String makeEscape( char ch )
     {
-        char[] escape = ci == 1 ? oneBuf : twoBuf;
+        char[] escape = oneBuf;
         if ( escape == null ){
-            switch ( ci ){
-                case 1: escape = oneBuf = new char[6]; break;
-                case 2: escape = twoBuf = new char[12]; break;
-            }
+            escape = oneBuf = new char[6];
         }
         int i = escape.length - 1;
-        while ( ci-- > 0 ){
-            int cp = ch[ci];
+        int cp = ch;
 
-            do{
-                escape[i--] = HEX_DIGITS[cp & 0xF];
-            }while ( (cp >>= 4) > 0 );
+        do{
+            escape[i--] = HEX_DIGITS[cp & 0xF];
+        }while ( (cp >>= 4) > 0 );
 
-            int lim = (ci * 6) + 2;
-            while ( i >= lim ){
-                escape[i--] = '0';
-            }
-
-            escape[i--] = 'u';
-            escape[i--] = BACKSLASH;
+        while ( i > 1 ){
+            escape[i--] = '0';
         }
+
+        escape[1] = 'u';
+        escape[0] = BACKSLASH;
+
+        return new String(escape);
+    }
+
+    /**
+     * Make a surrogate pair code unit escape.
+     *
+     * @param ch the char array.
+     * @return the escape.
+     */
+    private String makeEscape( char[] ch )
+    {
+        char[] escape = twoBuf;
+        if ( escape == null ){
+            escape = twoBuf = new char[12];
+        }
+        int i = escape.length - 1;
+
+        int cp = ch[1];
+        do{
+            escape[i--] = HEX_DIGITS[cp & 0xF];
+        }while ( (cp >>= 4) > 0 );
+        while ( i > 7 ){
+            escape[i--] = '0';
+        }
+        escape[i--] = 'u';
+        escape[i--] = BACKSLASH;
+
+        cp = ch[0];
+        do{
+            escape[i--] = HEX_DIGITS[cp & 0xF];
+        }while ( (cp >>= 4) > 0 );
+        while ( i > 1 ){
+            escape[i--] = '0';
+        }
+        escape[1] = 'u';
+        escape[0] = BACKSLASH;
 
         return new String(escape);
     }
