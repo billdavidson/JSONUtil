@@ -557,7 +557,7 @@ public class TestJSONUtil
     {
         JSONConfig cfg = new JSONConfig().setUseECMA6(false).setEscapeNonAscii(true);
         StringBuilder buf = new StringBuilder();
-        Set<Character> singles = new HashSet<>(Arrays.asList('\b','\t','\n','\f','\r'));
+        Set<Character> singles = new HashSet<Character>(Arrays.asList('\b','\t','\n','\f','\r'));
         Random rand = new Random();
         int bound = Character.MAX_CODE_POINT+1;
         int min = Character.MIN_SUPPLEMENTARY_CODE_POINT;
@@ -570,8 +570,8 @@ public class TestJSONUtil
             buf.appendCodePoint(cp);
             String result;
             if ( cp >= min ){
-                int high = Character.highSurrogate(cp);
-                int low = Character.lowSurrogate(cp);
+                int high = buf.charAt(0);
+                int low = buf.charAt(1);
                 result = '"' + String.format("\\u%04X\\u%04X", high, low) + '"';
             }else{
                 result = '"' + String.format("\\u%04X", cp) + '"';
