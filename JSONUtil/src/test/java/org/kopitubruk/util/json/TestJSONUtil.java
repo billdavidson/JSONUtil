@@ -324,10 +324,8 @@ public class TestJSONUtil
     @Test
     public void testJSONPropertyNames() throws ScriptException, NoSuchMethodException
     {
-        JSONConfig jcfg = new JSONConfig();
-        jcfg.setFullJSONIdentifierCodePoints(false);
-        JSONConfig cfg = new JSONConfig();
-        cfg.setFullJSONIdentifierCodePoints(true);
+        JSONConfig jcfg = new JSONConfig().setFullJSONIdentifierCodePoints(false);
+        JSONConfig cfg = new JSONConfig().setFullJSONIdentifierCodePoints(true);
 
         JsonObject jsonObj = new JsonObject(1, cfg);
         int[] normalIdent = new int[1];
@@ -356,8 +354,7 @@ public class TestJSONUtil
     @Test
     public void testBadJSONPropertyNames()
     {
-        JSONConfig cfg = new JSONConfig();
-        cfg.setFullJSONIdentifierCodePoints(true);
+        JSONConfig cfg = new JSONConfig().setFullJSONIdentifierCodePoints(true);
 
         JsonObject jsonObj = new JsonObject(1, cfg);
         int[] codePoints = new int[256];
@@ -519,9 +516,7 @@ public class TestJSONUtil
     public void testECMA6UnicodeEscapeInString() throws ScriptException
     {
         Map<String,Object> jsonObj = new HashMap<>();
-        JSONConfig cfg = new JSONConfig();
-        cfg.setUseECMA6(true);
-        cfg.setEscapeNonAscii(true);
+        JSONConfig cfg = new JSONConfig().setUseECMA6(true).setEscapeNonAscii(true);
         StringBuilder buf = new StringBuilder();
         int codePoint = 0x1F4A9;
         buf.append("x");
@@ -543,10 +538,9 @@ public class TestJSONUtil
     public void testEscapePassThrough() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
-        JSONConfig cfg = new JSONConfig();
-        cfg.setUnEscapeWherePossible(false);
-        cfg.setPassThroughEscapes(true);
-        cfg.setUseECMA6(true);
+        JSONConfig cfg = new JSONConfig().setUnEscapeWherePossible(false)
+                                         .setPassThroughEscapes(true)
+                                         .setUseECMA6(true);
         // escapes that get passed through.
         String[] strs = { "\\u1234", "a\\u{41}", "\\\"", "\\/", "\\b", "\\f", "\\n", "\\r", "\\t", "\\\\" };
         for ( String str : strs ){
@@ -573,8 +567,7 @@ public class TestJSONUtil
     {
         Map<String,Object> jsonObj = new LinkedHashMap<>();
         String[] strs = {"a\\u0041", "d\\u{41}", "e\\v", "f\\'"};
-        JSONConfig cfg = new JSONConfig();
-        cfg.setUnEscapeWherePossible(true);
+        JSONConfig cfg = new JSONConfig().setUnEscapeWherePossible(true);
         for ( String str : strs ){
             jsonObj.clear();
             jsonObj.put("x", str);
@@ -598,8 +591,8 @@ public class TestJSONUtil
         }
 
         // test that these get fixed regardless.
-        cfg.setUnEscapeWherePossible(false);
-        cfg.setPassThroughEscapes(true);
+        cfg.setUnEscapeWherePossible(false)
+           .setPassThroughEscapes(true);
 
         // test octal/hex unescape.
         for ( int i = 0; i < 256; i++ ){
@@ -646,8 +639,7 @@ public class TestJSONUtil
         obj = JSONParser.parseJSON("null");
         assertEquals(null, obj);
 
-        JSONConfig cfg = new JSONConfig();
-        cfg.setUsePrimitiveArrays(true);
+        JSONConfig cfg = new JSONConfig().setUsePrimitiveArrays(true);
 
         obj = JSONParser.parseJSON("[1.1,2.2,-3.134598765,4.0]", cfg);
         double[] doubles = (double[])obj;
@@ -720,8 +712,7 @@ public class TestJSONUtil
     public void testReservedWordsInIdentifiers() throws ScriptException, NoSuchMethodException
     {
         Map<String,Object> jsonObj = new HashMap<>();
-        JSONConfig cfg = new JSONConfig();
-        cfg.setAllowReservedWordsInIdentifiers(true);
+        JSONConfig cfg = new JSONConfig().setAllowReservedWordsInIdentifiers(true);
         Set<String> reservedWords = JSONUtil.getJavascriptReservedWords();
         for ( String reservedWord : reservedWords ){
             jsonObj.clear();
@@ -755,8 +746,7 @@ public class TestJSONUtil
         Map<Object,Object> jsonObj = new LinkedHashMap<>();
         StringBuilder buf = new StringBuilder("c");
         StringBuilder cmpBuf = new StringBuilder();
-        JSONConfig cfg = new JSONConfig();
-        cfg.setEscapeBadIdentifierCodePoints(true);
+        JSONConfig cfg = new JSONConfig().setEscapeBadIdentifierCodePoints(true);
         jsonObj.put("x\u0005", 0);
 
         String json = JSONUtil.toJSON(jsonObj, cfg);
@@ -1156,10 +1146,9 @@ public class TestJSONUtil
         Map<String,Object> jsonObj = new HashMap<>();
         float f = 1.23456f;
         jsonObj.put("x", f);
-        JSONConfig cfg = new JSONConfig();
         NumberFormat fmt = NumberFormat.getInstance();
         fmt.setMaximumFractionDigits(3);
-        cfg.addNumberFormat(f, fmt);
+        JSONConfig cfg = new JSONConfig().addNumberFormat(f, fmt);
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
         assertThat(json, is("{\"x\":1.235}"));
@@ -1374,8 +1363,7 @@ public class TestJSONUtil
         objs[2] = il;
         jsonObj.put("e", objs);
 
-        JSONConfig cfg = new JSONConfig();
-        cfg.setIndentPadding(new IndentPadding("\t", String.format("%n")));
+        JSONConfig cfg = new JSONConfig().setIndentPadding(new IndentPadding("\t", String.format("%n")));
         String json = JSONUtil.toJSON(jsonObj, cfg);
         validateJSON(json);
         @SuppressWarnings("unchecked")
@@ -1492,13 +1480,12 @@ public class TestJSONUtil
     @Test
     public void testReflect()
     {
-        JSONConfig cfg = new JSONConfig();
+        JSONConfig cfg = new JSONConfig().setValidatePropertyNames(false)
+                                         .setDetectDataStructureLoops(false)
+                                         .setFastStrings(true)
+                                         .setCacheReflectionData(false);
         JsonObject jsonObj = new JsonObject(1, cfg);
         jsonObj.add("f", new ReflectTestClass());
-        cfg.setValidatePropertyNames(false);
-        cfg.setDetectDataStructureLoops(false);
-        cfg.setFastStrings(true);
-        cfg.setCacheReflectionData(false);
 
         ReflectedObjectMapBuilder.clearReflectionCache();
 
