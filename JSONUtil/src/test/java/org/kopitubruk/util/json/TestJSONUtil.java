@@ -534,7 +534,7 @@ public class TestJSONUtil
     {
         JSONConfig cfg = new JSONConfig().setUseECMA6(true).setEscapeNonAscii(true);
         StringBuilder buf = new StringBuilder();
-        Set<Character> singles = new HashSet<>(Arrays.asList('\b','\t','\n','\f','\r'));
+        Set<Character> singles = new HashSet<Character>(Arrays.asList('\b','\t','\n','\f','\r'));
         Random rand = new Random();
         int bound = Character.MAX_CODE_POINT+1;
         int min = Character.MIN_SUPPLEMENTARY_CODE_POINT;
