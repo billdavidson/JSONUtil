@@ -121,6 +121,7 @@ import org.apache.commons.logging.LogFactory;
  *   <li>smallNumbers = false</li>
  *   <li>usePrimitiveArrays = false</li>
  *   <li>cacheReflectionData = false</li>
+ *   <li>manyEscapes = false</li>
  * </ul>
  * <h3>
  *   Allow generation of certain types of non-standard JSON.
@@ -226,6 +227,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static volatile boolean smallNumbers;
     private static volatile boolean usePrimitiveArrays;
     private static volatile boolean cacheReflectionData;
+    private static volatile boolean manyEscapes;
 
     private static volatile boolean quoteIdentifier;
     private static volatile boolean useECMA6;
@@ -609,6 +611,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         cfg.setSmallNumbers(smallNumbers);
         cfg.setUsePrimitiveArrays(usePrimitiveArrays);
         cfg.setCacheReflectionData(cacheReflectionData);
+        cfg.setManyEscapes(manyEscapes);
 
         // non-standard JSON options.
         cfg.setQuoteIdentifier(quoteIdentifier);
@@ -781,6 +784,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             smallNumbers = false;
             usePrimitiveArrays = false;
             cacheReflectionData = false;
+            manyEscapes = false;
 
             quoteIdentifier = true;
             useECMA6 = false;
@@ -1229,6 +1233,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * {@link Enumeration}, then all objects in it will be added.
      *
      * @param obj The object whose class to add to the reflect list.
+     * @see JSONReflectedClass
      * @since 1.9
      */
     public static synchronized void addReflectClass( Object obj )
@@ -1242,6 +1247,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * be added via JNDI.
      *
      * @param classes The objects to reflect.
+     * @see JSONReflectedClass
      * @since 1.9
      */
     public static synchronized void addReflectClasses( Collection<?> classes )
@@ -1886,9 +1892,48 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     @Override
     public void setCacheReflectionData( boolean dflt )
     {
-        cacheReflectionData = dflt;
-        if ( cacheReflectionData == false ){
-            ReflectedObjectMapBuilder.clearReflectionCache();
+        synchronized ( getClass() ){
+            cacheReflectionData = dflt;
+            if ( cacheReflectionData == false ){
+                ReflectedObjectMapBuilder.clearReflectionCache();
+            }
+        }
+    }
+
+    /**
+     * Return the manyEscapes policy.
+     *
+     * @return the manyEscapes policy.
+     */
+    @Override
+    public boolean isManyEscapes()
+    {
+        return manyEscapes;
+    }
+
+    /**
+     * If true, then the string processing code will optimize for strings that
+     * contain many code points that need to be escaped. Otherwise, it will
+     * optimize for strings that have few code points that need to be escaped.
+     * In my tests, the average number of escapes per string that caused it to
+     * cross over was about 40. Your performance may vary based upon your data
+     * and architecture.
+     * <p>
+     * The code that optimizes for strings that have few code points that need
+     * to be escaped creates a list of the indexes of code points that need to be
+     * escaped in the string before it does any other processing. This list can
+     * become large if you have a lot of escapes which could cause memory issues
+     * if you process very large strings with very large numbers of code points
+     * that need to be escaped.
+     *
+     * @param dflt if true then optimize for strings that contain many code
+     *            points that need to be escaped.
+     */
+    @Override
+    public void setManyEscapes( boolean dflt )
+    {
+        synchronized ( getClass() ){
+            manyEscapes = dflt;
         }
     }
 

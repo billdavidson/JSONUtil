@@ -17,7 +17,6 @@ package org.kopitubruk.util.json;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -34,7 +33,7 @@ import java.util.Set;
  */
 class DynamicPseudoMap extends AbstractPseudoMap
 {
-    private List<Map.Entry<Object,Object>> entries;
+    private ArrayList<Map.Entry<Object,Object>> entries;
 
     /**
      * Make a dynamically sized pseudo map
@@ -87,6 +86,14 @@ class DynamicPseudoMap extends AbstractPseudoMap
     public void clear()
     {
         entries.clear();
+    }
+
+    /**
+     * Call the ArrayList's trimToSize() method.
+     */
+    void trimToSize()
+    {
+        entries.trimToSize();
     }
 
     /**
