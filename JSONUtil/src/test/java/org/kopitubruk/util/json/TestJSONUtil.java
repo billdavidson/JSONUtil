@@ -1519,10 +1519,9 @@ public class TestJSONUtil
 
         JSONConfigDefaults.getInstance().clearReflectClasses();
         ReflectedObjectMapBuilder.clearReflectionCache();
-        cfg.setReflectUnknownObjects(false);
-
-        cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
-        cfg.addReflectClass(ReflectTestClass.class);
+        cfg.setReflectUnknownObjects(false)
+           .setReflectionPrivacy(ReflectUtil.PRIVATE)
+           .addReflectClass(ReflectTestClass.class);
 
         //int iterations = 1000000;
         //int iterations = 100000;
@@ -1547,9 +1546,10 @@ public class TestJSONUtil
         // BigObject
         iterations = 1;
 
-        cfg.clearReflectClasses();
-        cfg.addReflectClass(BigObject.class);
-        cfg.setFastStrings(false);
+        cfg.clearReflectClasses()
+           .addReflectClass(BigObject.class)
+           .setFastStrings(false)
+           .setManyEscapes(false);
         BigObject bigObj = new BigObject();
 
         runReflectionTiming(iterations, bigObj, cfg, false);
