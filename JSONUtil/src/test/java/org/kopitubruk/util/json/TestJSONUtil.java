@@ -478,18 +478,32 @@ public class TestJSONUtil
                                          .setPassThroughEscapes(true)
                                          .setUseECMA6(true);
         // escapes that get passed through.
-        String[] strs = { "\\u1234", "a\\u{41}", "\\\"", "\\/", "\\b", "\\f", "\\n", "\\r", "\\t", "\\\\" };
+        String[] strs = { "\\u1234", "a\\u{41}", "\\\"", "\\/", "\\b", "\\f", "\\n", "\\r", "\\t", "\\\\", "\\v" };
         for ( String str : strs ){
             jsonObj.clear();
             jsonObj.put("x", str);
 
             String json = JSONUtil.toJSON(jsonObj, cfg);
-            if ( str.indexOf('{') < 0 ){
+            if ( !(str.indexOf('{') > 0 || str.charAt(1) == 'v') ){
                 // Nashorn doesn't understand ECMAScript 6 code point escapes.
                 //validateJSON(json);
             }
-            assertThat(json, is("{\"x\":\""+str+"\"}"));
+            String result = str;
+            if ( "\\v".equals(str) ){
+                // illegal for JSON.  This is OK for ECMAScript 6 engines.
+                result = "\\u{B}";
+            }
+            assertThat(json, is("{\"x\":\""+result+"\"}"));
         }
+
+        // test it with ECMA6 disabled.
+        String str = "a\\u{41}";
+        jsonObj.clear();
+        jsonObj.put("x", str);
+        cfg.setUseECMA6(false);
+        String json = JSONUtil.toJSON(jsonObj, cfg);
+        //validateJSON(json);
+        assertThat(json, is("{\"x\":\"aA\"}"));
     }
 
     /**
@@ -1429,7 +1443,6 @@ public class TestJSONUtil
         cfg.clearReflectClasses()
            .addReflectClass(BigObject.class)
            .setFastStrings(false)
-           .setManyEscapes(false)
            .setEscapeNonAscii(true)
            .setUseECMA6(false);
         BigObject bigObj = new BigObject();
