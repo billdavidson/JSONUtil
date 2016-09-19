@@ -39,6 +39,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -520,12 +521,15 @@ public class TestJSONUtil
     {
         JSONConfig cfg = new JSONConfig().setUseECMA6(true).setEscapeNonAscii(true);
         StringBuilder buf = new StringBuilder();
+        Set<Character> singles = new HashSet<>(Arrays.asList('\b','\t','\n','\f','\r'));
         Random rand = new Random();
+        int bound = Character.MAX_CODE_POINT+1;
+        int min = Character.MIN_SUPPLEMENTARY_CODE_POINT;
         for ( int i = 0; i < 4096; i++ ){
             int cp;
             do{
-                cp = rand.nextInt(Character.MAX_CODE_POINT+1);
-            }while ( cp < Character.MIN_SUPPLEMENTARY_CODE_POINT || ! Character.isDefined(cp) );
+                cp = rand.nextInt(bound);
+            }while ( (cp > 0xF && cp < min) || (cp < 0xF && singles.contains((char)cp)) || ! Character.isDefined(cp) );
             buf.setLength(0);
             buf.appendCodePoint(cp);
             String result = '"' + String.format("\\u{%X}", cp) + '"';

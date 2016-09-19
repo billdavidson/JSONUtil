@@ -166,11 +166,11 @@ class CodePointData
     /*
      * Array of hex digits used to generate Unicode escapes.
      */
-    private static final char[] DIGITS = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+    private static final char[] HEX_DIGITS = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
 
 
-    /**
-     * Initialize JSON_ESC_MAP, JAVASCRIPT_ESC_MAP and EVAL_ESC_SET.
+    /*
+     * Initialize static data
      */
     static {
         JSON_ESC_MAP = new HashMap<>(8);
@@ -202,7 +202,7 @@ class CodePointData
                 case '\r': single = CR; break;
             }
             String esc = String.format("\\u%04X", i);
-            String esc6 = i < 0x10 ? String.format("\\u{%X}", i) : esc;
+            String esc6 = i < 0x10 ? makeECMA6Escape(i) : esc;
             UNICODE_ESC[i] = esc;
             SINGLE_ESC[i] = single != null ? single : esc;
             ECMA6_ESC[i] = esc6;
@@ -783,7 +783,7 @@ class CodePointData
             int cp = ch[ci];
 
             do{
-                escape[i--] = DIGITS[cp & 0xF];
+                escape[i--] = HEX_DIGITS[cp & 0xF];
             }while ( (cp >>= 4) > 0 );
 
             int lim = (ci * 6) + 2;
@@ -814,16 +814,16 @@ class CodePointData
 
         char[] escape = new char[size];
         int i = escape.length - 1;
-        cp = codePoint;
         escape[i--] = '}';
+        cp = codePoint;
 
         do{
-            escape[i--] = DIGITS[cp & 0xF];
+            escape[i--] = HEX_DIGITS[cp & 0xF];
         }while ( (cp >>= 4) > 0 );
 
-        escape[i--] = '{';
-        escape[i--] = 'u';
-        escape[i] = BACKSLASH;
+        escape[2] = '{';
+        escape[1] = 'u';
+        escape[0] = BACKSLASH;
 
         return new String(escape);
     }
@@ -862,7 +862,7 @@ class CodePointData
                     if ( Character.isSurrogatePair(ch0, ch1) ){
                         malformed = 0;
                         if ( escChecker.needEscape(Character.toCodePoint(ch0, ch1)) != 0 ){
-                            return ++i;
+                            return i;
                         }
                     }
                 }
