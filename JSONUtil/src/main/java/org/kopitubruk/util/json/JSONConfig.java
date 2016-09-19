@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 import java.util.TimeZone;
 
 /**
@@ -48,7 +49,7 @@ import java.util.TimeZone;
  *   <li>detectDataStructureLoops = true</li>
  *   <li>escapeBadIdentifierCodePoints = false</li>
  *   <li>fullJSONIdentifierCodePoints = false</li>
- *   <li>fastStrings</li>
+ *   <li>fastStrings = false</li>
  * </ul>
  * <h3>Safe alternate encoding options.</h3>
  * <ul>
@@ -63,6 +64,7 @@ import java.util.TimeZone;
  *   <li>smallNumbers = false</li>
  *   <li>usePrimitiveArrays = false</li>
  *   <li>cacheReflectionData = false</li>
+ *   <li>manyEscapes = false</li>
  * </ul>
  * <h3>
  *   Allow generation of certain types of non-standard JSON.
@@ -118,6 +120,11 @@ public class JSONConfig implements Serializable, Cloneable
     private List<Object> objStack;
 
     /**
+     * The property name validation pattern.
+     */
+    private Pattern validationPat = null;
+
+    /**
      * Optional number formats mapped from different number types.
      */
     private Map<Class<? extends Number>,NumberFormat> numberFormatMap = null;
@@ -170,6 +177,7 @@ public class JSONConfig implements Serializable, Cloneable
     private boolean smallNumbers;
     private boolean usePrimitiveArrays;
     private boolean cacheReflectionData;
+    private boolean manyEscapes;
 
     private boolean quoteIdentifier;
     private boolean useECMA6;
@@ -280,6 +288,7 @@ public class JSONConfig implements Serializable, Cloneable
         result.smallNumbers = smallNumbers;
         result.usePrimitiveArrays = usePrimitiveArrays;
         result.cacheReflectionData = cacheReflectionData;
+        result.manyEscapes = manyEscapes;
 
         // non-standard JSON.
         result.quoteIdentifier = quoteIdentifier;
@@ -309,6 +318,19 @@ public class JSONConfig implements Serializable, Cloneable
         if ( objStack != null ){
             objStack.clear();
         }
+    }
+
+    /**
+     * Get the propertyName validation pattern appropriate to the current flags.
+     *
+     * @return the propertyName validation pattern appropriate to the current flags.
+     */
+    Pattern getPropertyNameValidationPattern()
+    {
+        if ( validationPat == null ){
+            validationPat = JSONUtil.getPropertyNameValidationPattern(this);
+        }
+        return validationPat;
     }
 
     /**
@@ -728,6 +750,7 @@ public class JSONConfig implements Serializable, Cloneable
      * or {@link Enumeration}, then all objects in it will be added.
      *
      * @param obj The object whose class to add to the reflect list.
+     * @see JSONReflectedClass
      * @since 1.9
      */
     public void addReflectClass( Object obj )
@@ -768,6 +791,7 @@ public class JSONConfig implements Serializable, Cloneable
      * that automatically get reflected.
      *
      * @param classes The objects to reflect.
+     * @see JSONReflectedClass
      * @since 1.9
      */
     public void addReflectClasses( Collection<?> classes )
@@ -928,6 +952,7 @@ public class JSONConfig implements Serializable, Cloneable
         if ( fullJSONIdentifierCodePoints ){
             quoteIdentifier = true;
         }
+        validationPat = null;
     }
 
     /**
@@ -1254,6 +1279,39 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
+     * Return the manyEscapes policy.
+     *
+     * @return the manyEscapes policy.
+     */
+    public boolean isManyEscapes()
+    {
+        return manyEscapes;
+    }
+
+    /**
+     * If true, then the string processing code will optimize for strings that
+     * contain many code points that need to be escaped. Otherwise, it will
+     * optimize for strings that have few code points that need to be escaped.
+     * In my tests, the average number of escapes per string that caused it to
+     * cross over was about 40. Your performance may vary based upon your data
+     * and architecture.
+     * <p>
+     * The code that optimizes for strings that have few code points that need
+     * to be escaped creates a list of the indexes of code points that need to be
+     * escaped in the string before it does any other processing. This list can
+     * become large if you have a lot of escapes which could cause memory issues
+     * if you process very large strings with very large numbers of code points
+     * that need to be escaped.
+     *
+     * @param manyEscapes if true then optimize for strings that contain many
+     *            code points that need to be escaped.
+     */
+    public void setManyEscapes( boolean manyEscapes )
+    {
+        this.manyEscapes = manyEscapes;
+    }
+
+    /**
      * Find out what the identifier quote policy is.
      *
      * @return If true, then all identifiers will be quoted.
@@ -1307,6 +1365,7 @@ public class JSONConfig implements Serializable, Cloneable
     public void setUseECMA6( boolean useECMA6 )
     {
         this.useECMA6 = useECMA6;
+        validationPat = null;
     }
 
     /**

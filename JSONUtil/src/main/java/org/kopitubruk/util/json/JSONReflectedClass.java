@@ -240,7 +240,9 @@ public class JSONReflectedClass implements Cloneable
 
     /**
      * Set the set of field names to reflect. This silently discards any names
-     * that are not valid Java identifiers.
+     * that are not valid Java identifiers.  The collection is copied so you
+     * cannot modify what is stored except by replacing the entire collection
+     * by using this method.
      *
      * @param fieldNames The field names to include in reflected JSON output. If
      *            the {@link Collection} that you send to this method has a set

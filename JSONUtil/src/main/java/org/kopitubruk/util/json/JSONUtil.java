@@ -104,7 +104,9 @@ import java.util.regex.Pattern;
  *     These are objects that know how to convert themselves to JSON. This just
  *     calls their {@link JSONAble#toJSON(JSONConfig,Writer)} method. It is possible
  *     to use these as top level objects or as values inside other objects but it's
- *     kind of redundant to use them as top level.
+ *     kind of redundant to use them as top level.  A class called {@link JsonObject}
+ *     is included with this package that implements {@link JSONAble} and provides
+ *     a few conveniences for creating JSON object data.
  *   </dd>
  *   <dt>Reflected Objects</dt>
  *   <dd>
@@ -662,7 +664,7 @@ public class JSONUtil
                 // have to produce identical toString() results.
                 throw new DuplicatePropertyNameException(propertyName, cfg);
             }
-            checkValidJavascriptPropertyName(propertyName, cfg);
+            checkValidJavascriptPropertyNameImpl(propertyName, cfg);
             propertyNames.add(propertyName);
         }
 
@@ -684,14 +686,11 @@ public class JSONUtil
                                 hasSurrogates(propertyName);
 
         if ( doQuote ){
-            json.write('"');
+            fastWriteString(propertyName, json);
+        }else{
+            json.write(propertyName);
         }
 
-        json.write(propertyName);
-
-        if ( doQuote ){
-            json.write('"');
-        }
         json.write(':');
     }
 
@@ -704,11 +703,14 @@ public class JSONUtil
      */
     private static String escapeBadIdentifierCodePoints( String propertyName, JSONConfig cfg )
     {
-        StringBuilder buf = new StringBuilder(propertyName.length());
         boolean useSingleLetterEscapes = cfg.isFullJSONIdentifierCodePoints();
         boolean processInlineEscapes = true;
 
         CodePointData cp = new CodePointData(propertyName, cfg, useSingleLetterEscapes, processInlineEscapes);
+        if ( cp.isNoEscapes() && isValidJavascriptPropertyNameImpl(propertyName, cfg) ){
+            return propertyName;
+        }
+        StringBuilder buf = new StringBuilder(propertyName.length()+20);
         while ( cp.nextReady() ){
             String esc = cp.getEsc();
             if ( esc != null ){
@@ -734,16 +736,24 @@ public class JSONUtil
      */
     private static String escapeNonAscii( String str, JSONConfig cfg )
     {
-        StringBuilder buf = new StringBuilder(str.length());
-        CodePointData cp = new CodePointData(str, cfg);
-        while ( cp.nextReady() ){
-            if ( cp.getCodePoint() > CodePointData.MAX_ASCII ){
-                buf.append(cp.getEscapeString());
-            }else{
-                cp.appendChars(buf);
-            }
+        boolean noNonAscii = true;
+        for ( int i = 0, len = str.length(); noNonAscii && i < len; i++ ){
+            noNonAscii = str.charAt(i) <= CodePointData.MAX_ASCII;;
         }
-        return buf.toString();
+        if ( noNonAscii ){
+            return str;
+        }else{
+            StringBuilder buf = new StringBuilder(str.length()+20);
+            CodePointData cp = new CodePointData(str, cfg);
+            while ( cp.nextReady() ){
+                if ( cp.getCodePoint() > CodePointData.MAX_ASCII ){
+                    buf.append(cp.getEscapeString());
+                }else{
+                    cp.appendChars(buf);
+                }
+            }
+            return buf.toString();
+        }
     }
 
     /**
@@ -755,16 +765,20 @@ public class JSONUtil
      */
     private static String escapeSurrogates( String str, JSONConfig cfg )
     {
-        StringBuilder buf = new StringBuilder(str.length());
-        CodePointData cp = new CodePointData(str, cfg);
-        while ( cp.nextReady() ){
-            if ( cp.getCharCount() > 1 ){
-                buf.append(cp.getEscapeString());
-            }else{
-                cp.appendChars(buf);
+        if ( hasSurrogates(str) ){
+            StringBuilder buf = new StringBuilder(str.length());
+            CodePointData cp = new CodePointData(str, cfg);
+            while ( cp.nextReady() ){
+                if ( cp.getCharCount() > 1 ){
+                    buf.append(cp.getEscapeString());
+                }else{
+                    cp.appendChars(buf);
+                }
             }
+            return buf.toString();
+        }else{
+            return str;
         }
-        return buf.toString();
     }
 
     /**
@@ -813,27 +827,15 @@ public class JSONUtil
         }else if ( cfg.isFastStrings() ){
             fastWriteString(strValue, json);
         }else{
-            boolean useSingleLetterEscapes = true;
             boolean processInlineEscapes = cfg.isPassThroughEscapes();
             if ( cfg.isUnEscapeWherePossible() ){
                 strValue = CodePointData.unEscape(strValue, cfg);
             }
 
-            CodePointData cp = new CodePointData(strValue, cfg, useSingleLetterEscapes, processInlineEscapes);
-            if ( cp.isNoEscapes() ){
-                fastWriteString(strValue, json);
-            }else{
-                json.write('"');
-                while ( cp.nextReady() ){
-                    String esc = cp.getEsc();
-                    if ( esc != null ){
-                        json.write(esc);            // valid escape.
-                    }else{
-                        cp.writeChars(json);        // Pass it through -- usual case.
-                    }
-                }
-                json.write('"');
-            }
+            json.write('"');
+            CodePointData cp = new CodePointData(strValue, cfg, processInlineEscapes);
+            cp.writeString(json);
+            json.write('"');
         }
     }
 
@@ -884,7 +886,7 @@ public class JSONUtil
         }
 
         if ( num instanceof Integer ){
-            // stop checking types.
+            // Don't need any checking.
         }else if ( num instanceof Double ){
             Double d = (Double)num;
             isSafeJsonNumber = !(d.isInfinite() || d.isNaN());
@@ -914,6 +916,7 @@ public class JSONUtil
                 }
             }
         }
+        // else Byte or Short which don't need any checking
 
         return isSafeJsonNumber;
     }
@@ -1006,24 +1009,71 @@ public class JSONUtil
     public static void checkValidJavascriptPropertyName( String propertyName, JSONConfig cfg ) throws BadPropertyNameException
     {
         JSONConfig jcfg = cfg != null ? cfg : new JSONConfig();
-        Pattern validationPat = getPropertyNameValidationPattern(jcfg);
-
-        if ( propertyName == null ||
-                (isReservedWord(propertyName) && !jcfg.isAllowReservedWordsInIdentifiers()) ||
-                ! validationPat.matcher(propertyName).matches() ){
-            throw new BadPropertyNameException(propertyName, jcfg);
-        }
+        checkValidJavascriptPropertyNameImpl(propertyName, jcfg);
     }
 
     /**
-     * Checks if the input string represents a valid Javascript property name.
+     * Checks if the input string represents a valid Javascript property name
+     * using default identifier options.
      *
      * @param propertyName A Javascript property name to check.
      * @throws BadPropertyNameException If the propertyName is not a valid Javascript property name.
      */
     public static void checkValidJavascriptPropertyName( String propertyName ) throws BadPropertyNameException
     {
-        checkValidJavascriptPropertyName(propertyName, null);
+        checkValidJavascriptPropertyNameImpl(propertyName, new JSONConfig());
+    }
+
+    /**
+     * Checks if the input string represents a valid Javascript property name.
+     *
+     * @param propertyName A Javascript property name to check.
+     * @param cfg A JSONConfig to use for locale and identifier options.
+     * @throws BadPropertyNameException If the propertyName is not a valid Javascript property name.
+     */
+    private static void checkValidJavascriptPropertyNameImpl( String propertyName, JSONConfig cfg ) throws BadPropertyNameException
+    {
+        if ( ! isValidJavascriptPropertyNameImpl(propertyName, cfg) ){
+            throw new BadPropertyNameException(propertyName, cfg);
+        }
+    }
+
+    /**
+     * Return true if the input string is a valid Javascript property name.
+     *
+     * @param propertyName A Javascript property name to check.
+     * @param cfg A JSONConfig to use for locale and identifier options.  If null, defaults will be used.
+     * @return true if the input string represents a valid Javascript property name.
+     */
+    public static boolean isValidJavascriptPropertyName( String propertyName, JSONConfig cfg )
+    {
+        JSONConfig jcfg = cfg != null ? cfg : new JSONConfig();
+        return isValidJavascriptPropertyNameImpl(propertyName, jcfg);
+    }
+
+    /**
+     * Return true if the input string is a valid Javascript property name
+     * using default identifier options.
+     *
+     * @param propertyName A Javascript property name to check.
+     * @return true if the input string represents a valid Javascript property name.
+     */
+    public static boolean isValidJavascriptPropertyName( String propertyName )
+    {
+        return isValidJavascriptPropertyNameImpl(propertyName, new JSONConfig());
+    }
+
+    /**
+     * Return true if the input string is a valid Javascript property name.
+     *
+     * @param propertyName A Javascript property name to check.
+     * @param cfg A JSONConfig to use for locale and identifier options.
+     * @return true if the input string represents a valid Javascript property name.
+     */
+    private static boolean isValidJavascriptPropertyNameImpl( String propertyName, JSONConfig cfg )
+    {
+        return (!(propertyName == null || (isReservedWord(propertyName) && ! cfg.isAllowReservedWordsInIdentifiers()))) &&
+                cfg.getPropertyNameValidationPattern().matcher(propertyName).matches();
     }
 
     /**
@@ -1032,7 +1082,7 @@ public class JSONUtil
      * @param cfg A JSONConfig to use to decide which validation pattern to use.
      * @return A Pattern used for validating property names.
      */
-    private static Pattern getPropertyNameValidationPattern( JSONConfig cfg )
+    static Pattern getPropertyNameValidationPattern( JSONConfig cfg )
     {
         Pattern validationPat;
 
