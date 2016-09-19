@@ -506,9 +506,6 @@ class CodePointData
             if ( beginIndex < 0 ){
                 beginIndex = index; // start a new sub string.
             }
-            if ( nextIndex > lastEscIndex ){
-                nextIndex = len;    // end the loop and write the rest of the string.
-            }
             endIndex = nextIndex;
         }
 
@@ -526,6 +523,11 @@ class CodePointData
     {
         flushCurrentSubstring(json);
         json.write(esc);
+        if ( index == lastEscIndex ){
+            // just did last escape
+            beginIndex = nextIndex;
+            endIndex = nextIndex = len;
+        }
     }
 
     /**
