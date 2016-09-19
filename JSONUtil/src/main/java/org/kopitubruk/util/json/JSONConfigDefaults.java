@@ -121,7 +121,7 @@ import org.apache.commons.logging.LogFactory;
  *   <li>smallNumbers = false</li>
  *   <li>usePrimitiveArrays = false</li>
  *   <li>cacheReflectionData = false</li>
- *   <li>manyEscapes = false</li>
+ *   <li>manyEscapes = true</li>
  * </ul>
  * <h3>
  *   Allow generation of certain types of non-standard JSON.
@@ -1929,6 +1929,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * become large if you have a lot of escapes which could cause memory issues
      * if you process very large strings with very large numbers of code points
      * that need to be escaped.
+     * <p>
+     * The default is true because that is safe from potential memory problems
+     * but if you know that you won't have a lot of big strings with lots of
+     * escapes then going with false will make it a little bit faster.
      *
      * @param dflt if true then optimize for strings that contain many code
      *            points that need to be escaped.
