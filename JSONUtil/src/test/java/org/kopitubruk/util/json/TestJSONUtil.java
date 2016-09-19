@@ -36,6 +36,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -410,22 +411,57 @@ public class TestJSONUtil
     }
 
     /**
-     * Test that ECMAScript 6 code point escapes.
+     * Test ECMAScript 6 code point escapes.
      */
     @Test
     public void testECMA6UnicodeEscapeInString()
     {
         JSONConfig cfg = new JSONConfig().setUseECMA6(true).setEscapeNonAscii(true);
         StringBuilder buf = new StringBuilder();
+        Set<Character> singles = new HashSet<Character>(Arrays.asList('\b','\t','\n','\f','\r'));
         Random rand = new Random();
+        int bound = Character.MAX_CODE_POINT+1;
+        int min = Character.MIN_SUPPLEMENTARY_CODE_POINT;
         for ( int i = 0; i < 4096; i++ ){
             int cp;
             do{
-                cp = rand.nextInt(Character.MAX_CODE_POINT+1);
-            }while ( cp < Character.MIN_SUPPLEMENTARY_CODE_POINT || ! Character.isDefined(cp) );
+                cp = rand.nextInt(bound);
+            }while ( (cp > 0xF && cp < min) || (cp < 0xF && singles.contains((char)cp)) || ! Character.isDefined(cp) );
             buf.setLength(0);
             buf.appendCodePoint(cp);
             String result = '"' + String.format("\\u{%X}", cp) + '"';
+            String json = JSONUtil.toJSON(buf, cfg);
+            assertThat(json, is(result));
+        }
+    }
+
+    /**
+     * Test code unit escapes.
+     */
+    @Test
+    public void testEscapeGenerator()
+    {
+        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setEscapeNonAscii(true);
+        StringBuilder buf = new StringBuilder();
+        Set<Character> singles = new HashSet<Character>(Arrays.asList('\b','\t','\n','\f','\r'));
+        Random rand = new Random();
+        int bound = Character.MAX_CODE_POINT+1;
+        int min = Character.MIN_SUPPLEMENTARY_CODE_POINT;
+        for ( int i = 0; i < 4096; i++ ){
+            int cp;
+            do{
+                cp = rand.nextInt(bound);
+            }while ( (cp >= ' ' && cp < 128) || (cp < 0xF && singles.contains((char)cp)) || ! Character.isDefined(cp) );
+            buf.setLength(0);
+            buf.appendCodePoint(cp);
+            String result;
+            if ( cp >= min ){
+                int high = buf.charAt(0);
+                int low = buf.charAt(1);
+                result = '"' + String.format("\\u%04X\\u%04X", high, low) + '"';
+            }else{
+                result = '"' + String.format("\\u%04X", cp) + '"';
+            }
             String json = JSONUtil.toJSON(buf, cfg);
             assertThat(json, is(result));
         }

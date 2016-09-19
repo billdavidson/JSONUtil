@@ -156,10 +156,10 @@ class CodePointData
     /*
      * Array of hex digits used to generate Unicode escapes.
      */
-    private static final char[] DIGITS = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+    private static final char[] HEX_DIGITS = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
 
     /*
-     * Initialize JSON_ESC_MAP, JAVASCRIPT_ESC_MAP and EVAL_ESC_SET.
+     * Initialize static data
      */
     static {
         JSON_ESC_MAP = new HashMap<Character,String>(8);
@@ -191,7 +191,7 @@ class CodePointData
                 case '\r': single = CR; break;
             }
             String esc = String.format("\\u%04X", i);
-            String esc6 = i < 0x10 ? String.format("\\u{%X}", i) : esc;
+            String esc6 = i < 0x10 ? makeECMA6Escape(i) : esc;
             UNICODE_ESC[i] = esc;
             SINGLE_ESC[i] = single != null ? single : esc;
             ECMA6_ESC[i] = esc6;
@@ -743,9 +743,9 @@ class CodePointData
         }else{
             // Use normal escape.
             if ( isSurrogatePair != 0 ){
-                return makeEscape(chars, 2);
+                return makeEscape(chars);
             }else{
-                return makeEscape(chars, 1);
+                return makeEscape(chars[0]);
             }
         }
     }
@@ -753,35 +753,65 @@ class CodePointData
     /**
      * Make a code unit escape.
      *
-     * @param ch the char array.
-     * @param ct the count (1 or 2) of chars in the array to include.
+     * @param ch the char.
      * @return the escape.
      */
-    private String makeEscape( char[] ch, int ci )
+    private String makeEscape( char ch )
     {
-        char[] escape = ci == 1 ? oneBuf : twoBuf;
+        char[] escape = oneBuf;
         if ( escape == null ){
-            switch ( ci ){
-                case 1: escape = oneBuf = new char[6]; break;
-                case 2: escape = twoBuf = new char[12]; break;
-            }
+            escape = oneBuf = new char[6];
         }
         int i = escape.length - 1;
-        while ( ci-- > 0 ){
-            int cp = ch[ci];
+        int cp = ch;
 
-            do{
-                escape[i--] = DIGITS[cp & 0xF];
-            }while ( (cp >>= 4) > 0 );
+        do{
+            escape[i--] = HEX_DIGITS[cp & 0xF];
+        }while ( (cp >>= 4) > 0 );
 
-            int lim = (ci * 6) + 2;
-            while ( i >= lim ){
-                escape[i--] = '0';
-            }
-
-            escape[i--] = 'u';
-            escape[i--] = BACKSLASH;
+        while ( i > 1 ){
+            escape[i--] = '0';
         }
+
+        escape[1] = 'u';
+        escape[0] = BACKSLASH;
+
+        return new String(escape);
+    }
+
+    /**
+     * Make a surrogate pair code unit escape.
+     *
+     * @param ch the char array.
+     * @return the escape.
+     */
+    private String makeEscape( char[] ch )
+    {
+        char[] escape = twoBuf;
+        if ( escape == null ){
+            escape = twoBuf = new char[12];
+        }
+        int i = escape.length - 1;
+
+        int cp = ch[1];
+        do{
+            escape[i--] = HEX_DIGITS[cp & 0xF];
+        }while ( (cp >>= 4) > 0 );
+        while ( i > 7 ){
+            escape[i--] = '0';
+        }
+        escape[i--] = 'u';
+        escape[i--] = BACKSLASH;
+
+        cp = ch[0];
+        do{
+            escape[i--] = HEX_DIGITS[cp & 0xF];
+        }while ( (cp >>= 4) > 0 );
+        while ( i > 1 ){
+            escape[i--] = '0';
+        }
+        escape[1] = 'u';
+        escape[0] = BACKSLASH;
 
         return new String(escape);
     }
@@ -802,16 +832,16 @@ class CodePointData
 
         char[] escape = new char[size];
         int i = escape.length - 1;
-        cp = codePoint;
         escape[i--] = '}';
+        cp = codePoint;
 
         do{
-            escape[i--] = DIGITS[cp & 0xF];
+            escape[i--] = HEX_DIGITS[cp & 0xF];
         }while ( (cp >>= 4) > 0 );
 
-        escape[i--] = '{';
-        escape[i--] = 'u';
-        escape[i] = BACKSLASH;
+        escape[2] = '{';
+        escape[1] = 'u';
+        escape[0] = BACKSLASH;
 
         return new String(escape);
     }
@@ -850,7 +880,7 @@ class CodePointData
                     if ( Character.isSurrogatePair(ch0, ch1) ){
                         malformed = 0;
                         if ( escChecker.needEscape(Character.toCodePoint(ch0, ch1)) != 0 ){
-                            return ++i;
+                            return i;
                         }
                     }
                 }
