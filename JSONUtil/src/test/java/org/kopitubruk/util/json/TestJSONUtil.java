@@ -270,7 +270,7 @@ public class TestJSONUtil
         int partIndex = 0;
         int nameIndex = 0;
 
-        JsonObject jsonObj = new JsonObject(1);
+        JsonObject jsonObj = new JsonObject(1, cfg);
 
         int startSize = validStart.size();
         int partSize = validPart.size();
@@ -281,7 +281,7 @@ public class TestJSONUtil
             if ( nameIndex == MAX_LENGTH ){
                 jsonObj.clear();
                 jsonObj.add(new String(propertyName,0,nameIndex), 0);
-                String json = jsonObj.toJSON(cfg);
+                String json = jsonObj.toJSON();
                 validateJSON(json);    // this makes this test take a long time to run.
                 nameIndex = 0;
                 if ( startIndex < startSize ){
@@ -313,7 +313,7 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
         cfg.setFullJSONIdentifierCodePoints(true);
 
-        JsonObject jsonObj = new JsonObject(1);
+        JsonObject jsonObj = new JsonObject(1, cfg);
         int[] normalIdent = new int[1];
         int[] escName = new int[2];
         escName[0] = '\\';
@@ -324,8 +324,10 @@ public class TestJSONUtil
                 normalIdent[0] = i;
                 jsonObj.clear();
                 jsonObj.add(new String(normalIdent,0,1), 0);
+
                 //String json =
                         jsonObj.toJSON(cfg);
+
                 // these would fail eval().
                 //parseJSON(json);
                 ++jsonOnlyCount;
@@ -344,7 +346,7 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig();
         cfg.setFullJSONIdentifierCodePoints(true);
 
-        JsonObject jsonObj = new JsonObject(1);
+        JsonObject jsonObj = new JsonObject(1, cfg);
         int[] codePoints = new int[256];
         int j = 0;
 
@@ -352,13 +354,13 @@ public class TestJSONUtil
             if (  i < ' ' || ! Character.isDefined(i) ){
                 codePoints[j++] = i;
                 if ( j == codePoints.length ){
-                    testBadIdentifier(codePoints, 0, j, jsonObj, cfg);
+                    testBadIdentifier(codePoints, 0, j, jsonObj);
                     j = 0;
                 }
             }
         }
         if ( j > 0 ){
-            testBadIdentifier(codePoints, 0, j, jsonObj, cfg);
+            testBadIdentifier(codePoints, 0, j, jsonObj);
         }
     }
 
@@ -368,14 +370,14 @@ public class TestJSONUtil
     @Test
     public void testBadStartPropertyNames()
     {
-        JsonObject jsonObj = new JsonObject(1);
-        int[] codePoints = new int[1];
         JSONConfig cfg = new JSONConfig();
+        JsonObject jsonObj = new JsonObject(1, cfg);
+        int[] codePoints = new int[1];
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
             if ( ! JSONUtil.isValidIdentifierStart(i, cfg) ){
                 codePoints[0] = i;
-                testBadIdentifier(codePoints, 0, 1, jsonObj, cfg);
+                testBadIdentifier(codePoints, 0, 1, jsonObj);
             }
         }
     }
@@ -389,8 +391,8 @@ public class TestJSONUtil
         int[] codePoints = new int[256];
         int j = 1;
         codePoints[0] = '_';
-        JsonObject jsonObj = new JsonObject(1);
         JSONConfig cfg = new JSONConfig();
+        JsonObject jsonObj = new JsonObject(1, cfg);
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
             if ( isNormalCodePoint(i) && ! JSONUtil.isValidIdentifierStart(i, cfg) && ! JSONUtil.isValidIdentifierPart(i, cfg) ){
@@ -398,13 +400,13 @@ public class TestJSONUtil
                 // just skip them.  anyone who sends bad surrogate pairs deserves what they get.
                 codePoints[j++] = i;
                 if ( j == codePoints.length ){
-                    testBadIdentifier(codePoints, 1, j, jsonObj, cfg);
+                    testBadIdentifier(codePoints, 1, j, jsonObj);
                     j = 1;
                 }
             }
         }
         if ( j > 1 ){
-            testBadIdentifier(codePoints, 1, j, jsonObj, cfg);
+            testBadIdentifier(codePoints, 1, j, jsonObj);
         }
     }
 
@@ -416,14 +418,14 @@ public class TestJSONUtil
      * @param end The index just after the last code point to check for.
      * @param jsonObj A jsonObj to use for the test.
      */
-    private void testBadIdentifier( int[] codePoints, int start, int end, JsonObject jsonObj, JSONConfig cfg )
+    private void testBadIdentifier( int[] codePoints, int start, int end, JsonObject jsonObj )
     {
         // clear in order to avoid memory abuse.
         // didn't create the object here because it would have to be recreated millions of times.
         jsonObj.clear();
         try{
             jsonObj.add(new String(codePoints,0,end), 0);
-            jsonObj.toJSON(cfg);
+            jsonObj.toJSON();
             fail(String.format("Expected a BadPropertyNameException to be thrown for U+%04X", codePoints[start]));
         }catch ( BadPropertyNameException e ){
             String message = e.getMessage();
@@ -443,8 +445,8 @@ public class TestJSONUtil
     public void testValidStrings() throws ScriptException, NoSuchMethodException
     {
         int[] codePoints = new int[32768];
-        JsonObject jsonObj = new JsonObject(1);
         JSONConfig cfg = new JSONConfig();
+        JsonObject jsonObj = new JsonObject(1, cfg);
         int j = 0;
 
         for ( int i = 0; i <= Character.MAX_CODE_POINT; i++ ){
@@ -454,7 +456,8 @@ public class TestJSONUtil
                 if ( j == codePoints.length ){
                     jsonObj.clear();
                     jsonObj.add("x", getString(codePoints,j));
-                    validateJSON(jsonObj.toJSON(cfg));
+                    String json = jsonObj.toJSON();
+                    validateJSON(json);
                     j = 0;
                 }
             }
@@ -462,8 +465,15 @@ public class TestJSONUtil
         if ( j > 0 ){
             jsonObj.clear();
             jsonObj.add("x", getString(codePoints,j));
-            validateJSON(jsonObj.toJSON(cfg));
+            String json = jsonObj.toJSON();
+            validateJSON(json);
         }
+
+        jsonObj.clear();
+        jsonObj.add("x", "Some data\nSome other data.");
+        String json = jsonObj.toJSON();
+        validateJSON(json);
+        assertThat(json, is("{\"x\":\"Some data\\nSome other data.\"}"));
     }
 
     /**
@@ -586,14 +596,10 @@ public class TestJSONUtil
 
             String json = JSONUtil.toJSON(jsonObj, cfg);
             char firstChar = str.charAt(0);
-            if ( firstChar != 'd' ){
-                // Nashorn doesn't understand EMCAScript 6 code point escapes.
-                validateJSON(json);
-            }
-            // \v unescaped will be re-escaped as a Unicode code unit.
             String result;
             switch ( firstChar ){
                 case 'e':
+                    // \v unescaped will be re-escaped as a Unicode code unit.
                     result = firstChar + "\\u000B";
                     break;
                 case 'f':
@@ -1027,6 +1033,18 @@ public class TestJSONUtil
         String json = JSONUtil.toJSON(jsonObj);
         validateJSON(json);
         assertThat(json, is("{\"x\":68719476735}"));
+
+        l = 9007199254740993L;
+        jsonObj.put("x", l);
+        JSONConfig cfg = new JSONConfig();
+
+        cfg.setPreciseNumbers(false);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"x\":9007199254740993}"));
+
+        cfg.setPreciseNumbers(true);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"x\":\"9007199254740993\"}"));
     }
 
     /**
@@ -1078,6 +1096,18 @@ public class TestJSONUtil
         String json = JSONUtil.toJSON(jsonObj);
         validateJSON(json);
         assertThat(json, is("{\"x\":1234567890}"));
+
+        bi = new BigInteger("9007199254740993");
+        jsonObj.put("x", bi);
+        JSONConfig cfg = new JSONConfig();
+
+        cfg.setPreciseNumbers(false);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"x\":9007199254740993}"));
+
+        cfg.setPreciseNumbers(true);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"x\":\"9007199254740993\"}"));
     }
 
     /**
@@ -1095,6 +1125,18 @@ public class TestJSONUtil
         String json = JSONUtil.toJSON(jsonObj);
         validateJSON(json);
         assertThat(json, is("{\"x\":12345.67890}"));
+
+        bd = new BigDecimal("9007199254740993");
+        jsonObj.put("x", bd);
+        JSONConfig cfg = new JSONConfig();
+
+        cfg.setPreciseNumbers(false);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"x\":9007199254740993}"));
+
+        cfg.setPreciseNumbers(true);
+        json = JSONUtil.toJSON(jsonObj, cfg);
+        assertThat(json, is("{\"x\":\"9007199254740993\"}"));
     }
 
     /**
@@ -1411,9 +1453,8 @@ public class TestJSONUtil
         JsonObject jsonObj = new JsonObject(2)
                                     .add(new DupStr(1), 0)
                                     .add(new DupStr(2), 1);
-        JSONConfig cfg = new JSONConfig();
         try{
-            jsonObj.toJSON(cfg);
+            jsonObj.toJSON();
             fail("Expected a DuplicatePropertyNameException to be thrown");
         }catch ( DuplicatePropertyNameException e ){
             assertThat(e.getMessage(), is("Property x occurs twice in the same object."));
@@ -1488,9 +1529,9 @@ public class TestJSONUtil
     @Test
     public void testReflect()
     {
-        JsonObject jsonObj = new JsonObject(1);
-        jsonObj.add("f", new ReflectTestClass());
         JSONConfig cfg = new JSONConfig();
+        JsonObject jsonObj = new JsonObject(1, cfg);
+        jsonObj.add("f", new ReflectTestClass());
         cfg.setValidatePropertyNames(false);
         cfg.setDetectDataStructureLoops(false);
         cfg.setFastStrings(true);
@@ -1499,30 +1540,31 @@ public class TestJSONUtil
         ReflectedObjectMapBuilder.clearReflectionCache();
 
         // JNDI set up to only show fields a and e.
-        String json = jsonObj.toJSON(cfg);
+        String json = jsonObj.toJSON();
         assertThat(json, is("{\"f\":{\"a\":1,\"k\":25.0}}"));
 
         cfg.clearReflectClasses();
         cfg.addReflectClass(ReflectTestClass.class);
 
         cfg.setReflectionPrivacy(ReflectUtil.PRIVATE);
-        json = jsonObj.toJSON(cfg);
+        json = jsonObj.toJSON();
         assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[],\"d\":null,\"f\":true}}"));
 
         cfg.setReflectionPrivacy(ReflectUtil.PACKAGE);
-        json = jsonObj.toJSON(cfg);
+        json = jsonObj.toJSON();
         assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"c\":[],\"f\":true}}"));
 
         cfg.setReflectionPrivacy(ReflectUtil.PROTECTED);
-        json = jsonObj.toJSON(cfg);
+        json = jsonObj.toJSON();
         assertThat(json, is("{\"f\":{\"a\":1,\"b\":\"something\",\"f\":true}}"));
 
         cfg.setReflectionPrivacy(ReflectUtil.PUBLIC);
-        json = jsonObj.toJSON(cfg);
+        json = jsonObj.toJSON();
         assertThat(json, is("{\"f\":{\"a\":1,\"f\":true}}"));
 
         cfg = new JSONConfig(); // reload defaults.
-        json = jsonObj.toJSON(cfg);
+        jsonObj.setJSONConfig(cfg);
+        json = jsonObj.toJSON();
         assertThat(json, is("{\"f\":{\"a\":1,\"k\":25.0}}"));
 
         JSONConfigDefaults.getInstance().clearReflectClasses();
@@ -1553,11 +1595,11 @@ public class TestJSONUtil
         runReflectionTiming(iterations, r, cfg, true);
 
         // BigObject
-        //iterations = 100000;
+        iterations = 1;
 
         cfg.clearReflectClasses();
         cfg.addReflectClass(BigObject.class);
-        cfg.setFastStrings(true);
+        cfg.setFastStrings(false);
         BigObject bigObj = new BigObject();
 
         runReflectionTiming(iterations, bigObj, cfg, false);
@@ -1569,19 +1611,19 @@ public class TestJSONUtil
 
     private String runMapTiming( int iterations, ReflectTestClass obj, JSONConfig cfg )
     {
-        JsonObject jsonObj = new JsonObject(1);
+        JsonObject jsonObj = new JsonObject(1, cfg);
         String json = null;
 
         long start = System.currentTimeMillis();
         for ( int i = 0; i < iterations; i++ ){
-            JsonObject mapObj = new JsonObject(4)
+            JsonObject mapObj = new JsonObject(4, cfg)
                                         .add("a", obj.getA())
                                         .add("b", obj.getB())
                                         .add("c", obj.getC())
                                         .add("d", null);  // no getter and private
             jsonObj.clear();
             jsonObj.add("f", mapObj);
-            json = jsonObj.toJSON(cfg);
+            json = jsonObj.toJSON();
         }
         long end = System.currentTimeMillis();
         s_log.debug("map: "+((end-start)/1000.0)+"s");
@@ -1590,7 +1632,7 @@ public class TestJSONUtil
 
     private String runReflectionTiming( int iterations, Object obj, JSONConfig cfg, boolean doCaching )
     {
-        JsonObject jsonObj = new JsonObject(1).add("f", obj);
+        JsonObject jsonObj = new JsonObject(1, cfg).add("f", obj);
         String json = null;
 
         String tag;
@@ -1604,7 +1646,7 @@ public class TestJSONUtil
         }
         long start = System.currentTimeMillis();
         for ( int i = 0; i < iterations; i++ ){
-            json = jsonObj.toJSON(cfg);
+            json = jsonObj.toJSON();
         }
         long end = System.currentTimeMillis();
         s_log.debug(tag+((end-start)/1000.0)+"s");

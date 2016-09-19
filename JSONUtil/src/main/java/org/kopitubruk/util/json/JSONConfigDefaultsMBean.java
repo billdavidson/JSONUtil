@@ -161,24 +161,6 @@ public interface JSONConfigDefaultsMBean
     public void removeReflectClassByName( String className ) throws MBeanException;
 
     /**
-     * Get the the cacheReflectionData policy.
-     *
-     * @return the cacheReflectionData policy.
-     * @since 1.9
-     */
-    public boolean isCacheReflectionData();
-
-    /**
-     * If true, then when an object is reflected its reflection data
-     * will be cached to improve performance on subsequent reflections
-     * of objects of its class.
-     *
-     * @param dflt if true, then cache reflection data.
-     * @since 1.9
-     */
-    public void setCacheReflectionData( boolean dflt );
-
-    /**
      * Get a string with newline separated list of classes that get reflected.
      *
      * @return A string with newline separated list of classes that get reflected.
@@ -458,6 +440,52 @@ public interface JSONConfigDefaultsMBean
      * @since 1.9
      */
     public void setUsePrimitiveArrays( boolean dflt );
+
+
+    /**
+     * Get the the cacheReflectionData policy.
+     *
+     * @return the cacheReflectionData policy.
+     * @since 1.9
+     */
+    public boolean isCacheReflectionData();
+
+    /**
+     * If true, then when an object is reflected its reflection data
+     * will be cached to improve performance on subsequent reflections
+     * of objects of its class.
+     *
+     * @param dflt if true, then cache reflection data.
+     * @since 1.9
+     */
+    public void setCacheReflectionData( boolean dflt );
+
+    /**
+     * Return the manyEscapes policy.
+     *
+     * @return the manyEscapes policy.
+     */
+    public boolean isManyEscapes();
+
+    /**
+     * If true, then the string processing code will optimize for strings that
+     * contain many code points that need to be escaped. Otherwise, it will
+     * optimize for strings that have few code points that need to be escaped.
+     * In my tests, the average number of escapes per string that caused it to
+     * cross over was about 40. Your performance may vary based upon your data
+     * and architecture.
+     * <p>
+     * The code that optimizes for strings that have few code points that need
+     * to be escaped creates a list of the indexes of code points that need to be
+     * escaped in the string before it does any other processing. This list can
+     * become large if you have a lot of escapes which could cause memory issues
+     * if you process very large strings with very large numbers of code points
+     * that need to be escaped.
+     *
+     * @param dflt if true then optimize for strings that contain many code
+     *            points that need to be escaped.
+     */
+    public void setManyEscapes( boolean dflt );
 
     /**
      * Get the default quote identifier policy.
