@@ -17,11 +17,9 @@ package org.kopitubruk.util.json;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Queue;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -145,16 +143,6 @@ class CodePointData
     private static final EscapeChecker BASIC_EC = new BasicEscapeChecker();
 
     /*
-     * Maximum initial queue size.
-     */
-    private static final int MAX_INITIAL_QUEUE_SIZE = 64;
-
-    /*
-     * Initial queue size for keeping track of escapes.
-     */
-    private static volatile int initialQueueSize = 8;
-
-    /*
      * Arrays of escapes for control characters.
      */
     private static final int NUM_CONTROLS = 32;
@@ -232,7 +220,6 @@ class CodePointData
     private int isMalformed;
     private boolean supportEval;
     private boolean escapeNonAscii;
-    private boolean manyEscapes;
 
     /**
      * If this is not null after a run of {@link #nextReady()} then it means
@@ -320,7 +307,6 @@ class CodePointData
         supportEval = ! cfg.isFullJSONIdentifierCodePoints();
         escapeNonAscii = cfg.isEscapeNonAscii();
         escapeSurrogates = (escapeNonAscii || cfg.isEscapeSurrogates()) ? 1 : 0;
-        manyEscapes = cfg.isManyEscapes();
 
         controls = useECMA6 != 0 ? ECMA6_SINGLE_ESC : SINGLE_ESC;
 
@@ -429,36 +415,17 @@ class CodePointData
     }
 
     /**
-     * Write a string to the given writer.
+     * Write the current string to the given Writer using escaping as needed or
+     * requested by the configuration options. If there are no code points that
+     * need to be escaped then this method just writes the entire string. If
+     * there are code points that need to be escaped, then substrings which don't
+     * contain any characters to be escaped are written with a single write for
+     * better efficiency.
      *
      * @param json The writer.
      * @throws IOException if there's an I/O error.
      */
     void writeString( Writer json ) throws IOException
-    {
-        if ( manyEscapes ){
-            writeStringManyEscapes(json);
-        }else{
-            writeStringFewEscapes(json);
-        }
-    }
-
-    /**
-     * Write the current string to the given Writer using escaping as needed or
-     * requested by the configuration options. If there are no code points that
-     * need to be escaped then this method just writes the entire string. If
-     * there are ode points that need to be escaped, then substrings which don't
-     * contain any characters to be escaped are written with a single write for
-     * better efficiency.
-     * <p>
-     * This version performs better when there are lots of escapes than
-     * {@link #writeStringFewEscapes(Writer)} but worse when there are few or no
-     * escapes.
-     *
-     * @param json The writer.
-     * @throws IOException if there's an I/O error.
-     */
-    private void writeStringManyEscapes( Writer json ) throws IOException
     {
         lastEscIndex = findLastEscape();
 
@@ -553,88 +520,6 @@ class CodePointData
         if ( beginIndex >= 0 ){
             json.write(strValue, beginIndex, endIndex - beginIndex);
             beginIndex = -1;
-        }
-    }
-
-    /**
-     * Write the current string to the given Writer using escaping as needed or
-     * requested by the configuration options. If there are no code points that
-     * need to be escaped then this method just writes the entire string. If
-     * there are ode points that need to be escaped, then substrings which don't
-     * contain any characters to be escaped are written with a single write for
-     * better efficiency.
-     * <p>
-     * This version performs better when there are few or no escapes than
-     * {@link #writeStringManyEscapes(Writer)} but worse when there are many
-     * escapes.
-     *
-     * @param json The writer.
-     * @throws IOException if there's an I/O error.
-     */
-    private void writeStringFewEscapes( Writer json ) throws IOException
-    {
-        Queue<Integer> escapes = findEscapes();
-
-        if ( escapes == null ){
-            json.write(strValue);
-            return;
-        }
-
-        // get the index of the first escape.
-        int nextEscape = escapes.poll();
-        int escapesRemaining = escapes.size();
-
-        // escaping necessary.
-        while ( nextIndex < len ){
-            if ( nextIndex < nextEscape ){
-                // skip to the next escape
-                json.write(strValue, nextIndex, nextEscape - nextIndex);
-                nextIndex = nextEscape;
-            }else{
-                // escape this one.
-                nextCodePoint();
-
-                if ( isSurrogatePair != 0 || isMalformed != 0 ){
-                    json.write(getEscapeString());
-                }else{
-                    int doEscape = 1;
-                    if ( processInlineEscapes != 0 && chars[0] == BACKSLASH ){
-                        esc = null;
-                        int newChars = handler.doMatches();
-                        if ( esc != null ){
-                            json.write(esc);
-                            doEscape = 0;
-                        }else if ( newChars != 0 ){
-                            json.write(chars, 0, charCount);
-                            doEscape = 0;
-                        }
-                    }
-                    if ( doEscape != 0 ){
-                        if ( chars[0] < NUM_CONTROLS ){
-                            json.write(controls[(int)chars[0]]);
-                        }else{
-                            switch ( chars[0] ){
-                                case '"': json.write(DQ); break;
-                                case '/': json.write(SL); break;
-                                case BACKSLASH: json.write(BK); break;
-                                default: json.write(getEscapeString()); break;
-                            }
-                        }
-                    }
-                }
-
-                if ( escapesRemaining-- > 0 ){
-                    // get the index of the next escape
-                    nextEscape = escapes.poll();
-                }else{
-                    // no more escapes
-                    if ( nextIndex < len ){
-                        // write the rest of the string.
-                        json.write(strValue, nextIndex, len - nextIndex);
-                        nextIndex = len;
-                    }
-                }
-            }
         }
     }
 
@@ -907,92 +792,6 @@ class CodePointData
     }
 
     /**
-     * Find a collection of escapes for this string.
-     *
-     * @return a queue of escape indexes or null if there are none.
-     */
-    private Queue<Integer> findEscapes()
-    {
-        Queue<Integer> escapes = null;
-        escChecker = getEscapeChecker();
-        int i = 0;
-        int n = 0;
-        int iqs = 0;
-        // loop until the first escape is encountered.
-        while ( n < len ){
-            i = n;
-            char ch0 = strValue.charAt(i);
-            if ( Character.isSurrogate(ch0) ){
-                int malformed = 1;
-                if ( ++n < len ){
-                    char ch1 = strValue.charAt(n);
-                    if ( Character.isSurrogatePair(ch0, ch1) ){
-                        malformed = 0;
-                        if ( escChecker.needEscape(Character.toCodePoint(ch0, ch1)) != 0 ){
-                            escapes = newEscapes(i, iqs = getInitialQueueSize());
-                            ++n;
-                            break;
-                        }
-                    }
-                }
-                if ( malformed != 0 ){
-                    escapes = newEscapes(i, iqs = getInitialQueueSize());
-                    break;
-                }
-            }else if ( escChecker.needEscape(ch0) != 0 ){
-                escapes = newEscapes(i, iqs = getInitialQueueSize());
-                ++n;
-                break;
-            }
-            ++n;
-        }
-        if ( n < len ){
-            while ( n < len ){
-                i = n;
-                char ch0 = strValue.charAt(i);
-                if ( Character.isSurrogate(ch0) ){
-                    int malformed = 1;
-                    if ( ++n < len ){
-                        char ch1 = strValue.charAt(n);
-                        if ( Character.isSurrogatePair(ch0, ch1) ){
-                            malformed = 0;
-                            if ( escChecker.needEscape(Character.toCodePoint(ch0, ch1)) != 0 ){
-                                escapes.add(i);
-                            }
-                        }
-                    }
-                    if ( malformed != 0 ){
-                        --n;
-                        escapes.add(i);
-                    }
-                }else if ( escChecker.needEscape(ch0) != 0 ){
-                    escapes.add(i);
-                }
-                ++n;
-            }
-            int size = escapes.size();
-            if ( size > iqs && iqs < MAX_INITIAL_QUEUE_SIZE ){
-                setInitialQueueSize(Math.min(size, MAX_INITIAL_QUEUE_SIZE));
-            }
-        }
-        return escapes;
-    }
-
-    /**
-     * Make a new escapes queue and add the first element to it.
-     *
-     * @param i the first escape index.
-     * @param iqs the initial queue size.
-     * @return the escapes queue.
-     */
-    private Queue<Integer> newEscapes( int i, int iqs )
-    {
-        Queue<Integer> escapes = new ArrayDeque<>(iqs);
-        escapes.add(i);
-        return escapes;
-    }
-
-    /**
      * Get an escape checker appropriate for the current flags.
      *
      * @return An escape checker appropriate for the current flags.
@@ -1014,26 +813,6 @@ class CodePointData
         }else{
             return BASIC_EC;
         }
-    }
-
-    /**
-     * Get the initial queue size.
-     *
-     * @return the initial queue size.
-     */
-    private static synchronized int getInitialQueueSize()
-    {
-        return initialQueueSize;
-    }
-
-    /**
-     * Set the initial queue size.
-     *
-     * @param iqs the new initial queue size
-     */
-    private static synchronized void setInitialQueueSize( int iqs )
-    {
-        initialQueueSize = iqs;
     }
 
     /**
@@ -1299,13 +1078,13 @@ class CodePointData
             if ( gotMatch(passThroughMatcher, index, end(passThroughRegionLength)) ){
                 // pass it through unchanged.
                 esc = passThroughMatcher.group(1);
-                nextIndex += esc.length();
+                nextIndex += esc.length() - 1;
             }else if ( gotMatch(jsEscMatcher, index, end(MAX_JS_ESC_LENGTH)) ){
                 // Any Javascript escapes that didn't make it through the pass through are not allowed.
                 String jsEsc = jsEscMatcher.group(1);
                 codePoint = chars[0] = getEscapeChar(jsEsc);
                 newChars = 1;
-                nextIndex += jsEsc.length();
+                nextIndex += jsEsc.length() - 1;
             }else if ( useECMA5 != 0 && gotMatch(codePointMatcher, index, end(MAX_CODE_POINT_ESC_LENGTH)) ){
                 /*
                  * Only get here if it wasn't passed through => useECMA6 is
@@ -1322,7 +1101,7 @@ class CodePointData
                     chars[0] = Character.highSurrogate(codePoint);
                     chars[1] = Character.lowSurrogate(codePoint);
                 }
-                nextIndex += codePointMatcher.group(1).length();
+                nextIndex += codePointMatcher.group(1).length() - 1;
             }
 
             if ( newChars != 0 ){
