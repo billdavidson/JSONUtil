@@ -144,12 +144,12 @@ class CodePointData
     private static final EscapeChecker SURROGATE_EC = new SurrogateEscapeChecker();
     private static final EscapeChecker BASIC_EC = new BasicEscapeChecker();
 
-    /**
+    /*
      * Maximum initial queue size.
      */
     private static final int MAX_INITIAL_QUEUE_SIZE = 64;
 
-    /**
+    /*
      * Initial queue size for keeping track of escapes.
      */
     private static volatile int initialQueueSize = 8;
@@ -162,6 +162,12 @@ class CodePointData
     private static final String[] SINGLE_ESC = new String[NUM_CONTROLS];
     private static final String[] ECMA6_ESC = new String[NUM_CONTROLS];
     private static final String[] ECMA6_SINGLE_ESC = new String[NUM_CONTROLS];
+
+    /*
+     * Array of hex digits used to generate Unicode escapes.
+     */
+    private static final char[] DIGITS = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+
 
     /**
      * Initialize JSON_ESC_MAP, JAVASCRIPT_ESC_MAP and EVAL_ESC_SET.
@@ -209,6 +215,8 @@ class CodePointData
     private EscapeHandler handler;
     private EscapeChecker escChecker;
     private String[] controls = null;
+    private char[] oneBuf = null;
+    private char[] twoBuf = null;
     private int nextIndex;
     private int len;
     private int lastEscIndex;
@@ -483,6 +491,10 @@ class CodePointData
                     }else if ( newChars != 0 ){
                         flushCurrentSubstring(json);
                         json.write(chars, 0, charCount);
+                        if ( index == lastEscIndex ){
+                            beginIndex = nextIndex;
+                            endIndex = nextIndex = len;
+                        }
                         continue;
                     }
                 }
@@ -702,15 +714,14 @@ class CodePointData
         }
 
         if ( useSingleLetterEscapes != 0 && esc == null && chars[0] <= MAX_SINGLE_ESC_CHAR ){
-            switch ( chars[0] ){
-                case '\b': esc = BS; break;
-                case '\t': esc = TAB; break;
-                case '\n': esc = NL; break;
-                case '\f': esc = FF; break;
-                case '\r': esc = CR; break;
-                case '"': esc = DQ; break;
-                case '/': esc = SL; break;
-                case BACKSLASH: esc = BK; break;
+            if ( chars[0] < NUM_CONTROLS ){
+                esc = controls[(int)chars[0]];
+            }else{
+                switch ( chars[0] ){
+                    case '"': esc = DQ; break;
+                    case '/': esc = SL; break;
+                    case BACKSLASH: esc = BK; break;
+                }
             }
         }
 
@@ -740,15 +751,81 @@ class CodePointData
         }else if ( useECMA6 != 0 && codePoint >= Character.MIN_SUPPLEMENTARY_CODE_POINT ){
             // Use ECMAScript 6 code point escape.
             // only very low or very high code points see an advantage.
-            return String.format("\\u{%X}", codePoint);
+            return makeECMA6Escape(codePoint);
         }else{
             // Use normal escape.
             if ( isSurrogatePair != 0 ){
-                return String.format("\\u%04X\\u%04X", (int)chars[0], (int)chars[1]);
+                return makeEscape(chars, 2);
             }else{
-                return String.format("\\u%04X", (int)chars[0]);
+                return makeEscape(chars, 1);
             }
         }
+    }
+
+    /**
+     * Make a code unit escape.
+     *
+     * @param ch the char array.
+     * @param ct the count (1 or 2) of chars in the array to include.
+     * @return the escape.
+     */
+    private String makeEscape( char[] ch, int ci )
+    {
+        char[] escape = ci == 1 ? oneBuf : twoBuf;
+        if ( escape == null ){
+            switch ( ci ){
+                case 1: escape = oneBuf = new char[6]; break;
+                case 2: escape = twoBuf = new char[12]; break;
+            }
+        }
+        int i = escape.length - 1;
+        while ( ci-- > 0 ){
+            int cp = ch[ci];
+
+            do{
+                escape[i--] = DIGITS[cp & 0xF];
+            }while ( (cp >>= 4) > 0 );
+
+            int lim = (ci * 6) + 2;
+            while ( i >= lim ){
+                escape[i--] = '0';
+            }
+
+            escape[i--] = 'u';
+            escape[i--] = BACKSLASH;
+        }
+
+        return new String(escape);
+    }
+
+    /**
+     * Make an ECMAScript 6 code point escape.
+     *
+     * @param codePoint The code point.
+     * @return the escape
+     */
+    private static String makeECMA6Escape( int codePoint )
+    {
+        int size = 5;
+        int cp = codePoint;
+        while ( (cp >>= 4) > 0 ){
+            ++size;
+        }
+
+        char[] escape = new char[size];
+        int i = escape.length - 1;
+        cp = codePoint;
+        escape[i--] = '}';
+
+        do{
+            escape[i--] = DIGITS[cp & 0xF];
+        }while ( (cp >>= 4) > 0 );
+
+        escape[i--] = '{';
+        escape[i--] = 'u';
+        escape[i] = BACKSLASH;
+
+        return new String(escape);
     }
 
     /**
