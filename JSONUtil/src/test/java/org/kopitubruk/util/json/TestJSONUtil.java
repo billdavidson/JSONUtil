@@ -41,6 +41,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.TimeZone;
@@ -515,17 +516,20 @@ public class TestJSONUtil
     @Test
     public void testECMA6UnicodeEscapeInString() throws ScriptException
     {
-        Map<String,Object> jsonObj = new HashMap<>();
         JSONConfig cfg = new JSONConfig().setUseECMA6(true).setEscapeNonAscii(true);
         StringBuilder buf = new StringBuilder();
-        int codePoint = 0x1F4A9;
-        buf.append("x");
-        buf.appendCodePoint(codePoint);
-        jsonObj.put("x", buf);
-        String json = JSONUtil.toJSON(jsonObj, cfg);
-        // Nashorn doesn't understand ECMAScript 6 code point escapes.
-        //validateJSON(json);
-        assertThat(json, is("{\"x\":\"x\\u{1F4A9}\"}"));
+        Random rand = new Random();
+        for ( int i = 0; i < 4096; i++ ){
+            int cp;
+            do{
+                cp = rand.nextInt(Character.MAX_CODE_POINT+1);
+            }while ( cp < Character.MIN_SUPPLEMENTARY_CODE_POINT || ! Character.isDefined(cp) );
+            buf.setLength(0);
+            buf.appendCodePoint(cp);
+            String result = '"' + String.format("\\u{%X}", cp) + '"';
+            String json = JSONUtil.toJSON(buf, cfg);
+            assertThat(json, is(result));
+        }
     }
 
     /**
@@ -1549,7 +1553,9 @@ public class TestJSONUtil
         cfg.clearReflectClasses()
            .addReflectClass(BigObject.class)
            .setFastStrings(false)
-           .setManyEscapes(false);
+           .setManyEscapes(true)
+           .setEscapeNonAscii(true)
+           .setUseECMA6(false);
         BigObject bigObj = new BigObject();
 
         runReflectionTiming(iterations, bigObj, cfg, false);
