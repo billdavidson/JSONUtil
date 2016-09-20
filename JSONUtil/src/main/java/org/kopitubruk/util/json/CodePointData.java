@@ -713,9 +713,8 @@ class CodePointData
     /**
      * Make an ECMAScript 6 code point escape. Note that this only gets called
      * for supplementary code points requiring 5 or 6 hex digits and this code
-     * depends upon that fact.  If it gets called with smaller code points then
-     * it will have unnecessary zeros.  If it gets called with higher then it
-     * will give bad data but higher would be bad data in the first place.
+     * depends upon that fact as well as the fact that there are no valid 6
+     * digit code points that don't start with "10".
      *
      * @param codePoint The code point.
      * @return the escape
@@ -733,23 +732,30 @@ class CodePointData
             if ( escape == null ){
                 escape = ecma6_5 = newECMA6Buf(9);
             }
+            escape[7] = HEX_DIGITS[cp & 0xF];
+            cp >>= 4;
+            escape[6] = HEX_DIGITS[cp & 0xF];
+            cp >>= 4;
+            escape[5] = HEX_DIGITS[cp & 0xF];
+            cp >>= 4;
+            escape[4] = HEX_DIGITS[cp & 0xF];
+            cp >>= 4;
+            escape[3] = HEX_DIGITS[cp & 0xF];
         }else{
             escape = ecma6_6;
             if ( escape == null ){
                 escape = ecma6_6 = newECMA6Buf(10);
+                escape[3] = '1';
+                escape[4] = '0';
             }
             escape[8] = HEX_DIGITS[cp & 0xF];
             cp >>= 4;
+            escape[7] = HEX_DIGITS[cp & 0xF];
+            cp >>= 4;
+            escape[6] = HEX_DIGITS[cp & 0xF];
+            cp >>= 4;
+            escape[5] = HEX_DIGITS[cp & 0xF];
         }
-        escape[7] = HEX_DIGITS[cp & 0xF];
-        cp >>= 4;
-        escape[6] = HEX_DIGITS[cp & 0xF];
-        cp >>= 4;
-        escape[5] = HEX_DIGITS[cp & 0xF];
-        cp >>= 4;
-        escape[4] = HEX_DIGITS[cp & 0xF];
-        cp >>= 4;
-        escape[3] = HEX_DIGITS[cp & 0xF];
 
         return new String(escape);
     }
