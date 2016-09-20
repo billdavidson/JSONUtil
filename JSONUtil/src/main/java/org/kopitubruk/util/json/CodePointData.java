@@ -156,7 +156,6 @@ class CodePointData
      */
     private static final char[] HEX_DIGITS = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
 
-
     /*
      * Initialize static data
      */
@@ -190,7 +189,7 @@ class CodePointData
                 case '\r': single = CR; break;
             }
             String esc = String.format("\\u%04X", i);
-            String esc6 = i < 0x10 ? makeECMA6Escape(i) : esc;
+            String esc6 = i < 0x10 ? String.format("\\u{%X}", i) : esc;
             UNICODE_ESC[i] = esc;
             SINGLE_ESC[i] = single != null ? single : esc;
             ECMA6_ESC[i] = esc6;
@@ -205,6 +204,8 @@ class CodePointData
     private String[] controls = null;
     private char[] oneBuf = null;
     private char[] twoBuf = null;
+    private char[] ecma6_5 = null;
+    private char[] ecma6_6 = null;
     private int nextIndex;
     private int len;
     private int lastEscIndex;
@@ -395,9 +396,9 @@ class CodePointData
     }
 
     /**
-     * If 1, then there are no escapes in this string.
+     * If true, then there are no escapes in this string.
      *
-     * @return If 1, then there are no escapes in this string.
+     * @return If true, then there are no escapes in this string.
      */
     boolean isNoEscapes()
     {
@@ -633,7 +634,7 @@ class CodePointData
     {
         if ( chars[0] < NUM_CONTROLS ){
             return controls[(int)chars[0]];
-        }else if ( useECMA6 != 0 && codePoint >= Character.MIN_SUPPLEMENTARY_CODE_POINT ){
+        }else if ( useECMA6 != 0 && isSurrogatePair != 0 ){
             // Use ECMAScript 6 code point escape.
             // only very low or very high code points see an advantage.
             return makeECMA6Escape(codePoint);
@@ -650,28 +651,25 @@ class CodePointData
     /**
      * Make a code unit escape.
      *
-     * @param ch the char.
+     * @param cp the char.
      * @return the escape.
      */
-    private String makeEscape( char ch )
+    private String makeEscape( int cp )
     {
         char[] escape = oneBuf;
         if ( escape == null ){
             escape = oneBuf = new char[6];
-        }
-        int i = escape.length - 1;
-        int cp = ch;
-
-        do{
-            escape[i--] = HEX_DIGITS[cp & 0xF];
-        }while ( (cp >>= 4) > 0 );
-
-        while ( i > 1 ){
-            escape[i--] = '0';
+            escape[0] = BACKSLASH;
+            escape[1] = 'u';
         }
 
-        escape[1] = 'u';
-        escape[0] = BACKSLASH;
+        escape[5] = HEX_DIGITS[cp & 0xF];
+        cp >>= 4;
+        escape[4] = HEX_DIGITS[cp & 0xF];
+        cp >>= 4;
+        escape[3] = HEX_DIGITS[cp & 0xF];
+        cp >>= 4;
+        escape[2] = HEX_DIGITS[cp & 0xF];
 
         return new String(escape);
     }
@@ -687,60 +685,91 @@ class CodePointData
         char[] escape = twoBuf;
         if ( escape == null ){
             escape = twoBuf = new char[12];
+            escape[0] = escape[6] = BACKSLASH;
+            escape[1] = escape[7] = 'u';
         }
-        int i = escape.length - 1;
 
         int cp = ch[1];
-        do{
-            escape[i--] = HEX_DIGITS[cp & 0xF];
-        }while ( (cp >>= 4) > 0 );
-        while ( i > 7 ){
-            escape[i--] = '0';
-        }
-        escape[i--] = 'u';
-        escape[i--] = BACKSLASH;
+        escape[11] = HEX_DIGITS[cp & 0xF];
+        cp >>= 4;
+        escape[10] = HEX_DIGITS[cp & 0xF];
+        cp >>= 4;
+        escape[9] = HEX_DIGITS[cp & 0xF];
+        cp >>= 4;
+        escape[8] = HEX_DIGITS[cp & 0xF];
 
         cp = ch[0];
-        do{
-            escape[i--] = HEX_DIGITS[cp & 0xF];
-        }while ( (cp >>= 4) > 0 );
-        while ( i > 1 ){
-            escape[i--] = '0';
-        }
-        escape[1] = 'u';
-        escape[0] = BACKSLASH;
+        escape[5] = HEX_DIGITS[cp & 0xF];
+        cp >>= 4;
+        escape[4] = HEX_DIGITS[cp & 0xF];
+        cp >>= 4;
+        escape[3] = HEX_DIGITS[cp & 0xF];
+        cp >>= 4;
+        escape[2] = HEX_DIGITS[cp & 0xF];
 
         return new String(escape);
     }
 
     /**
-     * Make an ECMAScript 6 code point escape.
+     * Make an ECMAScript 6 code point escape. Note that this only gets called
+     * for supplementary code points requiring 5 or 6 hex digits and this code
+     * depends upon that fact.  If it gets called with smaller code points then
+     * it will have unnecessary zeros.  If it gets called with higher then it
+     * will give bad data but higher would be bad data in the first place.
      *
      * @param codePoint The code point.
      * @return the escape
      */
-    private static String makeECMA6Escape( int codePoint )
+    private String makeECMA6Escape( int codePoint )
     {
+        char[] escape;
         int size = 5;
         int cp = codePoint;
-        while ( (cp >>= 4) > 0 ){
+        if ( (cp >> 20) > 0 ){
             ++size;
         }
-
-        char[] escape = new char[size];
-        int i = escape.length - 1;
-        escape[i--] = '}';
-        cp = codePoint;
-
-        do{
-            escape[i--] = HEX_DIGITS[cp & 0xF];
-        }while ( (cp >>= 4) > 0 );
-
-        escape[2] = '{';
-        escape[1] = 'u';
-        escape[0] = BACKSLASH;
+        if ( size == 5 ){
+            escape = ecma6_5;
+            if ( escape == null ){
+                escape = ecma6_5 = newECMA6Buf(9);
+            }
+        }else{
+            escape = ecma6_6;
+            if ( escape == null ){
+                escape = ecma6_6 = newECMA6Buf(10);
+            }
+            escape[8] = HEX_DIGITS[cp & 0xF];
+            cp >>= 4;
+        }
+        escape[7] = HEX_DIGITS[cp & 0xF];
+        cp >>= 4;
+        escape[6] = HEX_DIGITS[cp & 0xF];
+        cp >>= 4;
+        escape[5] = HEX_DIGITS[cp & 0xF];
+        cp >>= 4;
+        escape[4] = HEX_DIGITS[cp & 0xF];
+        cp >>= 4;
+        escape[3] = HEX_DIGITS[cp & 0xF];
 
         return new String(escape);
+    }
+
+    /**
+     * Make a new buffer for an ECMA6 code point escape.
+     *
+     * @param s the size
+     * @return the buffer with the basics initialized.
+     */
+    private char[] newECMA6Buf( int s )
+    {
+        char[] result = new char[s];
+
+        result[0] = BACKSLASH;
+        result[1] = 'u';
+        result[2] = '{';
+        result[s-1] = '}';
+
+        return result;
     }
 
     /**
@@ -1088,8 +1117,7 @@ class CodePointData
             }else if ( useECMA5 != 0 && gotMatch(codePointMatcher, index, end(MAX_CODE_POINT_ESC_LENGTH)) ){
                 /*
                  * Only get here if it wasn't passed through => useECMA6 is
-                 * 0.  Convert it to an inline codepoint.  Maybe something
-                 * later will escape it legally.
+                 * 0.  Convert it to an inline codepoint.
                  */
                 codePoint = Integer.parseInt(codePointMatcher.group(2),16);
                 newChars = 1;
