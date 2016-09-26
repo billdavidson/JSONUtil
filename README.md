@@ -4,6 +4,7 @@ towards being used in web servers and includes several options for validation
 and controlling the way that the JSON is generated.
 
 #### Features
+* Very fast encoding
 * Recursive traversal of Maps, Iterables (Collection, List, Set etc.), Enumerations, arrays and ResourceBundles
 * Data structure loop detection
 * [Reflection of objects is supported allowing lazy encoding of objects](https://github.com/billdavidson/JSONUtil/wiki/Using-Reflection-to-Encode-Objects-as-JSON)
@@ -34,7 +35,8 @@ and controlling the way that the JSON is generated.
 [Report Issues](https://github.com/billdavidson/JSONUtil/issues)
 
 ### What's New
-* Sep 14 - [JSONUtil 1.10.0](https://github.com/billdavidson/JSONUtil/releases/tag/JSONUtil-1.10.0) released with major speed enhancements for encoding strings and numbers.
+* Sep 19 - [JSONUtil 1.10.1](https://github.com/billdavidson/JSONUtil/releases/tag/JSONUtil-1.10.1) released with major speed enhancement for encoding strings that require escaping.
+* Sep 14 - JSONUtil 1.10.0 released with major speed enhancements for encoding strings and numbers.
 * Sep 08 - JSONUtil 1.9.3 released.
 * Aug 24 - JSONUtil 1.9.2 released.
 * Aug 17 - JSONUtil 1.9.1 released to fix bugs.

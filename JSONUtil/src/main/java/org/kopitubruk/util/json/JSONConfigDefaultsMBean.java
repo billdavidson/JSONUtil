@@ -169,6 +169,52 @@ public interface JSONConfigDefaultsMBean
     public String listReflectedClasses();
 
     /**
+     * Get the default policy for unmatched surrogates.
+     *
+     * @return the default policy for unmatched surrogates.
+     */
+    public int getUnmatchedSurrogatePolicy();
+
+    /**
+     * Tell JSONUtil what to do by default when it encounters unmatched surrogates in strings
+     * and identifiers.  The permitted values are:
+     * <ul>
+     *   <li>{@link JSONConfig#REPLACE} - Replace with Unicode replacement character U+FFFD (default)</li>
+     *   <li>{@link JSONConfig#DISCARD} - Discard them.</li>
+     *   <li>{@link JSONConfig#EXCEPTION} - Throw a {@link UndefinedCodePointException}</li>
+     *   <li>{@link JSONConfig#ESCAPE} - Include them but escape them</li>
+     *   <li>{@link JSONConfig#PASS} - Pass them through unmodified.</li>
+     * </ul>
+     * Any other value will be ignored.
+     *
+     * @param dflt the default unmatchedSurrogatePolicy to set
+     */
+    public void setUnmatchedSurrogatePolicy( int dflt );
+
+    /**
+     * Get the default policy for undefined code points.
+     *
+     * @return the policy for undefined code points.
+     */
+    public int getUndefinedCodePointPolicy();
+
+    /**
+     * Tell JSONUtil what to do by default when it encounters undefined code points in strings
+     * and identifiers.  The permitted values are:
+     * <ul>
+     *   <li>{@link JSONConfig#REPLACE} - Replace with Unicode replacement character U+FFFD (default)</li>
+     *   <li>{@link JSONConfig#DISCARD} - Discard them.</li>
+     *   <li>{@link JSONConfig#EXCEPTION} - Throw a {@link UndefinedCodePointException}</li>
+     *   <li>{@link JSONConfig#ESCAPE} - Include them but escape them</li>
+     *   <li>{@link JSONConfig#PASS} - Pass them through unmodified.</li>
+     * </ul>
+     * Any other value will be ignored.
+     *
+     * @param dflt the default undefinedCodePointPolicy to set
+     */
+    public void setUndefinedCodePointPolicy( int dflt );
+
+    /**
      * Set the default flag for validation of property names.
      * This will affect all new {@link JSONConfig} objects created after this call
      * within the same class loader.

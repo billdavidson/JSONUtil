@@ -108,6 +108,66 @@ public class JSONConfig implements Serializable, Cloneable
     private static TimeZone UTC_TIME_ZONE = TimeZone.getTimeZone("UTC");
 
     /**
+     * Replace bad data with the Unicode replacement character U+FFFD. Value 0.
+     *
+     * @see #setUnmatchedSurrogatePolicy(int)
+     * @see #setUndefinedCodePointPolicy(int)
+     * @see #setBadCharacterPolicy(int)
+     * @see JSONConfigDefaults#setUnmatchedSurrogatePolicy(int)
+     * @see JSONConfigDefaults#setUndefinedCodePointPolicy(int)
+     * @see JSONConfigDefaults#setBadCharacterPolicy(int)
+     */
+    public static final int REPLACE = 0;
+
+    /**
+     * Discard bad data.  Value 1.
+     *
+     * @see #setUnmatchedSurrogatePolicy(int)
+     * @see #setUndefinedCodePointPolicy(int)
+     * @see #setBadCharacterPolicy(int)
+     * @see JSONConfigDefaults#setUnmatchedSurrogatePolicy(int)
+     * @see JSONConfigDefaults#setUndefinedCodePointPolicy(int)
+     * @see JSONConfigDefaults#setBadCharacterPolicy(int)
+     */
+    public static final int DISCARD = 1;
+
+    /**
+     * Throw an exception on bad data.  Value 2.
+     *
+     * @see #setUnmatchedSurrogatePolicy(int)
+     * @see #setUndefinedCodePointPolicy(int)
+     * @see #setBadCharacterPolicy(int)
+     * @see JSONConfigDefaults#setUnmatchedSurrogatePolicy(int)
+     * @see JSONConfigDefaults#setUndefinedCodePointPolicy(int)
+     * @see JSONConfigDefaults#setBadCharacterPolicy(int)
+     */
+    public static final int EXCEPTION = 2;
+
+    /**
+     * Escape bad data.  Value 3.
+     *
+     * @see #setUnmatchedSurrogatePolicy(int)
+     * @see #setUndefinedCodePointPolicy(int)
+     * @see #setBadCharacterPolicy(int)
+     * @see JSONConfigDefaults#setUnmatchedSurrogatePolicy(int)
+     * @see JSONConfigDefaults#setUndefinedCodePointPolicy(int)
+     * @see JSONConfigDefaults#setBadCharacterPolicy(int)
+     */
+    public static final int ESCAPE = 3;
+
+    /**
+     * Pass bad data through.  Value 4.
+     *
+     * @see #setUnmatchedSurrogatePolicy(int)
+     * @see #setUndefinedCodePointPolicy(int)
+     * @see #setBadCharacterPolicy(int)
+     * @see JSONConfigDefaults#setUnmatchedSurrogatePolicy(int)
+     * @see JSONConfigDefaults#setUndefinedCodePointPolicy(int)
+     * @see JSONConfigDefaults#setBadCharacterPolicy(int)
+     */
+    public static final int PASS = 4;
+
+    /**
      * A locale used for error messages and localization by {@link JSONAble}s if
      * applicable.
      */
@@ -157,6 +217,16 @@ public class JSONConfig implements Serializable, Cloneable
      * The privacy level for reflection.
      */
     private int reflectionPrivacy = ReflectUtil.PUBLIC;
+
+    /**
+     * The bad surrogate policy.
+     */
+    private int unmatchedSurrogatePolicy;
+
+    /**
+     * The undefined code point policy.
+     */
+    private int undefinedCodePointPolicy;
 
     // various flags.  see their setters.
     private boolean validatePropertyNames;
@@ -266,6 +336,8 @@ public class JSONConfig implements Serializable, Cloneable
         result.dateParseFormats = null;
 
         result.reflectionPrivacy = reflectionPrivacy;
+        result.unmatchedSurrogatePolicy = unmatchedSurrogatePolicy;
+        result.undefinedCodePointPolicy = undefinedCodePointPolicy;
 
         // validation options.
         result.validatePropertyNames = validatePropertyNames;
@@ -334,6 +406,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Get the locale for this instance.
      *
      * @return the locale
+     * @see JSONConfigDefaults#getLocale()
      */
     public Locale getLocale()
     {
@@ -346,6 +419,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param locale the locale to set
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setLocale(Locale)
      */
     public JSONConfig setLocale( Locale locale )
     {
@@ -368,6 +442,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param numericClass A class.
      * @return A number format or null if one has not been set.
+     * @see JSONConfigDefaults#getNumberFormat(Class)
      */
     public NumberFormat getNumberFormat( Class<? extends Number> numericClass )
     {
@@ -379,6 +454,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param num An object that implements {@link Number}.
      * @return A number format or null if one has not been set.
+     * @see JSONConfigDefaults#getNumberFormat(Number)
      */
     public NumberFormat getNumberFormat( Number num )
     {
@@ -398,6 +474,7 @@ public class JSONConfig implements Serializable, Cloneable
      * @param numericClass The class.
      * @param fmt The number format.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#addNumberFormat(Class, NumberFormat)
      */
     public JSONConfig addNumberFormat( Class<? extends Number> numericClass, NumberFormat fmt )
     {
@@ -427,6 +504,7 @@ public class JSONConfig implements Serializable, Cloneable
      * @param numericType The object.
      * @param fmt The number format.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#addNumberFormat(Number, NumberFormat)
      */
     public JSONConfig addNumberFormat( Number numericType, NumberFormat fmt )
     {
@@ -442,6 +520,7 @@ public class JSONConfig implements Serializable, Cloneable
      * @param numFmtMap The input map.
      * @return this JSONConfig object.
      * @since 1.4
+     * @see JSONConfigDefaults#addNumberFormats(Map)
      */
     public JSONConfig addNumberFormats( Map<Class<? extends Number>,NumberFormat> numFmtMap )
     {
@@ -455,6 +534,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param numericClass The class.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#removeNumberFormat(Class)
      */
     public JSONConfig removeNumberFormat( Class<? extends Number> numericClass )
     {
@@ -477,6 +557,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param num An object that implements {@link Number}.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#removeNumberFormat(Number)
      */
     public JSONConfig removeNumberFormat( Number num )
     {
@@ -490,6 +571,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Clear all number formats.
      *
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#clearNumberFormats()
      */
     public JSONConfig clearNumberFormats()
     {
@@ -525,6 +607,7 @@ public class JSONConfig implements Serializable, Cloneable
      * @param fmt the dateFormat to set
      * @return this JSONConfig object.
      * @since 1.4
+     * @see JSONConfigDefaults#setDateGenFormat(DateFormat)
      */
     public JSONConfig setDateGenFormat( DateFormat fmt )
     {
@@ -540,6 +623,7 @@ public class JSONConfig implements Serializable, Cloneable
      * using the locale from this config object.
      * @return The format that was created.
      * @since 1.4
+     * @see JSONConfigDefaults#setDateGenFormat(String)
      */
     public DateFormat setDateGenFormat( String fmtStr )
     {
@@ -558,6 +642,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @return this JSONConfig object.
      * @since 1.4
+     * @see JSONConfigDefaults#clearDateGenFormat()
      */
     public JSONConfig clearDateGenFormat()
     {
@@ -613,6 +698,7 @@ public class JSONConfig implements Serializable, Cloneable
      * @param fmt A date parsing format.
      * @return this JSONConfig object.
      * @since 1.4
+     * @see JSONConfigDefaults#addDateParseFormat(DateFormat)
      */
     public JSONConfig addDateParseFormat( DateFormat fmt )
     {
@@ -631,6 +717,7 @@ public class JSONConfig implements Serializable, Cloneable
      * using the locale from this config object to create a DateFormat.
      * @return The format that gets created.
      * @since 1.4
+     * @see JSONConfigDefaults#addDateParseFormat(String)
      */
     public DateFormat addDateParseFormat( String fmtStr )
     {
@@ -646,6 +733,7 @@ public class JSONConfig implements Serializable, Cloneable
      * @param fmts A collection of date parsing formats.
      * @return this JSONConfig object.
      * @since 1.4
+     * @see JSONConfigDefaults#addDateParseFormats(Collection)
      */
     public JSONConfig addDateParseFormats( Collection<? extends DateFormat> fmts )
     {
@@ -661,6 +749,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @return this JSONConfig object.
      * @since 1.4
+     * @see JSONConfigDefaults#clearDateParseFormats()
      */
     public JSONConfig clearDateParseFormats()
     {
@@ -674,6 +763,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @return the padding object.
      * @since 1.7
+     * @see JSONConfigDefaults#getIndentPadding()
      */
     public IndentPadding getIndentPadding()
     {
@@ -686,6 +776,7 @@ public class JSONConfig implements Serializable, Cloneable
      * @param indentPadding the padding object.
      * @return this JSONConfig object.
      * @since 1.7
+     * @see JSONConfigDefaults#setIndentPadding(IndentPadding)
      */
     public JSONConfig setIndentPadding( IndentPadding indentPadding )
     {
@@ -698,6 +789,11 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @return the reflection privacy level.
      * @since 1.9
+     * @see ReflectUtil#PRIVATE
+     * @see ReflectUtil#PACKAGE
+     * @see ReflectUtil#PROTECTED
+     * @see ReflectUtil#PUBLIC
+     * @see JSONConfigDefaults#getReflectionPrivacy()
      */
     public int getReflectionPrivacy()
     {
@@ -714,6 +810,7 @@ public class JSONConfig implements Serializable, Cloneable
      * @see ReflectUtil#PACKAGE
      * @see ReflectUtil#PROTECTED
      * @see ReflectUtil#PUBLIC
+     * @see JSONConfigDefaults#setReflectionPrivacy(int)
      * @since 1.9
      */
     public JSONConfig setReflectionPrivacy( int reflectionPrivacy )
@@ -723,12 +820,13 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * Return true if objects with the same class given object are in the set of
-     * classes being automatically reflected.
+     * Return true if the given class is in the set of classes being
+     * automatically reflected.
      *
      * @param obj An object to check
-     * @return true if objects of the type are reflected.
+     * @return true if objects of the given type are reflected.
      * @since 1.9
+     * @see JSONConfigDefaults#isReflectClass(Object)
      */
     public boolean isReflectClass( Object obj )
     {
@@ -760,10 +858,11 @@ public class JSONConfig implements Serializable, Cloneable
     /**
      * Get the {@link JSONReflectedClass} for the given object if it is stored.
      * The main reason that you might want to use this is to modify the fields
-     * that are reflected in the class.
+     * or aliases that are reflected in the class.
      *
      * @param obj the class being reflected.
      * @return The JSONReflectedClass object or null if one is not stored.
+     * @see JSONConfigDefaults#getReflectedClass(Object)
      */
     public JSONReflectedClass getReflectedClass( Object obj )
     {
@@ -778,6 +877,10 @@ public class JSONConfig implements Serializable, Cloneable
      * @param obj The object whose class to add to the reflect list.
      * @return this JSONConfig object.
      * @see JSONReflectedClass
+     * @see #addReflectClasses(Collection)
+     * @see #addReflectClassByName(String)
+     * @see #setReflectUnknownObjects(boolean)
+     * @see JSONConfigDefaults#addReflectClass(Object)
      * @since 1.9
      */
     public JSONConfig addReflectClass( Object obj )
@@ -808,6 +911,10 @@ public class JSONConfig implements Serializable, Cloneable
      *            comma separated list of field names and/or field aliases.
      * @return this JSONConfig object.
      * @throws ClassNotFoundException If the class cannot be loaded.
+     * @see #addReflectClass(Object)
+     * @see #addReflectClasses(Collection)
+     * @see #setReflectUnknownObjects(boolean)
+     * @see JSONConfigDefaults#addReflectClassByName(String)
      * @since 1.9.2
      */
     public JSONConfig addReflectClassByName( String className ) throws ClassNotFoundException
@@ -823,6 +930,10 @@ public class JSONConfig implements Serializable, Cloneable
      * @param classes The objects to reflect.
      * @return this JSONConfig object.
      * @see JSONReflectedClass
+     * @see #addReflectClass(Object)
+     * @see #addReflectClassByName(String)
+     * @see #setReflectUnknownObjects(boolean)
+     * @see JSONConfigDefaults#addReflectClasses(Collection)
      * @since 1.9
      */
     public JSONConfig addReflectClasses( Collection<?> classes )
@@ -838,6 +949,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param obj An object of the type to be removed from the reflect list.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#removeReflectClass(Object)
      * @since 1.9
      */
     public JSONConfig removeReflectClass( Object obj )
@@ -853,6 +965,7 @@ public class JSONConfig implements Serializable, Cloneable
      * @param classes A collection objects of the types to be removed from
      * the reflect list.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#removeReflectClasses(Collection)
      * @since 1.9
      */
     public JSONConfig removeReflectClasses( Collection<?> classes )
@@ -865,6 +978,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Clear all reflection classes, disabling all automatic reflection.
      *
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#clearReflectClasses()
      * @since 1.9
      */
     public JSONConfig clearReflectClasses()
@@ -884,9 +998,130 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
+     * Get the policy for unmatched surrogates.
+     *
+     * @return the policy for unmatched surrogates.
+     * @see #REPLACE
+     * @see #DISCARD
+     * @see #EXCEPTION
+     * @see #ESCAPE
+     * @see #PASS
+     * @see JSONConfigDefaults#getUnmatchedSurrogatePolicy()
+     */
+    public int getUnmatchedSurrogatePolicy()
+    {
+        return unmatchedSurrogatePolicy;
+    }
+
+    /**
+     * Tell JSONUtil what to do when it encounters unmatched surrogates in strings
+     * and identifiers.  The permitted values are:
+     * <ul>
+     *   <li>{@link #REPLACE} - Replace with the Unicode replacement character U+FFFD (default)</li>
+     *   <li>{@link #DISCARD} - Discard them.</li>
+     *   <li>{@link #EXCEPTION} - Throw an {@link UnmatchedSurrogateException}</li>
+     *   <li>{@link #ESCAPE} - Include them but escape them</li>
+     *   <li>{@link #PASS} - Pass them through unmodified.</li>
+     * </ul>
+     * Any other value will be ignored.
+     *
+     * @param unmatchedSurrogatePolicy the unmatchedSurrogatePolicy to set
+     * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setUnmatchedSurrogatePolicy(int)
+     */
+    public JSONConfig setUnmatchedSurrogatePolicy( int unmatchedSurrogatePolicy )
+    {
+        switch ( unmatchedSurrogatePolicy )
+        {
+            case REPLACE:
+            case DISCARD:
+            case EXCEPTION:
+            case ESCAPE:
+            case PASS:
+                this.unmatchedSurrogatePolicy = unmatchedSurrogatePolicy;
+                break;
+        }
+        return this;
+    }
+
+    /**
+     * Get the policy for undefined code points.
+     *
+     * @return the policy for undefined code points.
+     * @see #REPLACE
+     * @see #DISCARD
+     * @see #EXCEPTION
+     * @see #ESCAPE
+     * @see #PASS
+     * @see JSONConfigDefaults#getUndefinedCodePointPolicy()
+     */
+    public int getUndefinedCodePointPolicy()
+    {
+        return undefinedCodePointPolicy;
+    }
+
+    /**
+     * Tell JSONUtil what to do when it encounters undefined code points in strings
+     * and identifiers.  The permitted values are:
+     * <ul>
+     *   <li>{@link #REPLACE} - Replace with the Unicode replacement character U+FFFD (default)</li>
+     *   <li>{@link #DISCARD} - Discard them.</li>
+     *   <li>{@link #EXCEPTION} - Throw an {@link UndefinedCodePointException}</li>
+     *   <li>{@link #ESCAPE} - Include them but escape them</li>
+     *   <li>{@link #PASS} - Pass them through unmodified.</li>
+     * </ul>
+     * Any other value will be ignored.
+     * <p>
+     * In code that interprets inline escapes, when an undefined code point is
+     * specified by an ECMAScript 6 code point escape and that value is greater
+     * than the maximum permissible code point (U+10FFFF), then for {@link JSONConfig#ESCAPE}
+     * or {@link JSONConfig#PASS} the code point will be set to the Unicode replacement
+     * character U+FFFD to indicate that the character has been replaced.
+     *
+     * @param undefinedCodePointPolicy the undefinedCodePointPolicy to set
+     * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setUndefinedCodePointPolicy(int)
+     */
+    public JSONConfig setUndefinedCodePointPolicy( int undefinedCodePointPolicy )
+    {
+        switch ( undefinedCodePointPolicy )
+        {
+            case REPLACE:
+            case DISCARD:
+            case EXCEPTION:
+            case ESCAPE:
+            case PASS:
+                this.undefinedCodePointPolicy = undefinedCodePointPolicy;
+                break;
+        }
+        return this;
+    }
+
+    /**
+     * Convenience method to call both {@link #setUnmatchedSurrogatePolicy(int)}
+     * and {@link #setUndefinedCodePointPolicy(int)} using the same value.
+     *
+     * @param badCharacterPolicy the badCharacterPolicy to set
+     * @return this JSONConfig object.
+     * @see #REPLACE
+     * @see #DISCARD
+     * @see #EXCEPTION
+     * @see #ESCAPE
+     * @see #PASS
+     * @see JSONConfigDefaults#setBadCharacterPolicy(int)
+     */
+    public JSONConfig setBadCharacterPolicy( int badCharacterPolicy )
+    {
+        setUnmatchedSurrogatePolicy(badCharacterPolicy);
+        setUndefinedCodePointPolicy(badCharacterPolicy);
+        return this;
+    }
+
+    /**
      * Check if property names will be validated.
      *
      * @return true if property names are set to be validated.
+     * @see JSONConfigDefaults#isValidatePropertyNames()
      */
     public boolean isValidatePropertyNames()
     {
@@ -915,6 +1150,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param validatePropertyNames Set to false to disable property name validation.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setValidatePropertyNames(boolean)
      */
     public JSONConfig setValidatePropertyNames( boolean validatePropertyNames )
     {
@@ -926,6 +1162,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Return true if data structure loops will be detected.
      *
      * @return true if data structure loops will be detected.
+     * @see JSONConfigDefaults#isDetectDataStructureLoops()
      */
     public boolean isDetectDataStructureLoops()
     {
@@ -941,6 +1178,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param detectDataStructureLoops If true then JSONUtil will attempt to detect loops in data structures.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setDetectDataStructureLoops(boolean)
      */
     public JSONConfig setDetectDataStructureLoops( boolean detectDataStructureLoops )
     {
@@ -952,6 +1190,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Find out if bad identifier code points will be escaped.
      *
      * @return the the identifier escape policy.
+     * @see JSONConfigDefaults#isEscapeBadIdentifierCodePoints()
      */
     public boolean isEscapeBadIdentifierCodePoints()
     {
@@ -964,6 +1203,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param escapeBadIdentifierCodePoints the escapeBadIdentifierCodePoints to set
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setEscapeBadIdentifierCodePoints(boolean)
      */
     public JSONConfig setEscapeBadIdentifierCodePoints( boolean escapeBadIdentifierCodePoints )
     {
@@ -975,6 +1215,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Get the full JSON identifier code points policy.
      *
      * @return the fullJSONIdentifierCodePoints
+     * @see JSONConfigDefaults#isFullJSONIdentifierCodePoints()
      */
     public boolean isFullJSONIdentifierCodePoints()
     {
@@ -990,6 +1231,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param fullJSONIdentifierCodePoints If true, then allow all code points permitted by the JSON standard in identifiers.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setFullJSONIdentifierCodePoints(boolean)
      */
     public JSONConfig setFullJSONIdentifierCodePoints( boolean fullJSONIdentifierCodePoints )
     {
@@ -1005,6 +1247,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Get the fastStrings policy.
      *
      * @return the fastStrings policy
+     * @see JSONConfigDefaults#isFastStrings()
      */
     public boolean isFastStrings()
     {
@@ -1015,19 +1258,20 @@ public class JSONConfig implements Serializable, Cloneable
      * If true, then string values will be copied to the output with no escaping
      * or validation.
      * <p>
-     * Only use this if you know that you have no characters in the range
-     * U+0000-U+001F or backslash or forward slash or double quote in your
-     * strings. If you want your JSON to be parsable by Javascript eval() then
-     * you also need to make sure that you don't have U+2028 (line separator) or
-     * U+2029 (paragraph separator).
+     * Only use this if you know that you have no unescaped characters in the
+     * range U+0000-U+001F or unescaped backslash or forward slash or double
+     * quote in your strings. If you want your JSON to be parsable by Javascript
+     * eval() then you also need to make sure that you don't have U+2028 (line
+     * separator) or U+2029 (paragraph separator).
      * <p>
-     * That said, if you are encoding a lot of large strings, this can
-     * improve performance by eliminating the check for characters that need
-     * to be escaped.
+     * That said, if you are encoding a lot of large strings, this can improve
+     * performance by eliminating the check for characters that need to be
+     * escaped.
      *
-     * @param fastStrings If true, then strings will be copied as is with no
-     *            escaping or validation.
+     * @param fastStrings If true, then string values will be copied as is with
+     *            no escaping or validation.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setFastStrings(boolean)
      */
     public JSONConfig setFastStrings( boolean fastStrings )
     {
@@ -1035,12 +1279,12 @@ public class JSONConfig implements Serializable, Cloneable
         return this;
     }
 
-
     /**
      * If true, then strings will be checked for number patterns and if they
      * look like numbers, then they won't be quoted.
      *
      * @return the isEncodeNumericStringsAsNumbers
+     * @see JSONConfigDefaults#isEncodeNumericStringsAsNumbers()
      */
     public boolean isEncodeNumericStringsAsNumbers()
     {
@@ -1055,6 +1299,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param encodeNumericStringsAsNumbers the encodeNumericStringsAsNumbers to set
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setEncodeNumericStringsAsNumbers(boolean)
      */
     public JSONConfig setEncodeNumericStringsAsNumbers( boolean encodeNumericStringsAsNumbers )
     {
@@ -1067,6 +1312,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Check if non-ascii characters are to be encoded as Unicode escapes.
      *
      * @return true if non-ascii characters should be encoded with Unicode escapes.
+     * @see JSONConfigDefaults#isEscapeNonAscii()
      */
     public boolean isEscapeNonAscii()
     {
@@ -1083,6 +1329,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param escapeNonAscii set to true if you want non-ascii to be Unicode escaped.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setEscapeNonAscii(boolean)
      */
     public JSONConfig setEscapeNonAscii( boolean escapeNonAscii )
     {
@@ -1094,70 +1341,14 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * The unEscape policy.
-     *
-     * @return the unEscape policy.
-     */
-    public boolean isUnEscapeWherePossible()
-    {
-        return unEscapeWherePossible;
-    }
-
-    /**
-     * If true then where possible, undo inline escapes in strings.
-     * Default is false. When false, escapes in strings are passed through
-     * unmodified, including hex escapes, octal escapes and ECMAScript 6 code point
-     * escapes, all of which are not allowed by the JSON standard. When true,
-     * then escapes are converted to UTF-16 before being put through the normal
-     * escape process so that unnecessary escapes are removed and escapes that
-     * are needed but aren't allowed in the JSON standard are converted to
-     * Unicode code unit escapes. This might be useful if you're reading your
-     * strings from a file or database that has old style escapes in it.
-     * <p>
-     * Note that this does not apply to property names.  It is only applied
-     * to string values.
-     *
-     * @param unEscapeWherePossible If true then where possible, undo inline
-     *        escapes in strings.
-     * @return this JSONConfig object.
-     */
-    public JSONConfig setUnEscapeWherePossible( boolean unEscapeWherePossible )
-    {
-        this.unEscapeWherePossible = unEscapeWherePossible;
-        return this;
-    }
-
-    /**
      * Return the escape surrogates policy.
      *
      * @return the escape surrogates policy.
+     * @see JSONConfigDefaults#isEscapeSurrogates()
      */
     public boolean isEscapeSurrogates()
     {
         return escapeSurrogates;
-    }
-
-    /**
-     * Get the pass through escapes policy.
-     *
-     * @return The pass through escapes policy.
-     */
-    public boolean isPassThroughEscapes()
-    {
-        return passThroughEscapes;
-    }
-
-    /**
-     * If true, then escapes in strings will be passed through unchanged.
-     * If false, then the backslash that starts the escape will be escaped.
-     *
-     * @param passThroughEscapes If true, then pass escapes through.
-     * @return this JSONConfig object.
-     */
-    public JSONConfig setPassThroughEscapes( boolean passThroughEscapes )
-    {
-        this.passThroughEscapes = passThroughEscapes;
-        return this;
     }
 
     /**
@@ -1166,6 +1357,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param escapeSurrogates the escapeSurrogates to set
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setEscapeSurrogates(boolean)
      */
     public JSONConfig setEscapeSurrogates( boolean escapeSurrogates )
     {
@@ -1177,9 +1369,71 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
+     * The unEscape policy.
+     *
+     * @return the unEscape policy.
+     * @see JSONConfigDefaults#isUnEscapeWherePossible()
+     */
+    public boolean isUnEscapeWherePossible()
+    {
+        return unEscapeWherePossible;
+    }
+
+    /**
+     * If true then where possible, undo inline escapes in strings before going
+     * through normal string processing. Default is false. When false, escapes
+     * in strings are escaped unless {@link #isPassThroughEscapes()} is set to
+     * true. If true, then all recognized inline escapes are unescaped before
+     * the string goes through normal processing. Note that this has no effect
+     * if {@link #isFastStrings()} returns true. This option can be useful if
+     * you have strings with some of the Javascript escapes which are illegal in
+     * JSON.
+     * <p>
+     * Note that this does not apply to property names. It is only applied to
+     * string values.
+     *
+     * @param unEscapeWherePossible If true then where possible, undo inline
+     *            escapes in strings.
+     * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setUnEscapeWherePossible(boolean)
+     */
+    public JSONConfig setUnEscapeWherePossible( boolean unEscapeWherePossible )
+    {
+        this.unEscapeWherePossible = unEscapeWherePossible;
+        return this;
+    }
+
+    /**
+     * Get the pass through escapes policy.
+     *
+     * @return The pass through escapes policy.
+     * @see JSONConfigDefaults#isPassThroughEscapes()
+     */
+    public boolean isPassThroughEscapes()
+    {
+        return passThroughEscapes;
+    }
+
+    /**
+     * If true, then legal escapes in strings will be passed through unchanged.
+     * If false, then the backslash that starts the escape will be escaped.  The
+     * normal default is false.
+     *
+     * @param passThroughEscapes If true, then pass escapes through.
+     * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setPassThroughEscapes(boolean)
+     */
+    public JSONConfig setPassThroughEscapes( boolean passThroughEscapes )
+    {
+        this.passThroughEscapes = passThroughEscapes;
+        return this;
+    }
+
+    /**
      * Get the encode dates as strings policy.
      *
      * @return the encodeDatesAsStrings policy.
+     * @see JSONConfigDefaults#isEncodeDatesAsStrings()
      */
     public boolean isEncodeDatesAsStrings()
     {
@@ -1194,6 +1448,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param encodeDatesAsStrings the encodeDatesAsStrings to set
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setEncodeDatesAsStrings(boolean)
      */
     public JSONConfig setEncodeDatesAsStrings( boolean encodeDatesAsStrings )
     {
@@ -1208,6 +1463,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Get the reflection of unknown objects policy.
      *
      * @return the reflectUnknownObjects policy.
+     * @see JSONConfigDefaults#isReflectUnknownObjects()
      */
     public boolean isReflectUnknownObjects()
     {
@@ -1215,14 +1471,19 @@ public class JSONConfig implements Serializable, Cloneable
     }
 
     /**
-     * Set the reflection encoding policy.  If true, then any time that an
-     * unknown object is encountered, this package will attempt to use
-     * reflection to encode it.  Default is false.  When false, then unknown
-     * objects will have their toString() method called.
+     * Set the unknown object reflection encoding policy. If true, then any time
+     * that an unknown object is encountered, this package will attempt to use
+     * reflection to encode it. Default is false. When false, then unknown
+     * objects will have their toString() method called unless their class has
+     * been added to the list of classes to be reflected.
      *
-     * @param reflectUnknownObjects If true, then attempt to use reflection
-     * to encode objects which are otherwise unknown.
+     * @param reflectUnknownObjects If true, then attempt to use reflection to
+     *            encode objects which are otherwise unknown.
      * @return this JSONConfig object.
+     * @see #addReflectClass(Object)
+     * @see #addReflectClasses(Collection)
+     * @see #addReflectClassByName(String)
+     * @see JSONConfigDefaults#setReflectUnknownObjects(boolean)
      * @since 1.9
      */
     public JSONConfig setReflectUnknownObjects( boolean reflectUnknownObjects )
@@ -1235,6 +1496,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Get the preciseNumbers policy.
      *
      * @return The preciseNumbers policy.
+     * @see JSONConfigDefaults#isPreciseNumbers()
      * @since 1.9
      */
     public boolean isPreciseNumbers()
@@ -1250,6 +1512,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param preciseNumbers If true then quote integer numbers that lose precision in 64-bit floating point.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setPreciseNumbers(boolean)
      * @since 1.9
      */
     public JSONConfig setPreciseNumbers( boolean preciseNumbers )
@@ -1262,6 +1525,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Get the smallNumbers policy.
      *
      * @return The smallNumbers policy.
+     * @see JSONConfigDefaults#isSmallNumbers()
      * @since 1.9
      */
     public boolean isSmallNumbers()
@@ -1278,6 +1542,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param smallNumbers If true then numbers will be made to use as little memory as possible.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setSmallNumbers(boolean)
      * @since 1.9
      */
     public JSONConfig setSmallNumbers( boolean smallNumbers )
@@ -1290,6 +1555,7 @@ public class JSONConfig implements Serializable, Cloneable
      * The primitive arrays policy.
      *
      * @return the usePrimitiveArrays policy.
+     * @see JSONConfigDefaults#isUsePrimitiveArrays()
      * @since 1.9
      */
     public boolean isUsePrimitiveArrays()
@@ -1314,6 +1580,7 @@ public class JSONConfig implements Serializable, Cloneable
      * @param usePrimitiveArrays if true, then the parser will create arrays of
      *            primitives as applicable.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setUsePrimitiveArrays(boolean)
      * @since 1.9
      */
     public JSONConfig setUsePrimitiveArrays( boolean usePrimitiveArrays )
@@ -1326,6 +1593,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Get the the cacheReflectionData policy.
      *
      * @return the cacheReflectionData policy.
+     * @see JSONConfigDefaults#isCacheReflectionData()
      * @since 1.9
      */
     public boolean isCacheReflectionData()
@@ -1340,6 +1608,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param cacheReflectionData if true, then cache reflection data.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setCacheReflectionData(boolean)
      * @since 1.9
      */
     public JSONConfig setCacheReflectionData( boolean cacheReflectionData )
@@ -1352,6 +1621,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Find out what the identifier quote policy is.
      *
      * @return If true, then all identifiers will be quoted.
+     * @see JSONConfigDefaults#isQuoteIdentifier()
      */
     public boolean isQuoteIdentifier()
     {
@@ -1374,6 +1644,7 @@ public class JSONConfig implements Serializable, Cloneable
      * @param quoteIdentifier If true, then all identifiers will be quoted. If
      *        false, then only those that really need quotes will be quoted.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setQuoteIdentifier(boolean)
      */
     public JSONConfig setQuoteIdentifier( boolean quoteIdentifier )
     {
@@ -1385,6 +1656,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Find out if ECMAScript 6 code point escapes are enabled.
      *
      * @return The ECMAScript 6 policy.
+     * @see JSONConfigDefaults#isUseECMA6()
      */
     public boolean isUseECMA6()
     {
@@ -1401,6 +1673,7 @@ public class JSONConfig implements Serializable, Cloneable
      * @param useECMA6 If true, use EMCAScript 6 code point escapes and allow
      * ECMAScript 6 identifier character set.
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setUseECMA6(boolean)
      */
     public JSONConfig setUseECMA6( boolean useECMA6 )
     {
@@ -1413,6 +1686,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Get the allowReservedWordsInIdentifiers policy.
      *
      * @return the allowReservedWordsInIdentifiers policy.
+     * @see JSONConfigDefaults#isAllowReservedWordsInIdentifiers()
      */
     public boolean isAllowReservedWordsInIdentifiers()
     {
@@ -1425,6 +1699,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param allowReservedWordsInIdentifiers the allowReservedWordsInIdentifiers to set
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setAllowReservedWordsInIdentifiers(boolean)
      */
     public JSONConfig setAllowReservedWordsInIdentifiers( boolean allowReservedWordsInIdentifiers )
     {
@@ -1436,6 +1711,7 @@ public class JSONConfig implements Serializable, Cloneable
      * Get the encode dates policy.
      *
      * @return the encodeDates policy.
+     * @see JSONConfigDefaults#isEncodeDatesAsObjects()
      */
     public boolean isEncodeDatesAsObjects()
     {
@@ -1450,6 +1726,7 @@ public class JSONConfig implements Serializable, Cloneable
      *
      * @param encodeDatesAsObjects the encodeDates to set
      * @return this JSONConfig object.
+     * @see JSONConfigDefaults#setEncodeDatesAsObjects(boolean)
      */
     public JSONConfig setEncodeDatesAsObjects( boolean encodeDatesAsObjects )
     {
