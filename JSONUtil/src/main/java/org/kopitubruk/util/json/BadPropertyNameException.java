@@ -15,9 +15,9 @@
  */
 package org.kopitubruk.util.json;
 
-import static org.kopitubruk.util.json.CodePointData.getEscapePassThroughPattern;
-import static org.kopitubruk.util.json.CodePointData.getEscapePassThroughRegionLength;
-import static org.kopitubruk.util.json.CodePointData.gotMatch;
+import static org.kopitubruk.util.json.StringProcessor.getEscapePassThroughPattern;
+import static org.kopitubruk.util.json.StringProcessor.getEscapePassThroughRegionLength;
+import static org.kopitubruk.util.json.StringProcessor.gotMatch;
 import static org.kopitubruk.util.json.JSONUtil.getBundle;
 import static org.kopitubruk.util.json.JSONUtil.isValidIdentifierPart;
 import static org.kopitubruk.util.json.JSONUtil.isValidIdentifierStart;
@@ -89,7 +89,7 @@ public final class BadPropertyNameException extends JSONException
          * Find the bad code points.
          */
         StringBuilder codePointList = new StringBuilder();
-        CodePointData cp = new CodePointData(propertyName, cfg);
+        StringProcessor cp = new StringProcessor(propertyName, cfg);
         while ( cp.nextReady() ){
             if ( cp.getCodePoint() == '\\' ){
                 // check for valid escapes.

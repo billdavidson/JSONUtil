@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  *
  * @author Bill Davidson
  */
-class CodePointData
+class StringProcessor
 {
     /**
      * Javascript escapes, including those not permitted in JSON.
@@ -281,7 +281,7 @@ class CodePointData
      * @param useSingleLetterEscapes Use single letter escapes permitted by JSON.
      * @param processInlineEscapes If true, then process inline escapes.
      */
-    CodePointData( String strValue, JSONConfig cfg, boolean useSingleLetterEscapes, boolean processInlineEscapes )
+    StringProcessor( String strValue, JSONConfig cfg, boolean useSingleLetterEscapes, boolean processInlineEscapes )
     {
         this(strValue, cfg);
 
@@ -321,7 +321,7 @@ class CodePointData
      * @param cfg The config object.
      * @param processInlineEscapes If true, then process inline escapes.
      */
-    CodePointData( String strValue, JSONConfig cfg, boolean processInlineEscapes )
+    StringProcessor( String strValue, JSONConfig cfg, boolean processInlineEscapes )
     {
         this(strValue, cfg);
         beginIndex = -1;
@@ -349,7 +349,7 @@ class CodePointData
      * @param strValue The string that will be analyzed.
      * @param cfg the config object.
      */
-    CodePointData( String strValue, JSONConfig cfg )
+    StringProcessor( String strValue, JSONConfig cfg )
     {
         // stuff that's common to both.
         this.strValue = strValue;
@@ -1150,7 +1150,7 @@ class CodePointData
         final int cpLen = MAX_CODE_POINT_ESC_LENGTH;
 
         StringBuilder buf = new StringBuilder();
-        CodePointData cp = new CodePointData(strValue, cfg);
+        StringProcessor cp = new StringProcessor(strValue, cfg);
         while ( cp.nextReady() ){
             if ( cp.codePoint == BACKSLASH ){
                 if ( gotMatch(jsEscMatcher, cp.index, cp.end(jsLen)) ){
@@ -1185,7 +1185,7 @@ class CodePointData
      * @param codeUnitMatcher the codeUnitMatcher that has just matched a code unit.
      * @param buf the buffer.
      */
-    private static void handleCodeUnitEscape( CodePointData cp, Matcher codeUnitMatcher, StringBuilder buf )
+    private static void handleCodeUnitEscape( StringProcessor cp, Matcher codeUnitMatcher, StringBuilder buf )
     {
         String esc = codeUnitMatcher.group(1);
         String hexStr = codeUnitMatcher.group(2);
@@ -1217,7 +1217,7 @@ class CodePointData
      * @param codePointMatcher the codePointMatcher that has just matched a code point.
      * @param buf the buffer.
      */
-    private static void handleCodePointEscape( CodePointData cp, Matcher codePointMatcher, StringBuilder buf )
+    private static void handleCodePointEscape( StringProcessor cp, Matcher codePointMatcher, StringBuilder buf )
     {
         String hexStr = codePointMatcher.group(2);
         int codePoint = Integer.parseInt(hexStr, 16);
