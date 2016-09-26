@@ -54,6 +54,7 @@ public final class BadPropertyNameException extends JSONException
         super(cfg);
         this.propertyName = propertyName;
         this.cfg = cfg.clone();
+        this.cfg.setBadCharacterPolicy(JSONConfig.ESCAPE);
     }
 
     /**

@@ -116,11 +116,6 @@ class CodePointData
     private static final char BACKSLASH = '\\';
 
     /**
-     * Maximum char that corresponds to single letter escapes.
-     */
-    private static final char MAX_SINGLE_ESC_CHAR = BACKSLASH;
-
-    /**
      * Single letter escapes.  These get used a lot.
      */
     private static final String BS = "\\b";
@@ -133,19 +128,9 @@ class CodePointData
     private static final String BK = "\\\\";
 
     /*
-     * Various escape checkers.
-     */
-    private static final EscapeChecker ASCII_EVAL_EC = new AsciiEvalEscapeChecker();
-    private static final EscapeChecker SURROGATE_EVAL_EC = new SurrogateEvalEscapeChecker();
-    private static final EscapeChecker EVAL_EC = new EvalEscapeChecker();
-    private static final EscapeChecker ASCII_EC = new AsciiEscapeChecker();
-    private static final EscapeChecker SURROGATE_EC = new SurrogateEscapeChecker();
-    private static final EscapeChecker BASIC_EC = new BasicEscapeChecker();
-
-    /*
      * Arrays of escapes for control characters.
      */
-    private static final int NUM_CONTROLS = 32;
+    private static final int NUM_CONTROLS = 16;
     private static final String[] UNICODE_ESC = new String[NUM_CONTROLS];
     private static final String[] SINGLE_ESC = new String[NUM_CONTROLS];
     private static final String[] ECMA6_ESC = new String[NUM_CONTROLS];
@@ -156,6 +141,19 @@ class CodePointData
      */
     private static final char[] HEX_DIGITS = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
 
+    /*
+     * Initial buffer patterns for generating escapes.
+     */
+    private static final char[] INITIAL_ONEBUF  = "\\u....".toCharArray();
+    private static final char[] INITIAL_TWOBUF  = "\\u....\\u....".toCharArray();
+    private static final char[] INITIAL_ECMA6_5 = "\\u{.....}".toCharArray();
+    private static final char[] INITIAL_ECMA6_6 = "\\u{10....}".toCharArray();
+
+    /*
+     * Unicode replacement character. Used to replace unmatched surrogates and
+     * undefined code points.
+     */
+    static final char UNICODE_REPLACEMENT_CHARACTER = 0xFFFD;
 
     /*
      * Initialize static data
@@ -171,7 +169,7 @@ class CodePointData
         JSON_ESC_MAP.put('/', SL);
         JSON_ESC_MAP.put(BACKSLASH, BK);
 
-        JAVASCRIPT_ESC_MAP = new HashMap<String,Character>(10);
+        JAVASCRIPT_ESC_MAP = new HashMap<String,Character>(JSON_ESC_MAP.size()+2);
         for ( Entry<Character,String> entry : JSON_ESC_MAP.entrySet() ){
             JAVASCRIPT_ESC_MAP.put(entry.getValue(), entry.getKey());
         }
@@ -179,6 +177,12 @@ class CodePointData
         JAVASCRIPT_ESC_MAP.put("\\v", (char)0xB);
         JAVASCRIPT_ESC_MAP.put("\\'", '\'');
 
+        /*
+         * Create escapes for control characters based on various flags. Used to
+         * speed up escapes for some of the most common escaped characters.  Also
+         * handles ECMAScript 6 code point escapes with single digits which are
+         * not handled properly by getEscapeString without this.
+         */
         for ( char ch = 0; ch < NUM_CONTROLS; ch++ ){
             String single = null;
             int i = ch;
@@ -190,7 +194,7 @@ class CodePointData
                 case '\r': single = CR; break;
             }
             String esc = String.format("\\u%04X", i);
-            String esc6 = i < 0x10 ? makeECMA6Escape(i) : esc;
+            String esc6 = String.format("\\u{%X}", i);
             UNICODE_ESC[i] = esc;
             SINGLE_ESC[i] = single != null ? single : esc;
             ECMA6_ESC[i] = esc6;
@@ -199,25 +203,45 @@ class CodePointData
     }
 
     // private data and flags.
-    private String strValue;
+    private JSONConfig cfg;
+    private String strValue;                    // the string being processed.
     private EscapeHandler handler;
     private EscapeChecker escChecker;
-    private String[] controls = null;
+    private String[] controls;                  // pre-computed escapes for controls.
     private char[] oneBuf = null;
     private char[] twoBuf = null;
-    private int nextIndex;
-    private int len;
-    private int lastEscIndex;
-    private int beginIndex;
-    private int endIndex;
+    private char[] ecma6_5 = null;
+    private char[] ecma6_6 = null;
+    private int nextIndex;                      // index in the string of the next code point
+    private int len;                            // length of the string.
+    private int lastProcessIndex;               // index of the last code point that needs processing in the string.
+    private int beginIndex;                     // beginning of current substring that doesn't need escaping.
+    private int endIndex;                       // ending of the current substring that doesn't need escaping.
+    private int unmatchedSurrogatePolicy;
+    private int undefinedCodePointPolicy;
+
+    /*
+     * These are integer booleans because integer checks against zero are faster
+     * than booleans on Intel architecture JVM's.  I'm guessing because booleans
+     * are stored as bit fields.  These are all used inside the critical loop
+     * for writeString().
+     */
     private int handleEscaping;
     private int processInlineEscapes;
     private int useECMA6;
     private int useSingleLetterEscapes;
     private int escapeSurrogates;
-    private int noEscapes;
-    private int isSurrogatePair;
-    private int isMalformed;
+    private int isSupplementary;
+    private int isUnmatchedSurrogate;
+    private int isDefined;
+    private int isReplaced;
+    private int didDiscard;
+    private int haveCodePoint;
+
+    /*
+     * Regular booleans that are only used outside the critical loop.
+     */
+    private boolean noEscapes;
     private boolean supportEval;
     private boolean escapeNonAscii;
 
@@ -226,7 +250,7 @@ class CodePointData
      * that a valid pass through escape has been detected or an escape
      * has been created.
      */
-    private String esc;
+    private String escape;
 
     /**
      * This holds the char value(s) for the current code point.  Methods
@@ -255,7 +279,7 @@ class CodePointData
      * @param strValue The string that will be analyzed.
      * @param cfg The config object.
      * @param useSingleLetterEscapes Use single letter escapes permitted by JSON.
-     * @param processInlineEscapes If 1, then process inline escapes.
+     * @param processInlineEscapes If true, then process inline escapes.
      */
     CodePointData( String strValue, JSONConfig cfg, boolean useSingleLetterEscapes, boolean processInlineEscapes )
     {
@@ -269,24 +293,24 @@ class CodePointData
         escapeSurrogates = cfg.isEscapeSurrogates() ? 1 : 0;
 
         // check if there is any escaping to be done.
-        lastEscIndex = findLastEscape();
-        noEscapes = lastEscIndex < 0 ? 1 : 0;
-        handleEscaping = noEscapes != 0 ? 0 : 1;
-
-        if ( useSingleLetterEscapes ){
-            controls = useECMA6 != 0 ? ECMA6_SINGLE_ESC : SINGLE_ESC;
-        }
+        lastProcessIndex = findLastProcess();
+        noEscapes = lastProcessIndex < 0;
+        handleEscaping = noEscapes ? 0 : 1;
 
         if ( handleEscaping != 0 ){
+            if ( this.useSingleLetterEscapes != 0 ){
+                controls = useECMA6 != 0 ? ECMA6_SINGLE_ESC : SINGLE_ESC;
+            }
+
             if ( this.processInlineEscapes != 0 ){
                 int lastBackSlash = strValue.lastIndexOf(BACKSLASH);
                 this.processInlineEscapes = lastBackSlash >= 0 ? 1 : 0;
-                if ( this.processInlineEscapes != 0){
+                if ( this.processInlineEscapes != 0 ){
                     handler = new EscapeHandler(cfg, lastBackSlash);
                 }
             }
         }else{
-            esc = null;
+            escape = null;
         }
     }
 
@@ -295,7 +319,7 @@ class CodePointData
      *
      * @param strValue The string that will be analyzed.
      * @param cfg The config object.
-     * @param processInlineEscapes If 1, then process inline escapes.
+     * @param processInlineEscapes If true, then process inline escapes.
      */
     CodePointData( String strValue, JSONConfig cfg, boolean processInlineEscapes )
     {
@@ -329,12 +353,17 @@ class CodePointData
     {
         // stuff that's common to both.
         this.strValue = strValue;
+        this.cfg = cfg;
         chars = new char[2];
         len = strValue.length();
         index = 0;
         nextIndex = 0;
         charCount = 0;
         useECMA6 = cfg.isUseECMA6() ? 1 : 0;
+
+        useSingleLetterEscapes = 0;
+        unmatchedSurrogatePolicy = cfg.getUnmatchedSurrogatePolicy();
+        undefinedCodePointPolicy = cfg.getUndefinedCodePointPolicy();
 
         controls = useECMA6 != 0 ? ECMA6_ESC : UNICODE_ESC;
 
@@ -389,19 +418,19 @@ class CodePointData
      *
      * @return The current escape or null if there isn't one.
      */
-    String getEsc()
+    String getEscape()
     {
-        return esc;
+        return escape;
     }
 
     /**
-     * If 1, then there are no escapes in this string.
+     * If true, then there are no escapes in this string.
      *
-     * @return If 1, then there are no escapes in this string.
+     * @return If true, then there are no escapes in this string.
      */
     boolean isNoEscapes()
     {
-        return noEscapes != 0 ? true : false;
+        return noEscapes;
     }
 
     /**
@@ -427,10 +456,10 @@ class CodePointData
      */
     void writeString( Writer json ) throws IOException
     {
-        lastEscIndex = findLastEscape();
+        lastProcessIndex = findLastProcess();
 
-        if ( lastEscIndex < 0 ){
-            json.write(strValue);
+        if ( lastProcessIndex < 0 ){
+            json.write(strValue);   // nothing to process.
             return;
         }
 
@@ -438,57 +467,46 @@ class CodePointData
         while ( nextIndex < len ){
             nextCodePoint();
 
-            if ( isSurrogatePair != 0 ){
-                if ( escapeSurrogates != 0 || ! Character.isDefined(codePoint) ){
-                    writeEscape(json, getEscapeString());
-                    continue;
-                }
-                // else OK
-            }else if ( isMalformed != 0 ){
-                // bad surrogate pair -- just write the single bad surrogate.
-                writeEscape(json, getEscapeString());
-                continue;
-            }else{
+            if ( haveCodePoint != 0 ){
+                // check for escapes.
                 if ( processInlineEscapes != 0 && chars[0] == BACKSLASH ){
-                    esc = null;
-                    int newChars = handler.doMatches();
+                    String esc = handler.checkInlineEscape();
                     if ( esc != null ){
                         writeEscape(json, esc);
-                        continue;
-                    }else if ( newChars != 0 ){
-                        flushCurrentSubstring(json);
-                        json.write(chars, 0, charCount);
-                        if ( index == lastEscIndex ){
-                            beginIndex = nextIndex;
-                            endIndex = nextIndex = len;
-                        }
-                        continue;
-                    }
-                }
-
-                if ( escChecker.needEscape(chars[0]) != 0 ){
-                    if ( chars[0] < NUM_CONTROLS ){
-                        writeEscape(json, controls[(int)chars[0]]);
                     }else{
-                        switch ( chars[0] ){
-                            case '"': writeEscape(json, DQ); break;
-                            case '/': writeEscape(json, SL); break;
-                            case BACKSLASH: writeEscape(json, BK); break;
-                            default: writeEscape(json, getEscapeString()); break;
-                        }
+                        writeChars(json);
                     }
-                    continue;
+                }else if ( needEscape() ){
+                    writeEscape(json, getEscapeString());
+                }else if ( isReplaced != 0 ){
+                    writeChars(json);
+                }else{
+                    if ( didDiscard != 0 ){
+                        flushCurrentSubstring(json);
+                    }
+                    if ( beginIndex < 0 ){
+                        beginIndex = index; // start a new sub string.
+                    }
+                    endIndex = nextIndex;   // extend the current substring.
                 }
             }
-
-            // no escaping needed for this code point.
-            if ( beginIndex < 0 ){
-                beginIndex = index; // start a new sub string.
-            }
-            endIndex = nextIndex;
         }
 
         flushCurrentSubstring(json);
+    }
+
+    /**
+     * Return true if an escape is needed for the current code point.
+     *
+     * @return true if an escape is needed.
+     */
+    private boolean needEscape()
+    {
+        if ( isSupplementary == 0 ){
+            return escChecker.needEscape(chars[0]);
+        }else{
+            return escChecker.needEscape();
+        }
     }
 
     /**
@@ -502,11 +520,25 @@ class CodePointData
     {
         flushCurrentSubstring(json);
         json.write(esc);
-        if ( index == lastEscIndex ){
-            // just did last escape
-            beginIndex = nextIndex;
-            endIndex = nextIndex = len;
-        }
+        checkLastProcess();
+    }
+
+    /**
+     * Write the chars to the given writer. This is only used when
+     * processInlineEscapes is true and an escape was found in the input string
+     * that got converted to a code point that doesn't need to be escaped.
+     * Because this code point is not in the input string, the current substring
+     * needs to be flushed so that this code point can be appended to the
+     * output.
+     *
+     * @param json the writer
+     * @throws IOException if there's an I/O error.
+     */
+    private void writeChars( Writer json ) throws IOException
+    {
+        flushCurrentSubstring(json);
+        json.write(chars, 0, charCount);
+        checkLastProcess();
     }
 
     /**
@@ -520,6 +552,19 @@ class CodePointData
         if ( beginIndex >= 0 ){
             json.write(strValue, beginIndex, endIndex - beginIndex);
             beginIndex = -1;
+        }
+    }
+
+    /**
+     * Check if the current index is the last code point that needs to be
+     * modified and if so, set up to write out the rest of the string.
+     */
+    private void checkLastProcess()
+    {
+        if ( nextIndex > lastProcessIndex ){
+            // did last escape. end escape processing.
+            beginIndex = nextIndex;
+            endIndex = nextIndex = len;
         }
     }
 
@@ -539,11 +584,14 @@ class CodePointData
         if ( nextIndex < len ){
             nextCodePoint();
 
-            if ( handleEscaping != 0 ){
-                handleEscaping();
+            if ( haveCodePoint != 0 ){
+                if ( handleEscaping != 0 ){
+                    escape = getEscapeIfNeeded();
+                }
+                return true;
+            }else{
+                return false;
             }
-
-            return true;
         }else{
             return false;
         }
@@ -554,125 +602,159 @@ class CodePointData
      */
     private void nextCodePoint()
     {
-        index = nextIndex;
+        haveCodePoint = 0;
+        didDiscard = 0;
 
-        charCount = 1;
-        codePoint = chars[0] = strValue.charAt(index);
-        isMalformed = isSurrogatePair = JSONUtil.isSurrogate(chars[0]) ? 1 : 0;
-        if ( isSurrogatePair != 0 ){
-            isSurrogatePair = ++nextIndex < len ? 1 : 0;
-            if ( isSurrogatePair != 0 ){
-                chars[1] = strValue.charAt(nextIndex);
-                isSurrogatePair = Character.isSurrogatePair(chars[0], chars[1]) ? 1 : 0;
-                if ( isSurrogatePair != 0 ){
-                    isMalformed = 0;
-                    charCount = 2;
-                    codePoint = Character.toCodePoint(chars[0], chars[1]);
-                }else{
-                    --nextIndex;
+        while ( haveCodePoint == 0 && nextIndex < len ){
+            index = nextIndex;
+            haveCodePoint = 1;
+            isReplaced = 0;
+            charCount = 1;
+            codePoint = chars[0] = strValue.charAt(index);
+            isUnmatchedSurrogate = isSupplementary = isSurrogate(chars[0]);
+            if ( isSupplementary != 0 ){
+                if ( index+1 < len ){
+                    chars[1] = strValue.charAt(index+1);
+                    if ( Character.isSurrogatePair(chars[0], chars[1]) ){
+                        isUnmatchedSurrogate = 0;
+                        charCount = 2;
+                        codePoint = Character.toCodePoint(chars[0], chars[1]);
+                        isDefined = isDefined(codePoint);
+                        ++nextIndex;
+                    }
+                }
+                if ( isUnmatchedSurrogate != 0 ){
+                    handleUnmatchedSurrogate();
                 }
             }else{
-                --nextIndex;
+                isDefined = isDefined(chars[0]);
             }
-        }
+            if ( isDefined == 0 ){
+                handleUndefined();
+            }
 
-        ++nextIndex;
+            ++nextIndex;
+        }
+    }
+
+    /**
+     * Do what needs to be done for an unmatched surrogate.
+     */
+    private void handleUnmatchedSurrogate()
+    {
+        switch ( unmatchedSurrogatePolicy ){
+            case JSONConfig.REPLACE:
+                replaceCodePoint();
+                break;
+            case JSONConfig.DISCARD:
+                didDiscard = 1;
+                haveCodePoint = 0;
+                break;
+            case JSONConfig.EXCEPTION:
+                throw new UnmatchedSurrogateException(cfg, strValue, index, chars[0]);
+            default:
+                isDefined = isDefined(chars[0]);
+                isSupplementary = 0;
+                break;
+        }
+    }
+
+    /**
+     * Do what needs to be done for an undefined code point.
+     */
+    private void handleUndefined()
+    {
+        switch ( undefinedCodePointPolicy ){
+            case JSONConfig.REPLACE:
+                replaceCodePoint();
+                break;
+            case JSONConfig.DISCARD:
+                didDiscard = 1;
+                haveCodePoint = 0;
+                break;
+            case JSONConfig.EXCEPTION:
+                throw new UndefinedCodePointException(cfg, strValue, index, codePoint);
+        }
+    }
+
+    /**
+     * Replace the current code point with the Unicode replacement character.
+     */
+    private void replaceCodePoint()
+    {
+        codePoint = chars[0] = UNICODE_REPLACEMENT_CHARACTER;
+        charCount = 1;
+        isSupplementary = isUnmatchedSurrogate = 0;
+        isDefined = isReplaced = 1;
     }
 
     /**
      * Handle escapes as appropriate.
+     *
+     * @return an escape if one is needed or null if not.
      */
-    private void handleEscaping()
+    private String getEscapeIfNeeded()
     {
-        esc = null;
-
-        if ( index > lastEscIndex ){
+        if ( index > lastProcessIndex ){
             // past last escape -- disable escape checking.
-            noEscapes = 1;
             handleEscaping = 0;
-            return;
-        }
-
-        if ( processInlineEscapes != 0 && chars[0] == BACKSLASH ){
-            handler.doMatches();            // check for escapes.
-        }
-
-        if ( useSingleLetterEscapes != 0 && esc == null && chars[0] <= MAX_SINGLE_ESC_CHAR ){
-            if ( chars[0] < NUM_CONTROLS ){
-                esc = controls[(int)chars[0]];
-            }else{
-                switch ( chars[0] ){
-                    case '"': esc = DQ; break;
-                    case '/': esc = SL; break;
-                    case BACKSLASH: esc = BK; break;
-                }
-            }
-        }
-
-        // any other escapes requested or required.
-        if ( esc == null ){
-            if ( isMalformed != 0 ){
-                esc = getEscapeString();
-            }else if ( isSurrogatePair != 0 ){
-                if ( escChecker.needEscape(codePoint) != 0 ){
-                    esc = getEscapeString();
-                }
-            }else if ( escChecker.needEscape(chars[0]) != 0 ){
-                esc = getEscapeString();
-            }
+            return null;
+        }else if ( processInlineEscapes != 0 && chars[0] == BACKSLASH ){
+            return handler.checkInlineEscape();
+        }else if ( needEscape() ){
+            return getEscapeString();
+        }else{
+            return null;
         }
     }
 
     /**
-     * Get the Unicode escaped version of the current code point.
+     * Get the escaped version of the current code point.
      *
      * @return the escaped version of the current code point.
      */
     String getEscapeString()
     {
-        if ( chars[0] < NUM_CONTROLS ){
-            return controls[(int)chars[0]];
-        }else if ( useECMA6 != 0 && codePoint >= Character.MIN_SUPPLEMENTARY_CODE_POINT ){
-            // Use ECMAScript 6 code point escape.
-            // only very low or very high code points see an advantage.
-            return makeECMA6Escape(codePoint);
-        }else{
-            // Use normal escape.
-            if ( isSurrogatePair != 0 ){
-                return makeEscape(chars);
+        if ( isSupplementary != 0 ){
+            if ( useECMA6 != 0 ){
+                return makeECMA6Escape(codePoint);
             }else{
-                return makeEscape(chars[0]);
+                return makeEscape(chars);
             }
+        }else if ( chars[0] < NUM_CONTROLS ){
+            return controls[(int)chars[0]];
+        }else if ( useSingleLetterEscapes != 0 ){
+            switch ( chars[0] ){
+                case '"': return DQ;
+                case '/': return SL;
+                case BACKSLASH: return BK;
+                default: return makeEscape(chars[0]);
+            }
+        }else{
+            return makeEscape(chars[0]);
         }
     }
 
     /**
      * Make a code unit escape.
      *
-     * @param ch the char.
+     * @param cp the char.
      * @return the escape.
      */
-    private String makeEscape( char ch )
+    private String makeEscape( int cp )
     {
-        char[] escape = oneBuf;
-        if ( escape == null ){
-            escape = oneBuf = new char[6];
-        }
-        int i = escape.length - 1;
-        int cp = ch;
+        char[] esc = oneBuf;
 
-        do{
-            escape[i--] = HEX_DIGITS[cp & 0xF];
-        }while ( (cp >>= 4) > 0 );
-
-        while ( i > 1 ){
-            escape[i--] = '0';
+        if ( esc == null ){
+            esc = oneBuf = copyOf(INITIAL_ONEBUF);
         }
 
-        escape[1] = 'u';
-        escape[0] = BACKSLASH;
+        esc[5] = HEX_DIGITS[cp & 0xF];
+        esc[4] = HEX_DIGITS[(cp >> 4) & 0xF];
+        esc[3] = HEX_DIGITS[(cp >> 8) & 0xF];
+        esc[2] = HEX_DIGITS[cp >> 12];
 
-        return new String(escape);
+        return new String(esc);
     }
 
     /**
@@ -683,33 +765,25 @@ class CodePointData
      */
     private String makeEscape( char[] ch )
     {
-        char[] escape = twoBuf;
-        if ( escape == null ){
-            escape = twoBuf = new char[12];
+        char[] esc = twoBuf;
+
+        if ( esc == null ){
+            esc = twoBuf = copyOf(INITIAL_TWOBUF);
         }
-        int i = escape.length - 1;
 
         int cp = ch[1];
-        do{
-            escape[i--] = HEX_DIGITS[cp & 0xF];
-        }while ( (cp >>= 4) > 0 );
-        while ( i > 7 ){
-            escape[i--] = '0';
-        }
-        escape[i--] = 'u';
-        escape[i--] = BACKSLASH;
+        esc[11] = HEX_DIGITS[cp & 0xF];
+        esc[10] = HEX_DIGITS[(cp >> 4) & 0xF];
+        esc[9] = HEX_DIGITS[(cp >> 8) & 0xF];
+        esc[8] = HEX_DIGITS[cp >> 12];
 
         cp = ch[0];
-        do{
-            escape[i--] = HEX_DIGITS[cp & 0xF];
-        }while ( (cp >>= 4) > 0 );
-        while ( i > 1 ){
-            escape[i--] = '0';
-        }
-        escape[1] = 'u';
-        escape[0] = BACKSLASH;
+        esc[5] = HEX_DIGITS[cp & 0xF];
+        esc[4] = HEX_DIGITS[(cp >> 4) & 0xF];
+        esc[3] = HEX_DIGITS[(cp >> 8) & 0xF];
+        esc[2] = HEX_DIGITS[cp >> 12];
 
-        return new String(escape);
+        return new String(esc);
     }
 
     /**
@@ -718,28 +792,33 @@ class CodePointData
      * @param codePoint The code point.
      * @return the escape
      */
-    private static String makeECMA6Escape( int codePoint )
+    private String makeECMA6Escape( int codePoint )
     {
-        int size = 5;
+        char[] esc;
         int cp = codePoint;
-        while ( (cp >>= 4) > 0 ){
-            ++size;
+
+        if ( (cp >> 20) == 0 ){
+            esc = ecma6_5;
+            if ( esc == null ){
+                esc = ecma6_5 = copyOf(INITIAL_ECMA6_5);
+            }
+            esc[7] = HEX_DIGITS[cp & 0xF];
+            esc[6] = HEX_DIGITS[(cp >> 4) & 0xF];
+            esc[5] = HEX_DIGITS[(cp >> 8) & 0xF];
+            esc[4] = HEX_DIGITS[(cp >> 12) & 0xF];
+            esc[3] = HEX_DIGITS[cp >> 16];
+        }else{
+            esc = ecma6_6;
+            if ( esc == null ){
+                esc = ecma6_6 = copyOf(INITIAL_ECMA6_6);
+            }
+            esc[8] = HEX_DIGITS[cp & 0xF];
+            esc[7] = HEX_DIGITS[(cp >> 4) & 0xF];
+            esc[6] = HEX_DIGITS[(cp >> 8) & 0xF];
+            esc[5] = HEX_DIGITS[(cp >> 12) & 0xF];
         }
 
-        char[] escape = new char[size];
-        int i = escape.length - 1;
-        escape[i--] = '}';
-        cp = codePoint;
-
-        do{
-            escape[i--] = HEX_DIGITS[cp & 0xF];
-        }while ( (cp >>= 4) > 0 );
-
-        escape[2] = '{';
-        escape[1] = 'u';
-        escape[0] = BACKSLASH;
-
-        return new String(escape);
+        return new String(esc);
     }
 
     /**
@@ -755,36 +834,51 @@ class CodePointData
     }
 
     /**
-     * Check if the string contains any characters that need to be escaped.
-     * This searches this string from the end so that it can record the
-     * index of the last character that needs to be escaped.
+     * Check if the string contains any characters that need to be processed.
+     * This searches this string from the end so that it can record the index of
+     * the last character that needs to be processed. This allows the forward
+     * looping code that runs after this to stop checking for code points that
+     * need to be processed after it gets to the last code point that needs to be
+     * processed.
      *
-     * @param strValue The string
-     * @return the index of the last escape or -1 if there isn't one.
+     * @return the index of the last code point that needs to be processed or -1 if there isn't one.
      */
-    private int findLastEscape()
+    private int findLastProcess()
     {
+        isUnmatchedSurrogate = 0;
         escChecker = getEscapeChecker();
+        int needDefined = undefinedCodePointPolicy != JSONConfig.PASS ? 1 : 0;
+        int needMatched = unmatchedSurrogatePolicy != JSONConfig.PASS ? 1 : 0;
         int i = len;
         while ( i > 0 ){
             --i;
             char ch1 = strValue.charAt(i);
             if ( JSONUtil.isSurrogate(ch1) ){
-                int malformed = 1;
+                isUnmatchedSurrogate = 1;
                 if ( --i >= 0 ){
                     char ch0 = strValue.charAt(i);
                     if ( Character.isSurrogatePair(ch0, ch1) ){
-                        malformed = 0;
-                        if ( escChecker.needEscape(Character.toCodePoint(ch0, ch1)) != 0 ){
+                        isDefined = isDefined(Character.toCodePoint(ch0, ch1));
+                        isUnmatchedSurrogate = 0;
+                        if ( escChecker.needEscape() || (isDefined == 0 && needDefined != 0) ){
                             return i;
                         }
                     }
                 }
-                if ( malformed != 0 ){
-                    return ++i;
+                if ( isUnmatchedSurrogate != 0 ){
+                    ++i;
+                    isDefined = isDefined(ch1);
+                    if ( escChecker.needEscape(ch1) || needMatched != 0 ){
+                        return i;
+                    }else{
+                        isUnmatchedSurrogate = 0;
+                    }
                 }
-            }else if ( escChecker.needEscape(ch1) != 0 ){
-                return i;
+            }else{
+                isDefined = isDefined(ch1);
+                if ( escChecker.needEscape(ch1) || (isDefined == 0 && needDefined != 0) ){
+                    return i;
+                }
             }
         }
         return -1;
@@ -799,18 +893,18 @@ class CodePointData
     {
         if ( supportEval ){
             if ( escapeNonAscii ){
-                return ASCII_EVAL_EC;
+                return new AsciiEvalEscapeChecker();
             }else if ( escapeSurrogates != 0 ){
-                return SURROGATE_EVAL_EC;
+                return new SurrogateEvalEscapeChecker();
             }else{
-                return EVAL_EC;
+                return new EvalEscapeChecker();
             }
         }else if ( escapeNonAscii ){
-            return ASCII_EC;
+            return new AsciiEscapeChecker();
         }else if ( escapeSurrogates != 0 ){
-            return SURROGATE_EC;
+            return new SurrogateEscapeChecker();
         }else{
-            return BASIC_EC;
+            return new BasicEscapeChecker();
         }
     }
 
@@ -848,21 +942,33 @@ class CodePointData
     }
 
     /**
-     * Return 1 if there's a JSON single character escape for this char.
+     * Return true if there's a JSON single character escape for this char.
      *
      * @param c The char to check.
-     * @return 1 if there's a JSON single character escape for this char.
+     * @return true if there's a JSON single character escape for this char.
      */
     static boolean haveJsonEsc( char c )
     {
-        return JSON_ESC_MAP.containsKey(c);
+        switch ( c ){
+            case '\b':
+            case '\t':
+            case '\n':
+            case '\r':
+            case '\f':
+            case '"':
+            case '/':
+            case BACKSLASH:
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**
      * Get the escape pass through pattern for identifiers or strings.
      *
      * @param cfg A configuration object to determine which pattern to use.
-     * @param useSingleLetterEscapes If 1, then use a pattern that allows JSON single letter escapes.
+     * @param useSingleLetterEscapes If true, then use a pattern that allows JSON single letter escapes.
      * @return The escape pass through pattern.
      */
     static Pattern getEscapePassThroughPattern( JSONConfig cfg, boolean useSingleLetterEscapes )
@@ -902,7 +1008,7 @@ class CodePointData
      * @param matcher The matcher.
      * @param start The start of the region.
      * @param end The end of the region.
-     * @return 1 if there is a match at the start of the region.
+     * @return true if there is a match at the start of the region.
      */
     static boolean gotMatch( Matcher matcher, int start, int end )
     {
@@ -911,54 +1017,68 @@ class CodePointData
     }
 
     /**
-     * Return 1 if the character is one of the non-control characters
+     * Make a copy of a char array.
+     *
+     * @param src the source array.
+     * @return a copy of the char array.
+     */
+    private static char[] copyOf( char[] src )
+    {
+        char[] dest = new char[src.length];
+        System.arraycopy(src, 0, dest, 0, src.length);
+        return dest;
+    }
+
+    /**
+     * Return true if the character is one of the non-control characters
      * that has to be escaped or something that breaks eval.
      *
      * @param ch the char to check.
-     * @return 1 if the char needs to be escaped based upon this test.
+     * @return true if the char needs to be escaped based upon this test.
      */
-    private static int isControl( char ch )
+    private static boolean isControl( char ch )
     {
-        return ch < ' ' ? 1 : 0;
+        return ch < ' ';
     }
 
     /**
-     * Return 1 if the character is a control character or non-ASCII
+     * Return true if the character is a control character or non-ASCII
      *
      * @param ch the char to check.
-     * @return 1 if the char needs to be escaped based upon this test.
+     * @return true if the char needs to be escaped based upon this test.
      */
-    private static int isNotAscii( char ch )
+    private static boolean isNotAscii( char ch )
     {
-        return ch < ' ' || ch > MAX_ASCII ? 1 : 0;
+        return ch < ' ' || ch > MAX_ASCII;
     }
 
     /**
-     * Return 1 if the character is one of the non-control characters
+     * Return true if the character is one of the non-control characters
      * that has to be escaped.
      *
      * @param ch the char to check.
-     * @return 1 if the char needs to be escaped based upon this test.
+     * @return true if the char needs to be escaped based upon this test.
      */
-    private static int isEsc( char ch )
+    private static boolean isEsc( char ch )
     {
         switch ( ch ){
             case '"':
             case '/':
             case BACKSLASH:
-                return 1;
+                return true;
+            default:
+                return false;
         }
-        return 0;
     }
 
     /**
-     * Return 1 if the character is one of the non-control characters
+     * Return true if the character is one of the non-control characters
      * that has to be escaped or something that breaks eval.
      *
      * @param ch the char to check.
-     * @return 1 if the char needs to be escaped based upon this test.
+     * @return true if the char needs to be escaped based upon this test.
      */
-    private static int isEvalEsc( char ch )
+    private static boolean isEvalEsc( char ch )
     {
         switch ( ch ){
             case '"':
@@ -966,9 +1086,69 @@ class CodePointData
             case BACKSLASH:
             case LINE_SEPARATOR:
             case PARAGRAPH_SEPARATOR:
-                return 1;
+                return true;
+            default:
+                return false;
         }
-        return 0;
+    }
+
+    /**
+     * Shorthand for doing boolean isDefined as an int.
+     *
+     * @param ch the char to check
+     * @return 1 if it's defined.  0 if not.
+     */
+    private static int isDefined( char ch )
+    {
+        return Character.isDefined(ch) ? 1 : 0;
+    }
+
+    /**
+     * Shorthand for doing boolean isDefined as an int.
+     *
+     * @param cp the code point to check
+     * @return 1 if it's defined.  0 if not.
+     */
+    private static int isDefined( int cp )
+    {
+        return Character.isDefined(cp) ? 1 : 0;
+    }
+
+    /**
+     * Shorthand for doing boolean isSurrogate as an int.
+     *
+     * @param ch the char to check
+     * @return 1 if it's a surrogate.  0 if not.
+     */
+    private static int isSurrogate( char ch )
+    {
+        return JSONUtil.isSurrogate(ch) ? 1 : 0;
+    }
+
+    /**
+     * Get the high surrogate for the code point.
+     *
+     * @param cp the code point.
+     * @return the high surrogate of the code point
+     */
+    static char highSurrogate( int cp )
+    {
+        int[] cps = { cp };
+        String str = new String(cps,0,1);
+        return str.charAt(0);
+    }
+
+    /**
+     * Get the low surrogate for the code point.
+     *
+     * @param cp the code point.
+     * @return the low surrogate of the code point
+     */
+    static char lowSurrogate( int cp )
+    {
+        int[] cps = { cp };
+        String str = new String(cps,0,1);
+        return str.length() > 0 ? str.charAt(1) : str.charAt(0);
     }
 
     /**
@@ -983,30 +1163,30 @@ class CodePointData
      */
     static String unEscape( String strValue, JSONConfig cfg )
     {
-        if ( strValue.indexOf(BACKSLASH) < 0 ){
-            // nothing to do.
-            return strValue;
+        int lastBackSlash = strValue.lastIndexOf(BACKSLASH);
+        if ( lastBackSlash < 0 ){
+            return strValue;            // nothing to do.
         }
 
         Matcher jsEscMatcher = JAVASCRIPT_ESC_PAT.matcher(strValue);
         Matcher codeUnitMatcher = CODE_UNIT_PAT.matcher(strValue);
         Matcher codePointMatcher = CODE_POINT_PAT.matcher(strValue);
+        final int jsLen = MAX_JS_ESC_LENGTH;
+        final int unLen = CODE_UNIT_ESC_LENGTH;
+        final int cpLen = MAX_CODE_POINT_ESC_LENGTH;
 
-        int lastBackSlash = strValue.lastIndexOf(BACKSLASH);
         StringBuilder buf = new StringBuilder();
         CodePointData cp = new CodePointData(strValue, cfg);
         while ( cp.nextReady() ){
             if ( cp.codePoint == BACKSLASH ){
-                if ( gotMatch(jsEscMatcher, cp.index, cp.end(MAX_JS_ESC_LENGTH)) ){
+                if ( gotMatch(jsEscMatcher, cp.index, cp.end(jsLen)) ){
                     String esc = jsEscMatcher.group(1);
                     buf.append(getEscapeChar(esc));
-                    cp.nextIndex += esc.length();
-                }else if ( gotMatch(codeUnitMatcher, cp.index, cp.end(CODE_UNIT_ESC_LENGTH)) ){
-                    buf.append((char)Integer.parseInt(codeUnitMatcher.group(2),16));
-                    cp.nextIndex += codeUnitMatcher.group(1).length();
-                }else if ( gotMatch(codePointMatcher, cp.index, cp.end(MAX_CODE_POINT_ESC_LENGTH)) ){
-                    buf.appendCodePoint(Integer.parseInt(codePointMatcher.group(2),16));
-                    cp.nextIndex += codePointMatcher.group(1).length();
+                    cp.nextIndex += esc.length() - 1;
+                }else if ( gotMatch(codeUnitMatcher, cp.index, cp.end(unLen)) ){
+                    handleCodeUnitEscape(cp, codeUnitMatcher, buf);
+                }else if ( gotMatch(codePointMatcher, cp.index, cp.end(cpLen)) ){
+                    handleCodePointEscape(cp, codePointMatcher, buf);
                 }else{
                     // have '\' but nothing looks like a valid escape; just pass it through.
                     cp.appendChars(buf);
@@ -1022,6 +1202,76 @@ class CodePointData
             }
         }
         return buf.toString();
+    }
+
+    /**
+     * Handle unescaping a code unit escape.
+     *
+     * @param cp The CodePointData
+     * @param codeUnitMatcher the codeUnitMatcher that has just matched a code unit.
+     * @param buf the buffer.
+     */
+    private static void handleCodeUnitEscape( CodePointData cp, Matcher codeUnitMatcher, StringBuilder buf )
+    {
+        String esc = codeUnitMatcher.group(1);
+        String hexStr = codeUnitMatcher.group(2);
+        char ch = (char)Integer.parseInt(hexStr, 16);
+        int addIt = 1;
+        if ( ! Character.isDefined(ch) ){
+            switch ( cp.undefinedCodePointPolicy ){
+                case JSONConfig.REPLACE:
+                    cp.replaceCodePoint();
+                    ch = (char)cp.getCodePoint();
+                    break;
+                case JSONConfig.DISCARD:
+                    addIt = 0;
+                    break;
+                case JSONConfig.EXCEPTION:
+                    throw new UndefinedCodePointException(cp.cfg, cp.strValue, cp.getIndex(), ch);
+            }
+        }
+        if ( addIt != 0 ){
+            buf.append(ch);
+        }
+        cp.nextIndex += esc.length() - 1;
+    }
+
+    /**
+     * Handle unescaping a code point escape.
+     *
+     * @param cp The CodePointData
+     * @param codePointMatcher the codePointMatcher that has just matched a code point.
+     * @param buf the buffer.
+     */
+    private static void handleCodePointEscape( CodePointData cp, Matcher codePointMatcher, StringBuilder buf )
+    {
+        String hexStr = codePointMatcher.group(2);
+        int codePoint = Integer.parseInt(hexStr, 16);
+        int addIt = 1;
+        if ( ! Character.isDefined(codePoint) ){
+            switch ( cp.undefinedCodePointPolicy ){
+                case JSONConfig.REPLACE:
+                    cp.replaceCodePoint();
+                    codePoint = cp.getCodePoint();
+                    break;
+                case JSONConfig.DISCARD:
+                    addIt = 0;
+                    break;
+                case JSONConfig.EXCEPTION:
+                    throw new UndefinedCodePointException(cp.cfg, cp.strValue, cp.getIndex(), hexStr);
+                default:
+                    if ( codePoint > Character.MAX_CODE_POINT ){
+                        // no way to properly encode this value.
+                        cp.replaceCodePoint();
+                        codePoint = cp.getCodePoint();
+                    }
+                    break;
+            }
+        }
+        if ( addIt != 0 ){
+            buf.appendCodePoint(codePoint);
+        }
+        cp.nextIndex += codePointMatcher.group(1).length() - 1;
     }
 
     /**
@@ -1044,7 +1294,6 @@ class CodePointData
          *
          * @param cfg the config object.
          * @param lastBackSlash the index of the last backslash in the string.
-         * @param passThroughOnly if 1, only do pass throughs.
          */
         private EscapeHandler( JSONConfig cfg, int lastBackSlash )
         {
@@ -1067,62 +1316,43 @@ class CodePointData
         }
 
         /**
-         * Do the matching for escapes.
+         * Do the matching for escapes. If an escape is generated or passed
+         * through, it is returned. If not, then the chars array will hold a
+         * newly created code point to replace the escape found here and it will
+         * not need to be escaped.
+         *
+         * @return the escape if any, otherwise null and current code point data will be modified.
          */
-        private int doMatches()
+        private String checkInlineEscape()
         {
+            String esc = null;
+            String hexStr = null;
             int newChars = 0;
 
             // check for escapes.
             if ( gotMatch(passThroughMatcher, index, end(passThroughRegionLength)) ){
                 // pass it through unchanged.
                 esc = passThroughMatcher.group(1);
-                nextIndex += esc.length() - 1;
+                nextIndex += esc.length() - 1;    // skip matched escape
             }else if ( gotMatch(jsEscMatcher, index, end(MAX_JS_ESC_LENGTH)) ){
                 // Any Javascript escapes that didn't make it through the pass through are not allowed.
+                newChars = 1;
                 String jsEsc = jsEscMatcher.group(1);
                 codePoint = chars[0] = getEscapeChar(jsEsc);
-                newChars = 1;
-                nextIndex += jsEsc.length() - 1;
+                nextIndex += jsEsc.length() - 1;    // skip matched escape
             }else if ( useECMA5 != 0 && gotMatch(codePointMatcher, index, end(MAX_CODE_POINT_ESC_LENGTH)) ){
-                /*
-                 * Only get here if it wasn't passed through => useECMA6 is
-                 * 0.  Convert it to an inline codepoint.  Maybe something
-                 * later will escape it legally.
-                 */
-                codePoint = Integer.parseInt(codePointMatcher.group(2),16);
                 newChars = 1;
-                if ( codePoint < Character.MIN_SUPPLEMENTARY_CODE_POINT ){
-                    chars[0] = (char)codePoint;
-                }else{
-                    isSurrogatePair = 1;
-                    charCount = 2;
-                    int[] cps = { codePoint };
-                    String str = new String(cps,0,1);
-                    chars[0] = str.charAt(0);
-                    chars[1] = str.charAt(1);
-                }
-                nextIndex += codePointMatcher.group(1).length() - 1;
+                hexStr = handleCodePointEscape();
+            }else{
+                esc = getEscapeString();     // backslash that doesn't fit a known escape pattern.
             }
 
             if ( newChars != 0 ){
-                if ( isSurrogatePair != 0 ){
-                    if ( escChecker.needEscape(codePoint) != 0 ){
-                        esc = getEscapeString();
-                    }
-                }else if ( escChecker.needEscape(chars[0]) != 0 ){
-                    if ( chars[0] < NUM_CONTROLS ){
-                        esc = controls[(int)chars[0]];
-                    }else if ( useSingleLetterEscapes != 0 ){
-                        switch ( chars[0] ){
-                            case '"': esc = DQ; break;
-                            case '/': esc = SL; break;
-                            case BACKSLASH: esc = BK; break;
-                            default: esc = getEscapeString();
-                        }
-                    }else{
-                        esc = getEscapeString();
-                    }
+                if ( isDefined == 0 ){
+                    esc = handleUndefined(hexStr);
+                }
+                if ( esc == null && needEscape() ){
+                    esc = getEscapeString();         // new code point that needs escaping
                 }
             }
 
@@ -1132,7 +1362,63 @@ class CodePointData
                 handler = null;
             }
 
-            return newChars;
+            return esc;
+        }
+
+        /**
+         * Handle a code point escape. Only get here if it wasn't passed through
+         * which means that useECMA6 is false. Convert it to an inline codepoint.
+         *
+         * @return the hex string for the code point escape.
+         */
+        private String handleCodePointEscape()
+        {
+            String hexStr = codePointMatcher.group(2);
+            codePoint = Integer.parseInt(hexStr, 16);
+            if ( codePoint < Character.MIN_SUPPLEMENTARY_CODE_POINT ){
+                chars[0] = (char)codePoint;
+                isDefined = isDefined(chars[0]);
+            }else if ( codePoint > Character.MAX_CODE_POINT ){
+                isDefined = 0;
+            }else{
+                isSupplementary = 1;
+                charCount = 2;
+                chars[0] = highSurrogate(codePoint);
+                chars[1] = lowSurrogate(codePoint);
+                isDefined = isDefined(codePoint);
+            }
+            nextIndex += codePointMatcher.group(1).length() - 1;    // skip matched escape
+
+            return hexStr;
+        }
+
+        /**
+         * Handle an undefined code point.
+         *
+         * @param hexStr the hex characters for the code point.
+         * @return an escape
+         */
+        private String handleUndefined( String hexStr )
+        {
+            String esc = null;
+
+            switch ( undefinedCodePointPolicy ){
+                case JSONConfig.REPLACE:
+                    replaceCodePoint();
+                    break;
+                case JSONConfig.DISCARD:
+                    esc = "";
+                    break;
+                case JSONConfig.EXCEPTION:
+                    throw new UndefinedCodePointException(cfg, strValue, index, hexStr);
+                default:
+                    if ( codePoint > Character.MAX_CODE_POINT ){
+                        replaceCodePoint();
+                    }
+                    break;
+            }
+
+            return esc;
         }
     } // class EscapeHandler
 
@@ -1145,58 +1431,55 @@ class CodePointData
          * Does the actual checking.
          *
          * @param ch the char
-         * @return 1 if the char needs to be escaped.
+         * @return true if the char needs to be escaped.
          */
-        int needEscapeImpl( char ch );
+        boolean needEscapeImpl( char ch );
 
         /**
          * Does the actual checking.
          *
-         * @return 1 if the codePoint needs to be escaped.
+         * @return true if the codePoint needs to be escaped.
          */
-        int needEscapeImpl();
+        boolean needEscapeImpl();
 
         /**
-         * Return 1 if the given char needs to be escaped.
+         * Return true if the given char needs to be escaped.
          *
          * @param ch the char.
-         * @return 1 if the given char needs to be escaped.
+         * @return true if the given char needs to be escaped.
          */
-        int needEscape( char ch );
+        boolean needEscape( char ch );
 
         /**
-         * Return 1 if the given code point needs to be escaped.
+         * Return true if the current code point needs to be escaped.
          *
-         * @param cp the code point.
-         * @return 1 if the given code point needs to be escaped.
+         * @return true if the current code point needs to be escaped.
          */
-        int needEscape( int cp );
+        boolean needEscape();
     }
 
     /**
      * Abstract class for escape checkers.
      */
-    private static abstract class AbstractEscapeChecker implements EscapeChecker
+    private abstract class AbstractEscapeChecker implements EscapeChecker
     {
-        public int needEscape( char ch )
+        public boolean needEscape( char ch )
         {
-            if ( needEscapeImpl(ch) != 0 ){
-                return 1;
-            }else if ( Character.isDefined(ch) ){
-                return 0;
+            if ( isDefined == 0 ){
+                return undefinedCodePointPolicy == JSONConfig.ESCAPE;
+            }else if ( isUnmatchedSurrogate != 0 ){
+                return unmatchedSurrogatePolicy == JSONConfig.ESCAPE;
             }else{
-                return 1;
+                return needEscapeImpl(ch);
             }
         }
 
-        public int needEscape( int cp )
+        public boolean needEscape()
         {
-            if ( needEscapeImpl() != 0 ){
-                return 1;
-            }else if ( Character.isDefined(cp) ){
-                return 0;
+            if ( isDefined == 0 ){
+                return undefinedCodePointPolicy == JSONConfig.ESCAPE;
             }else{
-                return 1;
+                return needEscapeImpl();
             }
         }
     }
@@ -1204,136 +1487,96 @@ class CodePointData
     /**
      * Checks for controls and other escapes without eval protection.
      */
-    private static class BasicEscapeChecker extends AbstractEscapeChecker
+    private class BasicEscapeChecker extends AbstractEscapeChecker
     {
-        public int needEscapeImpl( char ch )
+        public boolean needEscapeImpl( char ch )
         {
-            if ( isControl(ch) != 0 ){
-                return 1;
-            }else if ( isEsc(ch) != 0 ){
-                return 1;
-            }else{
-                return 0;
-            }
+            return isControl(ch) || isEsc(ch);
         }
 
-        public int needEscapeImpl()
+        public boolean needEscapeImpl()
         {
-            return 0;
+            return false;
         }
     }
 
     /**
      * Checks for controls and other escapes with eval protection.
      */
-    private static class EvalEscapeChecker extends AbstractEscapeChecker
+    private class EvalEscapeChecker extends AbstractEscapeChecker
     {
-        public int needEscapeImpl( char ch )
+        public boolean needEscapeImpl( char ch )
         {
-            if ( isControl(ch) != 0 ){
-                return 1;
-            }else if ( isEvalEsc(ch) != 0 ){
-                return 1;
-            }else{
-                return 0;
-            }
+            return isControl(ch) || isEvalEsc(ch);
         }
 
-        public int needEscapeImpl()
+        public boolean needEscapeImpl()
         {
-            return 0;
+            return false;
         }
     }
 
     /**
      * Checks for controls, non-ASCII and other escapes without eval protection.
      */
-    private static class AsciiEscapeChecker extends AbstractEscapeChecker
+    private class AsciiEscapeChecker extends AbstractEscapeChecker
     {
-        public int needEscapeImpl( char ch )
+        public boolean needEscapeImpl( char ch )
         {
-            if ( isNotAscii(ch) != 0 ){
-                return 1;
-            }else if ( isEsc(ch) != 0 ){
-                return 1;
-            }else{
-                return 0;
-            }
+            return isNotAscii(ch) || isEsc(ch);
         }
 
-        public int needEscapeImpl()
+        public boolean needEscapeImpl()
         {
-            return 1;
+            return true;
         }
     }
 
     /**
      * Checks for controls, non-ASCII and other escapes with eval protection.
      */
-    private static class AsciiEvalEscapeChecker extends AbstractEscapeChecker
+    private class AsciiEvalEscapeChecker extends AbstractEscapeChecker
     {
-        public int needEscapeImpl( char ch )
+        public boolean needEscapeImpl( char ch )
         {
-            if ( isNotAscii(ch) != 0 ){
-                return 1;
-            }else if ( isEvalEsc(ch) != 0 ){
-                return 1;
-            }else{
-                return 0;
-            }
+            return isNotAscii(ch) || isEvalEsc(ch);
         }
 
-        public int needEscapeImpl()
+        public boolean needEscapeImpl()
         {
-            return 1;
+            return true;
         }
     }
 
     /**
      * Checks for controls, other escapes without eval protection and surrogates.
      */
-    private static class SurrogateEscapeChecker extends AbstractEscapeChecker
+    private class SurrogateEscapeChecker extends AbstractEscapeChecker
     {
-        public int needEscapeImpl( char ch )
+        public boolean needEscapeImpl( char ch )
         {
-            if ( isControl(ch) != 0 ){
-                return 1;
-            }else if ( isEsc(ch) != 0 ){
-                return 1;
-            }else if ( JSONUtil.isSurrogate(ch) ){
-                return 1;
-            }else{
-                return 0;
-            }
+            return isControl(ch) || isEsc(ch) || JSONUtil.isSurrogate(ch);
         }
 
-        public int needEscapeImpl()
+        public boolean needEscapeImpl()
         {
-            return 1;
+            return true;
         }
     }
 
     /**
      * Checks for controls, other escapes with eval protection and surrogates.
      */
-    private static class SurrogateEvalEscapeChecker extends AbstractEscapeChecker
+    private class SurrogateEvalEscapeChecker extends AbstractEscapeChecker
     {
-        public int needEscapeImpl( char ch )
+        public boolean needEscapeImpl( char ch )
         {
-            if ( isControl(ch) != 0 ){
-                return 1;
-            }else if ( isEvalEsc(ch) != 0 ){
-                return 1;
-            }else if ( JSONUtil.isSurrogate(ch) ){
-                return 1;
-            }else{
-                return 0;
-            }
+            return isControl(ch) || isEvalEsc(ch) || JSONUtil.isSurrogate(ch);
         }
 
-        public int needEscapeImpl()
+        public boolean needEscapeImpl()
         {
-            return 1;
+            return true;
         }
     }
 }
