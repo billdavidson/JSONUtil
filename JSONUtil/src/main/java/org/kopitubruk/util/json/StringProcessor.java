@@ -226,24 +226,28 @@ class StringProcessor
      * are stored as bit fields.  These are all used inside the critical loop
      * for writeString().
      */
-    private int handleEscaping;
-    private int processInlineEscapes;
-    private int useECMA6;
-    private int useSingleLetterEscapes;
-    private int escapeSurrogates;
-    private int isSupplementary;
-    private int isUnmatchedSurrogate;
-    private int isDefined;
-    private int isReplaced;
-    private int didDiscard;
-    private int haveCodePoint;
+
+    // configuration
+    private int handleEscaping;             // if true, then handle escaping
+    private int processInlineEscapes;       // if true, then process inline escapes
+    private int useECMA6;                   // if true, then use ECMAScript 6 escapes
+    private int useSingleLetterEscapes;     // if true, then use single letter JSON escapes
+    private int escapeSurrogates;           // if true, then surrogates should be escaped.
+
+    // current code point state
+    private int isSupplementary;            // if true, then the current code point is supplementary.
+    private int isUnmatchedSurrogate;       // if true, then the current code point is an unmatched surrogate.
+    private int isDefined;                  // if true, then the current code point is defined in Unicode.
+    private int isReplaced;                 // if true, then the current code point was replaced.
+    private int didDiscard;                 // if true, then characters were discarded while getting the current code point.
+    private int haveCodePoint;              // if true, then there's a code point set up for further processing.
 
     /*
      * Regular booleans that are only used outside the critical loop.
      */
-    private boolean noEscapes;
-    private boolean supportEval;
-    private boolean escapeNonAscii;
+    private boolean noProcessing;           // if true, then the string has no processing that needs to be done.
+    private boolean supportEval;            // if true, then support Javascript eval()
+    private boolean escapeNonAscii;         // if true, then escape all non-ASCII characters
 
     /**
      * If this is not null after a run of {@link #nextReady()} then it means
@@ -293,9 +297,9 @@ class StringProcessor
         escapeSurrogates = cfg.isEscapeSurrogates() ? 1 : 0;
 
         // check if there is any escaping to be done.
-        lastProcessIndex = findLastProcess();
-        noEscapes = lastProcessIndex < 0;
-        handleEscaping = noEscapes ? 0 : 1;
+        lastProcessIndex = findLastProcessIndex();
+        noProcessing = lastProcessIndex < 0;
+        handleEscaping = noProcessing ? 0 : 1;
 
         if ( handleEscaping != 0 ){
             if ( this.useSingleLetterEscapes != 0 ){
@@ -424,13 +428,13 @@ class StringProcessor
     }
 
     /**
-     * If true, then there are no escapes in this string.
+     * If true, then there is no processing needed in this string.
      *
-     * @return If true, then there are no escapes in this string.
+     * @return If true, then there is no processing needed in this string.
      */
-    boolean isNoEscapes()
+    boolean isNoProcessing()
     {
-        return noEscapes;
+        return noProcessing;
     }
 
     /**
@@ -446,24 +450,24 @@ class StringProcessor
     /**
      * Write the current string to the given Writer using escaping as needed or
      * requested by the configuration options. If there are no code points that
-     * need to be escaped then this method just writes the entire string. If
-     * there are code points that need to be escaped, then substrings which don't
-     * contain any characters to be escaped are written with a single write for
-     * better efficiency.
+     * need to be dealt with then this method just writes the entire string. If
+     * there are code points that need to be dealt with, then substrings which
+     * don't contain any characters to be escaped are written with a single
+     * write for better efficiency.
      *
      * @param json The writer.
      * @throws IOException if there's an I/O error.
      */
     void writeString( Writer json ) throws IOException
     {
-        lastProcessIndex = findLastProcess();
+        lastProcessIndex = findLastProcessIndex();
 
         if ( lastProcessIndex < 0 ){
             json.write(strValue);   // nothing to process.
             return;
         }
 
-        // escaping necessary.
+        // processing necessary.
         while ( nextIndex < len ){
             nextCodePoint();
 
@@ -481,8 +485,12 @@ class StringProcessor
                 }else if ( isReplaced != 0 ){
                     writeChars(json);
                 }else{
+                    // no special processing on this code point.
                     if ( didDiscard != 0 ){
                         flushCurrentSubstring(json);
+                        if ( index > lastProcessIndex ){
+                            nextIndex = len;    // done.
+                        }
                     }
                     if ( beginIndex < 0 ){
                         beginIndex = index; // start a new sub string.
@@ -562,7 +570,7 @@ class StringProcessor
     private void checkLastProcess()
     {
         if ( nextIndex > lastProcessIndex ){
-            // did last escape. end escape processing.
+            // did last processed code point. end character processing.
             beginIndex = nextIndex;
             endIndex = nextIndex = len;
         }
@@ -581,24 +589,20 @@ class StringProcessor
      */
     boolean nextReady()
     {
-        if ( nextIndex < len ){
-            nextCodePoint();
+        nextCodePoint();
 
-            if ( haveCodePoint != 0 ){
-                if ( handleEscaping != 0 ){
-                    escape = getEscapeIfNeeded();
-                }
-                return true;
-            }else{
-                return false;
+        if ( haveCodePoint != 0 ){
+            if ( handleEscaping != 0 ){
+                escape = getEscapeIfNeeded();
             }
+            return true;
         }else{
             return false;
         }
     }
 
     /**
-     * Set up the next code point.
+     * Set up the data and state variables for the next code point.
      */
     private void nextCodePoint()
     {
@@ -843,7 +847,7 @@ class StringProcessor
      *
      * @return the index of the last code point that needs to be processed or -1 if there isn't one.
      */
-    private int findLastProcess()
+    private int findLastProcessIndex()
     {
         isUnmatchedSurrogate = 0;
         escChecker = getEscapeChecker();

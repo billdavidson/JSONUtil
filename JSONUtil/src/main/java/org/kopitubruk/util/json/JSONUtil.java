@@ -702,7 +702,7 @@ public class JSONUtil
         boolean processInlineEscapes = true;
 
         StringProcessor cp = new StringProcessor(propertyName, cfg, useSingleLetterEscapes, processInlineEscapes);
-        if ( cp.isNoEscapes() && isValidJavascriptPropertyNameImpl(propertyName, cfg) ){
+        if ( cp.isNoProcessing() && isValidJavascriptPropertyNameImpl(propertyName, cfg) ){
             return propertyName;
         }
         StringBuilder buf = new StringBuilder(propertyName.length()+20);

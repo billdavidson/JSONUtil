@@ -703,10 +703,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         cfg.addNumberFormats(getNumberFormatMap());
         cfg.setDateGenFormat(getDateGenFormat());
         cfg.addDateParseFormats(getDateParseFormats());
+
+        // other non-booleans
         cfg.setReflectionPrivacy(reflectionPrivacy);
         cfg.setUndefinedCodePointPolicy(undefinedCodePointPolicy);
         cfg.setUnmatchedSurrogatePolicy(unmatchedSurrogatePolicy);
 
+        // reflection.
         Map<Class<?>,JSONReflectedClass> refClasses = reflectClasses == null ? null : new HashMap<>(reflectClasses.size());
         if ( refClasses != null ){
             for ( Entry<Class<?>,JSONReflectedClass> entry : reflectClasses.entrySet() ){
