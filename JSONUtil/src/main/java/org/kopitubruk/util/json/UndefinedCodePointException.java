@@ -53,14 +53,14 @@ public class UndefinedCodePointException extends JSONException
      * @param cfg the config object.
      * @param strValue the string that contains the undefined code point.
      * @param position the position within the string value of the undefined code point
-     * @param codePointString the hex string of the undefined code point.
+     * @param codePointHexString the hex string of the undefined code point.
      */
-    UndefinedCodePointException( JSONConfig cfg, String strValue, int position, String codePointString )
+    UndefinedCodePointException( JSONConfig cfg, String strValue, int position, String codePointHexString )
     {
         super(cfg);
         this.strValue = strValue;
         this.position = position;
-        codePoint = Integer.parseInt(codePointString, 16);
+        codePoint = Integer.parseInt(codePointHexString, 16);
     }
 
     /**
