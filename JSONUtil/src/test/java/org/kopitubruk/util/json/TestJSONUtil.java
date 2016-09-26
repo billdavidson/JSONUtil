@@ -679,7 +679,8 @@ public class TestJSONUtil
     {
         JSONConfig cfg = new JSONConfig().setUseECMA6(false).setBadCharacterPolicy(JSONConfig.DISCARD);
         Random rand = new Random();
-        final String result = "{\"a\":\"a\",\"b\":\"a\",\"c\":\"\",\"d\":\"aa\"}";
+        final String result = makeResult("");
+
         for ( int i = 0; i <= BAD_CHARS; i++ ){
             assertThat(JSONUtil.toJSON(surrogateTestMap(getRandomSurrogate(rand)), cfg), is(result));
         }
@@ -811,7 +812,7 @@ public class TestJSONUtil
     {
         JSONConfig cfg = new JSONConfig().setUseECMA6(false).setBadCharacterPolicy(JSONConfig.DISCARD);
         Random rand = new Random();
-        final String result = "{\"a\":\"a\",\"b\":\"a\",\"c\":\"\",\"d\":\"aa\"}";
+        final String result = makeResult("");
 
         for ( int i = 0; i <= BAD_CHARS; i++ ){
             assertThat(JSONUtil.toJSON(undefinedTestMap(getRandomUndefined(rand)), cfg), is(result));
