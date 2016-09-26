@@ -701,8 +701,8 @@ public class JSONUtil
         boolean useSingleLetterEscapes = cfg.isFullJSONIdentifierCodePoints();
         boolean processInlineEscapes = true;
 
-        CodePointData cp = new CodePointData(propertyName, cfg, useSingleLetterEscapes, processInlineEscapes);
-        if ( cp.isNoEscapes() && isValidJavascriptPropertyNameImpl(propertyName, cfg) ){
+        StringProcessor cp = new StringProcessor(propertyName, cfg, useSingleLetterEscapes, processInlineEscapes);
+        if ( cp.isNoProcessing() && isValidJavascriptPropertyNameImpl(propertyName, cfg) ){
             return propertyName;
         }
         StringBuilder buf = new StringBuilder(propertyName.length()+20);
@@ -733,15 +733,15 @@ public class JSONUtil
     {
         boolean noNonAscii = true;
         for ( int i = 0, len = str.length(); noNonAscii && i < len; i++ ){
-            noNonAscii = str.charAt(i) <= CodePointData.MAX_ASCII;;
+            noNonAscii = str.charAt(i) <= StringProcessor.MAX_ASCII;;
         }
         if ( noNonAscii ){
             return str;
         }else{
             StringBuilder buf = new StringBuilder(str.length()+20);
-            CodePointData cp = new CodePointData(str, cfg);
+            StringProcessor cp = new StringProcessor(str, cfg);
             while ( cp.nextReady() ){
-                if ( cp.getCodePoint() > CodePointData.MAX_ASCII ){
+                if ( cp.getCodePoint() > StringProcessor.MAX_ASCII ){
                     buf.append(cp.getEscapeString());
                 }else{
                     cp.appendChars(buf);
@@ -762,7 +762,7 @@ public class JSONUtil
     {
         if ( hasSurrogates(str) ){
             StringBuilder buf = new StringBuilder(str.length());
-            CodePointData cp = new CodePointData(str, cfg);
+            StringProcessor cp = new StringProcessor(str, cfg);
             while ( cp.nextReady() ){
                 if ( cp.getCharCount() > 1 ){
                     buf.append(cp.getEscapeString());
@@ -811,11 +811,11 @@ public class JSONUtil
         }else{
             boolean processInlineEscapes = cfg.isPassThroughEscapes();
             if ( cfg.isUnEscapeWherePossible() ){
-                strValue = CodePointData.unEscape(strValue, cfg);
+                strValue = StringProcessor.unEscape(strValue, cfg);
             }
 
             json.write('"');
-            CodePointData cp = new CodePointData(strValue, cfg, processInlineEscapes);
+            StringProcessor cp = new StringProcessor(strValue, cfg, processInlineEscapes);
             cp.writeString(json);
             json.write('"');
         }
@@ -970,7 +970,7 @@ public class JSONUtil
         if ( cfg.isFullJSONIdentifierCodePoints() ){
             return codePoint >= ' ' &&
                     Character.isDefined(codePoint) &&
-                    ! (codePoint <= '\\' && CodePointData.haveJsonEsc((char)codePoint));
+                    ! (codePoint <= '\\' && StringProcessor.haveJsonEsc((char)codePoint));
         }else{
             return cfg.isUseECMA6() ? Character.isUnicodeIdentifierPart(codePoint)
                                     : (isValidIdentifierStart(codePoint, cfg) ||

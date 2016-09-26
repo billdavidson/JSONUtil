@@ -297,7 +297,7 @@ public class JSONParser
             // need an identifier
             if ( token.tokenType == TokenType.STRING || token.tokenType == TokenType.UNQUOTED_ID ){
                 // got an identifier.
-                String key = CodePointData.unEscape(token.value, cfg);
+                String key = StringProcessor.unEscape(token.value, cfg);
                 // need a colon
                 token = tokens.nextToken();
                 if ( token.tokenType == TokenType.COLON ){
@@ -378,7 +378,7 @@ public class JSONParser
         JSONConfig cfg = tokens.getJSONConfig();
         switch ( token.tokenType ){
             case STRING:
-                String unesc = CodePointData.unEscape(token.value, cfg);
+                String unesc = StringProcessor.unEscape(token.value, cfg);
                 if ( cfg.isFormatDates() ){
                     try{
                         return parseDate(unesc, cfg);
@@ -407,7 +407,7 @@ public class JSONParser
                     return Boolean.valueOf(token.value);
                 }
             case DATE:
-                return parseDate(CodePointData.unEscape(token.value, cfg), cfg);
+                return parseDate(StringProcessor.unEscape(token.value, cfg), cfg);
             case START_OBJECT:
             case START_ARRAY:
                 return parseTokens(token, tokens);
