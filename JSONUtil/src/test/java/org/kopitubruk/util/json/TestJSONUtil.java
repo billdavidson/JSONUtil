@@ -416,7 +416,8 @@ public class TestJSONUtil
     @Test
     public void testECMA6UnicodeEscapeInString()
     {
-        JSONConfig cfg = new JSONConfig().setUseECMA6(true).setEscapeNonAscii(true);
+        JSONConfig cfg = new JSONConfig().setUseECMA6(true).setEscapeNonAscii(true)
+                                         .setBadCharacterPolicy(JSONConfig.ESCAPE);
         StringBuilder buf = new StringBuilder();
         Set<Character> singles = new HashSet<Character>(Arrays.asList('\b','\t','\n','\f','\r'));
         Random rand = new Random();
@@ -426,10 +427,15 @@ public class TestJSONUtil
             int cp;
             do{
                 cp = rand.nextInt(bound);
-            }while ( (cp > 0xF && cp < min) || (cp < 0xF && singles.contains((char)cp)) || ! Character.isDefined(cp) );
+            }while ( cp > 0xF && cp < min );
             buf.setLength(0);
             buf.appendCodePoint(cp);
-            String result = '"' + String.format("\\u{%X}", cp) + '"';
+            String result;
+            if ( cp < 0xF && singles.contains((char)cp) ){
+                result = '"' + CodePointData.getEscape((char)cp) + '"';
+            }else{
+                result = '"' + String.format("\\u{%X}", cp) + '"';
+            }
             String json = JSONUtil.toJSON(buf, cfg);
             assertThat(json, is(result));
         }
@@ -441,7 +447,8 @@ public class TestJSONUtil
     @Test
     public void testEscapeGenerator()
     {
-        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setEscapeNonAscii(true);
+        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setEscapeNonAscii(true)
+                                         .setBadCharacterPolicy(JSONConfig.ESCAPE);
         StringBuilder buf = new StringBuilder();
         Set<Character> singles = new HashSet<Character>(Arrays.asList('\b','\t','\n','\f','\r'));
         Random rand = new Random();
@@ -451,18 +458,321 @@ public class TestJSONUtil
             int cp;
             do{
                 cp = rand.nextInt(bound);
-            }while ( (cp >= ' ' && cp < 128) || (cp < 0xF && singles.contains((char)cp)) || ! Character.isDefined(cp) );
+            }while ( cp >= ' ' && cp < 128 );
             buf.setLength(0);
             buf.appendCodePoint(cp);
             String result;
-            if ( cp >= min ){
+            if ( cp < min ){
+                if ( cp < 0xF && singles.contains((char)cp) ){
+                    result = '"' + CodePointData.getEscape((char)cp) + '"';
+                }else{
+                    result = '"' + String.format("\\u%04X", cp) + '"';
+                }
+            }else{
                 int high = buf.charAt(0);
                 int low = buf.charAt(1);
                 result = '"' + String.format("\\u%04X\\u%04X", high, low) + '"';
-            }else{
-                result = '"' + String.format("\\u%04X", cp) + '"';
             }
             String json = JSONUtil.toJSON(buf, cfg);
+            assertThat(json, is(result));
+        }
+    }
+
+    /**
+     * Make the surrogate test and return it.
+     *
+     * @param ch the character being tested.
+     * @return the map.
+     */
+    private Map<String,Object> surrogateTestMap( char ch )
+    {
+        Map<String,Object> jsonObj = new LinkedHashMap<String,Object>();
+
+        jsonObj.put("a", ch+"a");               // start
+        jsonObj.put("b", "a"+ch);               // end
+        jsonObj.put("c", ch);                   // alone
+        jsonObj.put("d", "a" + ch + "a");       // embedded
+
+        return jsonObj;
+    }
+
+    /**
+     * Utility for other tests.
+     *
+     * @param rand a random number generator.
+     * @return a random surrogate.
+     */
+    private char getRandomSurrogate( Random rand )
+    {
+        final int bound = 1 + Character.MAX_LOW_SURROGATE - Character.MIN_HIGH_SURROGATE;
+
+        char ch;
+        do{
+            ch = (char)(rand.nextInt(bound) + Character.MIN_HIGH_SURROGATE);
+        }while ( ! Character.isDefined(ch) || ! JSONUtil.isSurrogate((char)ch) );
+
+        return ch;
+    }
+
+    /**
+     * Test bad character replacement.
+     */
+    @Test
+    public void testReplaceSurrogates()
+    {
+        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setBadCharacterPolicy(JSONConfig.REPLACE);
+        Random rand = new Random();
+        String result = "{\"a\":\"" + CodePointData.UNICODE_REPLACEMENT_CHARACTER +
+                        "a\",\"b\":\"a" + CodePointData.UNICODE_REPLACEMENT_CHARACTER +
+                        "\",\"c\":\"" + CodePointData.UNICODE_REPLACEMENT_CHARACTER +
+                        "\",\"d\":\"a" + CodePointData.UNICODE_REPLACEMENT_CHARACTER + "a\"}";
+
+        for ( int i = 0; i <= 4096; i++ ){
+            char ch = getRandomSurrogate(rand);
+
+            String json = JSONUtil.toJSON(surrogateTestMap(ch), cfg);
+            assertThat(json, is(result));
+        }
+    }
+
+    /**
+     * Test bad character discard.
+     */
+    @Test
+    public void testDiscardSurrogates()
+    {
+        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setBadCharacterPolicy(JSONConfig.DISCARD);
+        Random rand = new Random();
+        String result = "{\"a\":\"a\",\"b\":\"a\",\"c\":\"\",\"d\":\"aa\"}";
+        for ( int i = 0; i <= 4096; i++ ){
+            char ch = getRandomSurrogate(rand);
+
+            String json = JSONUtil.toJSON(surrogateTestMap(ch), cfg);
+            assertThat(json, is(result));
+        }
+    }
+
+    /**
+     * Test bad character exception.
+     */
+    @Test
+    public void testExceptionSurrogates()
+    {
+        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setBadCharacterPolicy(JSONConfig.EXCEPTION);
+        Random rand = new Random();
+
+        for ( int i = 0; i <= 4096; i++ ){
+            char ch = getRandomSurrogate(rand);
+            String result = String.format("Unmatched surrogate U+%04X at position", (int)ch);
+            try{
+                JSONUtil.toJSON(surrogateTestMap(ch), cfg);
+                fail(String.format("Expected a UnmatchedSurrogateException to be thrown."));
+            }catch ( UnmatchedSurrogateException e ){
+                String message = e.getMessage();
+                assertThat(message, containsString(result));
+            }
+        }
+    }
+
+    /**
+     * Test bad character escape.
+     */
+    @Test
+    public void testEscapeBadSurrogates()
+    {
+        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setBadCharacterPolicy(JSONConfig.ESCAPE);
+        Random rand = new Random();
+
+        for ( int i = 0; i <= 4096; i++ ){
+            char ch = getRandomSurrogate(rand);
+            String escape = String.format("\\u%04X", (int)ch);
+            String result = "{\"a\":\"" + escape +
+                            "a\",\"b\":\"a" + escape +
+                            "\",\"c\":\"" + escape +
+                            "\",\"d\":\"a" + escape + "a\"}";
+            String json = JSONUtil.toJSON(surrogateTestMap(ch), cfg);
+            assertThat(json, is(result));
+        }
+    }
+
+    /**
+     * Test bad character pass.
+     */
+    @Test
+    public void testPassSurrogates()
+    {
+        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setBadCharacterPolicy(JSONConfig.PASS);
+        Random rand = new Random();
+
+        for ( int i = 0; i <= 4096; i++ ){
+            char ch = getRandomSurrogate(rand);
+            String result = "{\"a\":\"" + ch +
+                            "a\",\"b\":\"a" + ch +
+                            "\",\"c\":\"" + ch +
+                            "\",\"d\":\"a" + ch + "a\"}";
+            String json = JSONUtil.toJSON(surrogateTestMap(ch), cfg);
+            assertThat(json, is(result));
+        }
+    }
+
+    /**
+     * Make the undefined test map and return it.
+     *
+     * @param cp the code point being tested.
+     * @return the map.
+     */
+    private Map<String,Object> undefinedTestMap( int cp )
+    {
+        Map<String,Object> jsonObj = new LinkedHashMap<String,Object>();
+
+        StringBuilder buf = new StringBuilder();
+
+        buf.setLength(0);
+        buf.appendCodePoint(cp);
+        buf.append("a");
+        jsonObj.put("a", buf.toString());
+
+        buf.setLength(0);
+        buf.append("a");
+        buf.appendCodePoint(cp);
+        jsonObj.put("b", buf.toString());
+
+        buf.setLength(0);
+        buf.appendCodePoint(cp);
+        jsonObj.put("c", buf.toString());
+
+        buf.setLength(0);
+        buf.append("a");
+        buf.appendCodePoint(cp);
+        buf.append("a");
+        jsonObj.put("d", buf.toString());
+
+        return jsonObj;
+    }
+
+    /**
+     * Utility for other tests.
+     *
+     * @param rand a random number generator.
+     * @return a random surrogate.
+     */
+    private int getRandomUndefined( Random rand )
+    {
+        final int bound = Character.MAX_CODE_POINT + 1;
+
+        int cp;
+        do{
+            cp = rand.nextInt(bound);
+        }while (  Character.isDefined(cp) || (cp < Character.MIN_SUPPLEMENTARY_CODE_POINT && JSONUtil.isSurrogate((char)cp)) );
+
+        return cp;
+    }
+
+    /**
+     * Test bad character replacement.
+     */
+    @Test
+    public void testReplaceUndefined()
+    {
+        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setBadCharacterPolicy(JSONConfig.REPLACE);
+        Random rand = new Random();
+        String result = "{\"a\":\"" + CodePointData.UNICODE_REPLACEMENT_CHARACTER +
+                        "a\",\"b\":\"a" + CodePointData.UNICODE_REPLACEMENT_CHARACTER +
+                        "\",\"c\":\"" + CodePointData.UNICODE_REPLACEMENT_CHARACTER +
+                        "\",\"d\":\"a" + CodePointData.UNICODE_REPLACEMENT_CHARACTER + "a\"}";
+
+        for ( int i = 0; i <= 4096; i++ ){
+            int cp = getRandomUndefined(rand);
+            String json = JSONUtil.toJSON(undefinedTestMap(cp), cfg);
+            assertThat(json, is(result));
+        }
+    }
+
+    /**
+     * Test bad character discard.
+     */
+    @Test
+    public void testDiscardUndefined()
+    {
+        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setBadCharacterPolicy(JSONConfig.DISCARD);
+        Random rand = new Random();
+        String result = "{\"a\":\"a\",\"b\":\"a\",\"c\":\"\",\"d\":\"aa\"}";
+
+        for ( int i = 0; i <= 4096; i++ ){
+            int cp = getRandomUndefined(rand);
+            String json = JSONUtil.toJSON(undefinedTestMap(cp), cfg);
+            assertThat(json, is(result));
+        }
+    }
+
+    /**
+     * Test bad character exception.
+     */
+    @Test
+    public void testExceptionUndefined()
+    {
+        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setBadCharacterPolicy(JSONConfig.EXCEPTION);
+        Random rand = new Random();
+
+        for ( int i = 0; i <= 4096; i++ ){
+            int cp = getRandomUndefined(rand);
+            String result = String.format("Undefined code point U+%04X at position", cp);
+            try{
+                JSONUtil.toJSON(undefinedTestMap(cp), cfg);
+                fail(String.format("Expected a UndefinedCodePointException to be thrown."));
+            }catch ( UndefinedCodePointException e ){
+                String message = e.getMessage();
+                assertThat(message, containsString(result));
+            }
+        }
+    }
+
+    /**
+     * Test bad character escape.
+     */
+    @Test
+    public void testEscapeUndefined()
+    {
+        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setBadCharacterPolicy(JSONConfig.ESCAPE);
+        Random rand = new Random();
+
+        for ( int i = 0; i <= 4096; i++ ){
+            int cp = getRandomUndefined(rand);
+            String escape;
+            if ( cp < Character.MIN_SUPPLEMENTARY_CODE_POINT ){
+                escape = String.format("\\u%04X", cp);
+            }else{
+                escape = String.format("\\u%04X\\u%04X", (int)CodePointData.highSurrogate(cp), (int)CodePointData.lowSurrogate(cp));
+            }
+            String result = "{\"a\":\"" + escape +
+                            "a\",\"b\":\"a" + escape +
+                            "\",\"c\":\"" + escape +
+                            "\",\"d\":\"a" + escape + "a\"}";
+            String json = JSONUtil.toJSON(undefinedTestMap(cp), cfg);
+            assertThat(json, is(result));
+        }
+    }
+
+    /**
+     * Test bad character pass.
+     */
+    @Test
+    public void testPassUndefined()
+    {
+        JSONConfig cfg = new JSONConfig().setUseECMA6(false).setBadCharacterPolicy(JSONConfig.PASS);
+        StringBuilder buf = new StringBuilder();
+        Random rand = new Random();
+
+        for ( int i = 0; i <= 4096; i++ ){
+            int cp = getRandomUndefined(rand);
+            buf.setLength(0);
+            buf.appendCodePoint(cp);
+            String pass = buf.toString();
+            String result = "{\"a\":\"" + pass +
+                            "a\",\"b\":\"a" + pass +
+                            "\",\"c\":\"" + pass +
+                            "\",\"d\":\"a" + pass + "a\"}";
+            String json = JSONUtil.toJSON(undefinedTestMap(cp), cfg);
             assertThat(json, is(result));
         }
     }
@@ -484,14 +794,10 @@ public class TestJSONUtil
             jsonObj.put("x", str);
 
             String json = JSONUtil.toJSON(jsonObj, cfg);
-            if ( !(str.indexOf('{') > 0 || str.charAt(1) == 'v') ){
+            String result = "\\v".equals(str) ? "\\u{B}" : str;
+            if ( result.indexOf('{') < 0 ){
                 // Nashorn doesn't understand ECMAScript 6 code point escapes.
                 //validateJSON(json);
-            }
-            String result = str;
-            if ( "\\v".equals(str) ){
-                // illegal for JSON.  This is OK for ECMAScript 6 engines.
-                result = "\\u{B}";
             }
             assertThat(json, is("{\"x\":\""+result+"\"}"));
         }
@@ -517,7 +823,7 @@ public class TestJSONUtil
         JSONConfig cfg = new JSONConfig().setUnEscapeWherePossible(true);
         for ( String str : strs ){
             jsonObj.clear();
-            jsonObj.put("x", str);
+            jsonObj.put("x", str+'Z');
 
             String json = JSONUtil.toJSON(jsonObj, cfg);
             char firstChar = str.charAt(0);
@@ -534,7 +840,7 @@ public class TestJSONUtil
                     result = firstChar + "A";
                     break;
             }
-            assertThat(json, is("{\"x\":\""+result+"\"}"));
+            assertThat(json, is("{\"x\":\""+result+"Z\"}"));
         }
 
         // test that these get fixed regardless.
@@ -544,15 +850,15 @@ public class TestJSONUtil
         // test octal/hex unescape.
         for ( int i = 0; i < 256; i++ ){
             jsonObj.clear();
-            jsonObj.put("x", String.format("a\\%o", i));
-            jsonObj.put("y", String.format("a\\x%02X", i));
+            jsonObj.put("x", String.format("a\\%oZ", i));
+            jsonObj.put("y", String.format("a\\x%02XZ", i));
             String result = CodePointData.getEscape((char)i);
             if ( result == null ){
                 result = i < 0x20 ? String.format("\\u%04X", i) : String.format("%c", (char)i);
             }
             String json = JSONUtil.toJSON(jsonObj, cfg);
             //validateJSON(json);
-            assertThat(json, is("{\"x\":\"a"+result+"\",\"y\":\"a"+result+"\"}"));
+            assertThat(json, is("{\"x\":\"a"+result+"Z\",\"y\":\"a"+result+"Z\"}"));
         }
     }
 
