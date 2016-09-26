@@ -240,6 +240,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     private static volatile IndentPadding indentPadding = null;
     private static volatile Map<Class<?>,JSONReflectedClass> reflectClasses = null;
     private static volatile int reflectionPrivacy;
+    private static volatile int unmatchedSurrogatePolicy;
+    private static volatile int undefinedCodePointPolicy;
 
     // stored for deregistration on unload.
     private static ObjectName mBeanName = null;
@@ -370,9 +372,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             loadReflectClassesFromJNDI(jndiData);
             setFlagsFromJNDI(jndiData);
 
-            reflectionPrivacy = JNDIUtil.getInt(jndiData, "reflectionPrivacy", reflectionPrivacy);
             try{
-                ReflectUtil.confirmPrivacyLevel(reflectionPrivacy, new JSONConfig());
+                jsonConfigDefaults.setReflectionPrivacy(JNDIUtil.getInt(jndiData, "reflectionPrivacy", reflectionPrivacy));
             }catch ( JSONReflectionException ex ){
                 if ( logging ){
                     ensureLogger();
@@ -382,6 +383,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 }
                 reflectionPrivacy = ReflectUtil.PUBLIC;
             }
+
+
+            if ( jndiData.containsKey("badCharacterPolicy") ){
+                setBadCharacterPolicy(JNDIUtil.getInt(jndiData, "badCharacterPolicy", JSONConfig.REPLACE));
+            }
+            jsonConfigDefaults.setUndefinedCodePointPolicy(JNDIUtil.getInt(jndiData, "undefinedCodePointPolicy", undefinedCodePointPolicy));
+            jsonConfigDefaults.setUnmatchedSurrogatePolicy(JNDIUtil.getInt(jndiData, "unmatchedSurrogatePolicy", unmatchedSurrogatePolicy));
         }catch ( Exception e ){
             // Nothing set in JNDI.  Use code defaults.  Not a problem.
             if ( logging ){
@@ -470,8 +478,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Initialize the boolean flags from JNDI. There are so many flags now that
      * I use reflection to look up the setter so that I don't have to change
      * this method every time I add a new flag. It's just at class load time and
-     * it's not that many things really so performance is not really a big issue
-     * in this case.
+     * it's not that many things really so performance is not a big issue in
+     * this case.
      *
      * @param jndiData A map of JNDI data.
      * @throws IllegalAccessException reflection problem.
@@ -561,108 +569,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Apply defaults to the given {@link JSONConfig} object.
-     *
-     * @param cfg The config object to initialize with defaults.
-     * @param loc The locale.
-     * @since 1.5
-     */
-    static synchronized void initJSONConfig( JSONConfig cfg, Locale loc )
-    {
-        cfg.setLocale(loc);
-
-        // formats
-        cfg.addNumberFormats(getNumberFormatMap());
-        cfg.setDateGenFormat(getDateGenFormat());
-        cfg.addDateParseFormats(getDateParseFormats());
-        cfg.setReflectionPrivacy(reflectionPrivacy);
-
-        Map<Class<?>,JSONReflectedClass> refClasses = reflectClasses == null ? null : new HashMap<>(reflectClasses.size());
-        if ( refClasses != null ){
-            for ( Entry<Class<?>,JSONReflectedClass> entry : reflectClasses.entrySet() ){
-                refClasses.put(entry.getKey(), entry.getValue().clone());
-            }
-        }
-        cfg.setReflectClasses(refClasses);
-
-        // validation options.
-        cfg.setValidatePropertyNames(validatePropertyNames);
-        cfg.setDetectDataStructureLoops(detectDataStructureLoops);
-        cfg.setEscapeBadIdentifierCodePoints(escapeBadIdentifierCodePoints);
-        cfg.setFullJSONIdentifierCodePoints(fullJSONIdentifierCodePoints);
-        cfg.setFastStrings(fastStrings);
-
-        // various alternate encoding options.
-        cfg.setEncodeNumericStringsAsNumbers(encodeNumericStringsAsNumbers);
-        cfg.setEscapeNonAscii(escapeNonAscii);
-        cfg.setUnEscapeWherePossible(unEscapeWherePossible);
-        cfg.setEscapeSurrogates(escapeSurrogates);
-        cfg.setPassThroughEscapes(passThroughEscapes);
-        cfg.setEncodeDatesAsStrings(encodeDatesAsStrings);
-        cfg.setReflectUnknownObjects(reflectUnknownObjects);
-        cfg.setPreciseNumbers(preciseNumbers);
-        cfg.setSmallNumbers(smallNumbers);
-        cfg.setUsePrimitiveArrays(usePrimitiveArrays);
-        cfg.setCacheReflectionData(cacheReflectionData);
-
-        // non-standard JSON options.
-        cfg.setQuoteIdentifier(quoteIdentifier);
-        cfg.setUseECMA6(useECMA6);
-        cfg.setAllowReservedWordsInIdentifiers(allowReservedWordsInIdentifiers);
-        cfg.setEncodeDatesAsObjects(encodeDatesAsObjects);
-
-        // indent padding, if any.
-        if ( indentPadding == null ){
-            cfg.setIndentPadding(indentPadding);
-        }else{
-            cfg.setIndentPadding(indentPadding.clone());
-        }
-    }
-
-    /**
-     * Get the number format map.
-     *
-     * @return the number format map.
-     */
-    static Map<Class<? extends Number>,NumberFormat> getNumberFormatMap()
-    {
-        return numberFormatMap;
-    }
-
-    /**
-     * Get the date string generation format.
-     *
-     * @return the dateFormat
-     * @since 1.4
-     */
-    static DateFormat getDateGenFormat()
-    {
-        return dateGenFormat;
-    }
-
-    /**
-     * Get the list of date parsing formats used by the parser when
-     * encodeDatesAsStrings or encodeDatesAsObjects is true.
-     *
-     * @return the list of date parsing formats.
-     * @since 1.4
-     */
-    static List<DateFormat> getDateParseFormats()
-    {
-        return dateParseFormats;
-    }
-
-    /**
-     * Return the JSONConfigDefaults singleton instance.
-     *
-     * @return the JSONConfigDefaults singleton instance.
-     */
-    public static JSONConfigDefaults getInstance()
-    {
-        return jsonConfigDefaults;
-    }
-
-    /**
      * <p>
      * When this package is used by a webapp, and you have an MBean server in your
      * environment, then you should create a ServletContextListener and call this
@@ -719,25 +625,13 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the default indent padding object.
+     * Return the JSONConfigDefaults singleton instance.
      *
-     * @return the padding object.
-     * @since 1.7
+     * @return the JSONConfigDefaults singleton instance.
      */
-    public static synchronized IndentPadding getIndentPadding()
+    public static JSONConfigDefaults getInstance()
     {
-        return indentPadding;
-    }
-
-    /**
-     * Set the padding object.
-     *
-     * @param indentPadding the default indent padding object.
-     * @since 1.7
-     */
-    public static synchronized void setIndentPadding( IndentPadding indentPadding )
-    {
-        JSONConfigDefaults.indentPadding = indentPadding;
+        return jsonConfigDefaults;
     }
 
     /**
@@ -789,6 +683,69 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             indentPadding = null;
             reflectClasses = null;
             reflectionPrivacy = ReflectUtil.PUBLIC;
+            unmatchedSurrogatePolicy = JSONConfig.REPLACE;
+            undefinedCodePointPolicy = JSONConfig.REPLACE;
+        }
+    }
+
+    /**
+     * Apply defaults to the given {@link JSONConfig} object.
+     *
+     * @param cfg The config object to initialize with defaults.
+     * @param loc The locale.
+     * @since 1.5
+     */
+    static synchronized void initJSONConfig( JSONConfig cfg, Locale loc )
+    {
+        cfg.setLocale(loc);
+
+        // formats
+        cfg.addNumberFormats(getNumberFormatMap());
+        cfg.setDateGenFormat(getDateGenFormat());
+        cfg.addDateParseFormats(getDateParseFormats());
+        cfg.setReflectionPrivacy(reflectionPrivacy);
+        cfg.setUndefinedCodePointPolicy(undefinedCodePointPolicy);
+        cfg.setUnmatchedSurrogatePolicy(unmatchedSurrogatePolicy);
+
+        Map<Class<?>,JSONReflectedClass> refClasses = reflectClasses == null ? null : new HashMap<>(reflectClasses.size());
+        if ( refClasses != null ){
+            for ( Entry<Class<?>,JSONReflectedClass> entry : reflectClasses.entrySet() ){
+                refClasses.put(entry.getKey(), entry.getValue().clone());
+            }
+        }
+        cfg.setReflectClasses(refClasses);
+
+        // validation options.
+        cfg.setValidatePropertyNames(validatePropertyNames);
+        cfg.setDetectDataStructureLoops(detectDataStructureLoops);
+        cfg.setEscapeBadIdentifierCodePoints(escapeBadIdentifierCodePoints);
+        cfg.setFullJSONIdentifierCodePoints(fullJSONIdentifierCodePoints);
+        cfg.setFastStrings(fastStrings);
+
+        // various alternate encoding options.
+        cfg.setEncodeNumericStringsAsNumbers(encodeNumericStringsAsNumbers);
+        cfg.setEscapeNonAscii(escapeNonAscii);
+        cfg.setUnEscapeWherePossible(unEscapeWherePossible);
+        cfg.setEscapeSurrogates(escapeSurrogates);
+        cfg.setPassThroughEscapes(passThroughEscapes);
+        cfg.setEncodeDatesAsStrings(encodeDatesAsStrings);
+        cfg.setReflectUnknownObjects(reflectUnknownObjects);
+        cfg.setPreciseNumbers(preciseNumbers);
+        cfg.setSmallNumbers(smallNumbers);
+        cfg.setUsePrimitiveArrays(usePrimitiveArrays);
+        cfg.setCacheReflectionData(cacheReflectionData);
+
+        // non-standard JSON options.
+        cfg.setQuoteIdentifier(quoteIdentifier);
+        cfg.setUseECMA6(useECMA6);
+        cfg.setAllowReservedWordsInIdentifiers(allowReservedWordsInIdentifiers);
+        cfg.setEncodeDatesAsObjects(encodeDatesAsObjects);
+
+        // indent padding, if any.
+        if ( indentPadding == null ){
+            cfg.setIndentPadding(indentPadding);
+        }else{
+            cfg.setIndentPadding(indentPadding.clone());
         }
     }
 
@@ -835,16 +792,6 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     public void setLocale( String languageTag )
     {
         setLocaleLanguageTag(languageTag);
-        if ( logging ){
-            synchronized ( getClass() ){
-                ensureLogger();
-                if ( log.isWarnEnabled() ){
-                    ResourceBundle bundle = JSONUtil.getBundle(getLocale());
-                    log.warn(String.format(bundle.getString("setLocaleDeprecated")));
-                }
-                releaseLogger();
-            }
-        }
     }
 
     /**
@@ -853,6 +800,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * by {@link Locale#getDefault()} will be returned.
      *
      * @return the default locale.
+     * @see JSONConfig#getLocale()
      */
     public static synchronized Locale getLocale()
     {
@@ -863,6 +811,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Set a default locale for new {@link JSONConfig} objects to use.
      *
      * @param loc the default locale.
+     * @see JSONConfig#setLocale(Locale)
      */
     public static synchronized void setLocale( Locale loc )
     {
@@ -870,10 +819,21 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
+     * Get the number format map.
+     *
+     * @return the number format map.
+     */
+    static Map<Class<? extends Number>,NumberFormat> getNumberFormatMap()
+    {
+        return numberFormatMap;
+    }
+
+    /**
      * Get the number format for the given class.
      *
      * @param numericClass A class.
      * @return A number format or null if one has not been set.
+     * @see JSONConfig#getNumberFormat(Class)
      */
     public static synchronized NumberFormat getNumberFormat( Class<? extends Number> numericClass )
     {
@@ -885,6 +845,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param num An object that implements {@link Number}.
      * @return A number format or null if one has not been set.
+     * @see JSONConfig#getNumberFormat(Number)
      */
     public static NumberFormat getNumberFormat( Number num )
     {
@@ -898,6 +859,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param numericClass The class.
      * @param fmt The number format.
+     * @see JSONConfig#addNumberFormat(Class, NumberFormat)
      */
     public static void addNumberFormat( Class<? extends Number> numericClass, NumberFormat fmt )
     {
@@ -920,6 +882,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param numericType The object.
      * @param fmt The number format.
+     * @see JSONConfig#addNumberFormat(Number, NumberFormat)
      */
     public static void addNumberFormat( Number numericType, NumberFormat fmt )
     {
@@ -933,6 +896,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * The formats are cloned for thread safety.
      *
      * @param numFmtMap The input map.
+     * @see JSONConfig#addNumberFormats(Map)
      * @since 1.4
      */
     public static synchronized void addNumberFormats( Map<Class<? extends Number>,NumberFormat> numFmtMap )
@@ -944,6 +908,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Remove the requested class from the default number formats.
      *
      * @param numericClass The class.
+     * @see JSONConfig#removeNumberFormat(Class)
      */
     public static synchronized void removeNumberFormat( Class<? extends Number> numericClass )
     {
@@ -962,6 +927,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Remove the requested class from the default number formats.
      *
      * @param num An object that implements {@link Number}.
+     * @see JSONConfig#removeNumberFormat(Number)
      */
     public static void removeNumberFormat( Number num )
     {
@@ -975,6 +941,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * <p>
      * Accessible via MBean server.
      *
+     * @see JSONConfig#clearNumberFormats()
      * @since 1.4
      */
     @Override
@@ -986,6 +953,17 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
+     * Get the date string generation format.
+     *
+     * @return the dateFormat
+     * @since 1.4
+     */
+    static DateFormat getDateGenFormat()
+    {
+        return dateGenFormat;
+    }
+
+    /**
      * Set the date format used for date string generation when
      * encodeDatesAsStrings or encodeDatesAsObjects is true.
      * <p>
@@ -994,7 +972,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @param fmtStr passed to the constructor for
      * {@link SimpleDateFormat#SimpleDateFormat(String,Locale)} using
      * the result of {@link #getLocale()}.
-     * @return the format that is created.
+     * @return the format that is created so that it can be modified.
+     * @see JSONConfig#setDateGenFormat(String)
      * @since 1.4
      */
     @Override
@@ -1015,6 +994,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * or encodeDatesAsObjects is true.
      *
      * @param fmt the dateFormat to set
+     * @see JSONConfig#setDateGenFormat(DateFormat)
      * @since 1.4
      */
     public static synchronized void setDateGenFormat( DateFormat fmt )
@@ -1029,6 +1009,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * <p>
      * Accessible via MBean server.
      *
+     * @see JSONConfig#clearDateGenFormat()
      * @since 1.4
      */
     @Override
@@ -1037,6 +1018,18 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         synchronized ( getClass() ){
             dateGenFormat = null;
         }
+    }
+
+    /**
+     * Get the list of date parsing formats used by the parser when
+     * encodeDatesAsStrings or encodeDatesAsObjects is true.
+     *
+     * @return the list of date parsing formats.
+     * @since 1.4
+     */
+    static List<DateFormat> getDateParseFormats()
+    {
+        return dateParseFormats;
     }
 
     /**
@@ -1049,7 +1042,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @param fmtStr Passed to
      * {@link SimpleDateFormat#SimpleDateFormat(String,Locale)} using
      * the result of {@link #getLocale()}.
-     * @return The format that gets created.
+     * @return The format that gets created so that it can be modified.
+     * @see JSONConfig#addDateParseFormat(String)
      * @since 1.4
      */
     @Override
@@ -1067,6 +1061,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * same order that they were added.
      *
      * @param fmt A date parsing format.
+     * @see JSONConfig#addDateParseFormat(DateFormat)
      * @since 1.4
      */
     public static void addDateParseFormat( DateFormat fmt )
@@ -1082,6 +1077,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * or encodeDatesAsObjects is true.
      *
      * @param fmts A collection of date parsing formats.
+     * @see JSONConfig#addDateParseFormats(Collection)
      * @since 1.4
      */
     public static synchronized void addDateParseFormats( Collection<? extends DateFormat> fmts )
@@ -1094,6 +1090,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * when encodeDatesAsStrings or encodeDatesAsObjects is true.
      * <p>
      * Accessible via MBean server.
+     * @see JSONConfig#clearDateParseFormats()
      */
     @Override
     public void clearDateParseFormats()
@@ -1104,11 +1101,40 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
+     * Get the default indent padding object.
+     *
+     * @return the padding object.
+     * @see JSONConfig#getIndentPadding()
+     * @since 1.7
+     */
+    public static synchronized IndentPadding getIndentPadding()
+    {
+        return indentPadding;
+    }
+
+    /**
+     * Set the padding object.
+     *
+     * @param indentPadding the default indent padding object.
+     * @see JSONConfig#setIndentPadding(IndentPadding)
+     * @since 1.7
+     */
+    public static synchronized void setIndentPadding( IndentPadding indentPadding )
+    {
+        JSONConfigDefaults.indentPadding = indentPadding;
+    }
+
+    /**
      * Get the reflection privacy level.
      * <p>
      * Accessible via MBean server.
      *
      * @return the reflection privacy level.
+     * @see ReflectUtil#PRIVATE
+     * @see ReflectUtil#PACKAGE
+     * @see ReflectUtil#PROTECTED
+     * @see ReflectUtil#PUBLIC
+     * @see JSONConfig#getReflectionPrivacy()
      * @since 1.9
      */
     @Override
@@ -1129,6 +1155,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @see ReflectUtil#PACKAGE
      * @see ReflectUtil#PROTECTED
      * @see ReflectUtil#PUBLIC
+     * @see JSONConfig#setReflectionPrivacy(int)
      * @since 1.9
      */
     @Override
@@ -1137,6 +1164,9 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
         int privacyLevel;
         try{
             privacyLevel = ReflectUtil.confirmPrivacyLevel(dflt, new JSONConfig());
+            synchronized ( getClass() ){
+                reflectionPrivacy = privacyLevel;
+            }
         }catch ( JSONReflectionException e ){
             synchronized ( getClass() ){
                 if ( logging ){
@@ -1149,17 +1179,15 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
                 throw new MBeanException(e);   // MBeans should only throw MBeanExceptions.
             }
         }
-        synchronized ( getClass() ){
-            reflectionPrivacy = privacyLevel;
-        }
     }
 
     /**
-     * Return true if objects with the same class given object are in the set of
-     * classes being automatically reflected.
+     * Return true if the given class is in the set of classes being
+     * automatically reflected.
      *
      * @param obj An object to check
-     * @return true if objects of the same type are reflected.
+     * @return true if objects of the given type are reflected.
+     * @see JSONConfig#isReflectClass(Object)
      * @since 1.9
      */
     public static boolean isReflectClass( Object obj )
@@ -1170,10 +1198,11 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     /**
      * Get the {@link JSONReflectedClass} for the given object if it is stored.
      * The main reason that you might want to use this is to modify the fields
-     * that are reflected in the class.
+     * or aliases that are reflected in the class.
      *
      * @param obj The class to look up.
      * @return the reflected class object or null if not found.
+     * @see JSONConfig#getReflectedClass(Object)
      */
     public static synchronized JSONReflectedClass getReflectedClass( Object obj )
     {
@@ -1205,6 +1234,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *            {@link ClassLoader#loadClass(String)} followed optionally by a
      *            comma separated list of field names and/or field aliases.
      * @throws MBeanException If there's a problem loading the class.
+     * @see JSONConfig#addReflectClassByName(String)
      * @since 1.9
      */
     @Override
@@ -1225,6 +1255,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param obj The object whose class to add to the reflect list.
      * @see JSONReflectedClass
+     * @see JSONConfig#addReflectClass(Object)
      * @since 1.9
      */
     public static synchronized void addReflectClass( Object obj )
@@ -1239,6 +1270,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param classes The objects to reflect.
      * @see JSONReflectedClass
+     * @see JSONConfig#addReflectClasses(Collection)
      * @since 1.9
      */
     public static synchronized void addReflectClasses( Collection<?> classes )
@@ -1296,6 +1328,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * then all objects in it will be removed.
      *
      * @param obj An object of the type to be removed from the reflect list.
+     * @see JSONConfig#removeReflectClass(Object)
      * @since 1.9
      */
     public static synchronized void removeReflectClass( Object obj )
@@ -1308,6 +1341,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * that automatically get reflected.
      *
      * @param classes The classes to remove.
+     * @see JSONConfig#removeReflectClasses(Collection)
      * @since 1.9
      */
     public static synchronized void removeReflectClasses( Collection<?> classes )
@@ -1318,7 +1352,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     /**
      * Clear all reflection classes, disabling all default automatic selective
      * reflection.
+     * <p>
+     * Accessible via MBean server.
      *
+     * @see JSONConfig#clearReflectClasses()
      * @since 1.9
      */
     @Override
@@ -1331,6 +1368,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Clear the reflection cache, if any.
+     * <p>
+     * Accessible via MBean server.
      *
      * @since 1.9
      */
@@ -1342,6 +1381,8 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
 
     /**
      * Get a string with newline separated list of classes that get reflected.
+     * <p>
+     * Accessible via MBean server.
      *
      * @return A string with newline separated list of classes that get reflected.
      * @since 1.9
@@ -1384,11 +1425,136 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
+     * Get the default policy for unmatched surrogates.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @return the default policy for unmatched surrogates.
+     * @see JSONConfig#REPLACE
+     * @see JSONConfig#DISCARD
+     * @see JSONConfig#EXCEPTION
+     * @see JSONConfig#ESCAPE
+     * @see JSONConfig#PASS
+     * @see JSONConfig#getUnmatchedSurrogatePolicy()
+     */
+    @Override
+    public int getUnmatchedSurrogatePolicy()
+    {
+        return unmatchedSurrogatePolicy;
+    }
+
+    /**
+     * Tell JSONUtil what to do by default when it encounters unmatched surrogates in strings
+     * and identifiers.  The permitted values are:
+     * <ul>
+     *   <li>{@link JSONConfig#REPLACE} - Replace with Unicode replacement character U+FFFD (default)</li>
+     *   <li>{@link JSONConfig#DISCARD} - Discard them.</li>
+     *   <li>{@link JSONConfig#EXCEPTION} - Throw a {@link UndefinedCodePointException}</li>
+     *   <li>{@link JSONConfig#ESCAPE} - Include them but escape them</li>
+     *   <li>{@link JSONConfig#PASS} - Pass them through unmodified.</li>
+     * </ul>
+     * Any other value will be ignored.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @param dflt the default unmatchedSurrogatePolicy to set
+     * @see JSONConfig#setUnmatchedSurrogatePolicy(int)
+     */
+    @Override
+    public void setUnmatchedSurrogatePolicy( int dflt )
+    {
+        switch ( dflt )
+        {
+            case JSONConfig.REPLACE:
+            case JSONConfig.DISCARD:
+            case JSONConfig.EXCEPTION:
+            case JSONConfig.ESCAPE:
+            case JSONConfig.PASS:
+                synchronized ( getClass() ){
+                    unmatchedSurrogatePolicy = dflt;
+                }
+                break;
+        }
+    }
+
+    /**
+     * Get the default policy for undefined code points.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @return the policy for undefined code points.
+     * @see JSONConfig#REPLACE
+     * @see JSONConfig#DISCARD
+     * @see JSONConfig#EXCEPTION
+     * @see JSONConfig#ESCAPE
+     * @see JSONConfig#PASS
+     * @see JSONConfig#getUndefinedCodePointPolicy()
+     */
+    @Override
+    public int getUndefinedCodePointPolicy()
+    {
+        return undefinedCodePointPolicy;
+    }
+
+    /**
+     * Tell JSONUtil what to do by default when it encounters undefined code points in strings
+     * and identifiers.  The permitted values are:
+     * <ul>
+     *   <li>{@link JSONConfig#REPLACE} - Replace with Unicode replacement character U+FFFD (default)</li>
+     *   <li>{@link JSONConfig#DISCARD} - Discard them.</li>
+     *   <li>{@link JSONConfig#EXCEPTION} - Throw a {@link UndefinedCodePointException}</li>
+     *   <li>{@link JSONConfig#ESCAPE} - Include them but escape them</li>
+     *   <li>{@link JSONConfig#PASS} - Pass them through unmodified.</li>
+     * </ul>
+     * Any other value will be ignored.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @param dflt the default undefinedCodePointPolicy to set
+     * @see JSONConfig#setUndefinedCodePointPolicy(int)
+     */
+    @Override
+    public void setUndefinedCodePointPolicy( int dflt )
+    {
+        switch ( dflt )
+        {
+            case JSONConfig.REPLACE:
+            case JSONConfig.DISCARD:
+            case JSONConfig.EXCEPTION:
+            case JSONConfig.ESCAPE:
+            case JSONConfig.PASS:
+                synchronized ( getClass() ){
+                    undefinedCodePointPolicy = dflt;
+                }
+                break;
+        }
+    }
+
+    /**
+     * Convenience method to call both {@link #setUnmatchedSurrogatePolicy(int)}
+     * and {@link #setUndefinedCodePointPolicy(int)} using the same value.
+     *
+     * @param badCharacterPolicy the badCharacterPolicy to set
+     * @see JSONConfig#REPLACE
+     * @see JSONConfig#DISCARD
+     * @see JSONConfig#EXCEPTION
+     * @see JSONConfig#ESCAPE
+     * @see JSONConfig#PASS
+     * @see JSONConfig#setBadCharacterPolicy(int)
+     */
+    public static synchronized void setBadCharacterPolicy( int badCharacterPolicy )
+    {
+        jsonConfigDefaults.setUnmatchedSurrogatePolicy(badCharacterPolicy);
+        jsonConfigDefaults.setUndefinedCodePointPolicy(badCharacterPolicy);
+    }
+
+    /**
      * Get the default validate property names policy.
      * <p>
      * Accessible via MBean server.
      *
      * @return The default validate property names policy.
+     * @see JSONConfig#isValidatePropertyNames()
      */
     @Override
     public boolean isValidatePropertyNames()
@@ -1404,6 +1570,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @param dflt If true, then property names will be validated by default.
+     * @see JSONConfig#setValidatePropertyNames(boolean)
      */
     @Override
     public void setValidatePropertyNames( boolean dflt )
@@ -1418,6 +1585,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @return The default detect data structure loops policy.
+     * @see JSONConfig#isDetectDataStructureLoops()
      */
     @Override
     public boolean isDetectDataStructureLoops()
@@ -1435,6 +1603,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @param dflt If true, then the code will detect loops in data structures.
+     * @see JSONConfig#setDetectDataStructureLoops(boolean)
      */
     @Override
     public void setDetectDataStructureLoops( boolean dflt )
@@ -1450,6 +1619,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @return The default escape bad identifier code points policy.
+     * @see JSONConfig#isEscapeBadIdentifierCodePoints()
      */
     @Override
     public boolean isEscapeBadIdentifierCodePoints()
@@ -1464,6 +1634,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @param dflt if true, then any bad code points in identifiers will be escaped.
+     * @see JSONConfig#setEscapeBadIdentifierCodePoints(boolean)
      */
     @Override
     public void setEscapeBadIdentifierCodePoints( boolean dflt )
@@ -1479,6 +1650,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @return the fullJSONIdentifierCodePoints
+     * @see JSONConfig#isFullJSONIdentifierCodePoints()
      */
     @Override
     public boolean isFullJSONIdentifierCodePoints()
@@ -1496,6 +1668,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @param dflt If true, then allow all code points permitted by the JSON standard in identifiers.
+     * @see JSONConfig#setFullJSONIdentifierCodePoints(boolean)
      */
     @Override
     public void setFullJSONIdentifierCodePoints( boolean dflt )
@@ -1512,6 +1685,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Get the fastStrings policy.
      *
      * @return the fastStrings policy
+     * @see JSONConfig#isFastStrings()
      */
     @Override
     public boolean isFastStrings()
@@ -1523,18 +1697,19 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * If true, then string values will be copied to the output with no escaping
      * or validation.
      * <p>
-     * Only use this if you know that you have no characters in the range
-     * U+0000-U+001F or backslash or forward slash or double quote in your
-     * strings. If you want your JSON to be parsable by Javascript eval() then
-     * you also need to make sure that you don't have U+2028 (line separator) or
-     * U+2029 (paragraph separator).
+     * Only use this if you know that you have no unescaped characters in the
+     * range U+0000-U+001F or unescaped backslash or forward slash or double
+     * quote in your strings. If you want your JSON to be parsable by Javascript
+     * eval() then you also need to make sure that you don't have U+2028 (line
+     * separator) or U+2029 (paragraph separator).
      * <p>
-     * That said, if you are encoding a lot of large strings, this can
-     * improve performance by eliminating the check for characters that need
-     * to be escaped.
+     * That said, if you are encoding a lot of large strings, this can improve
+     * performance by eliminating the check for characters that need to be
+     * escaped.
      *
-     * @param dflt If true, then strings will be copied as is with no
-     *            escaping or validation.
+     * @param dflt If true, then string values will be copied as is with no escaping
+     *            or validation.
+     * @see JSONConfig#setFastStrings(boolean)
      */
     @Override
     public void setFastStrings( boolean dflt )
@@ -1550,6 +1725,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @return The default encode numeric strings as numbers policy.
+     * @see JSONConfig#isEncodeNumericStringsAsNumbers()
      */
     @Override
     public boolean isEncodeNumericStringsAsNumbers()
@@ -1564,6 +1740,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true, then strings that look like valid JSON numbers
      * will be encoded as numbers.
+     * @see JSONConfig#setEncodeNumericStringsAsNumbers(boolean)
      */
     @Override
     public void setEncodeNumericStringsAsNumbers( boolean dflt )
@@ -1579,6 +1756,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @return The default quote non-ASCII policy.
+     * @see JSONConfig#isEscapeNonAscii()
      */
     @Override
     public boolean isEscapeNonAscii()
@@ -1595,6 +1773,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @param dflt If true, then all non-ASCII will be Unicode escaped.
+     * @see JSONConfig#setEscapeNonAscii(boolean)
      */
     @Override
     public void setEscapeNonAscii( boolean dflt )
@@ -1608,39 +1787,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the default unEscape policy.
-     * <p>
-     * Accessible via MBean server.
-     *
-     * @return the unEscape policy.
-     */
-    @Override
-    public boolean isUnEscapeWherePossible()
-    {
-        return unEscapeWherePossible;
-    }
-
-    /**
-     * Set default flag for undoing inline escapes in strings.
-     * <p>
-     * Accessible via MBean server.
-     *
-     * @param dflt If true then where possible, undo inline escapes in strings.
-     */
-    @Override
-    public void setUnEscapeWherePossible( boolean dflt )
-    {
-        synchronized ( getClass() ){
-            unEscapeWherePossible = dflt;
-        }
-    }
-
-    /**
      * Get the default escape surrogates policy.
      * <p>
      * Accessible via MBean server.
      *
      * @return the escape surrogates policy.
+     * @see JSONConfig#isEscapeSurrogates()
      */
     @Override
     public boolean isEscapeSurrogates()
@@ -1655,6 +1807,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true, then surrogates will be escaped in strings and identifiers
      * and escapeNonAscii will be forced to false.
+     * @see JSONConfig#setEscapeSurrogates(boolean)
      */
     @Override
     public void setEscapeSurrogates( boolean dflt )
@@ -1668,11 +1821,42 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
+     * Get the default unEscape policy.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @return the unEscape policy.
+     * @see JSONConfig#isUnEscapeWherePossible()
+     */
+    @Override
+    public boolean isUnEscapeWherePossible()
+    {
+        return unEscapeWherePossible;
+    }
+
+    /**
+     * Set default flag for undoing inline escapes in strings.
+     * <p>
+     * Accessible via MBean server.
+     *
+     * @param dflt If true then where possible, undo inline escapes in strings.
+     * @see JSONConfig#setUnEscapeWherePossible(boolean)
+     */
+    @Override
+    public void setUnEscapeWherePossible( boolean dflt )
+    {
+        synchronized ( getClass() ){
+            unEscapeWherePossible = dflt;
+        }
+    }
+
+    /**
      * Get the pass through escapes policy.
      * <p>
      * Accessible via MBean server.
      *
      * @return The pass through escapes policy.
+     * @see JSONConfig#isPassThroughEscapes()
      */
     @Override
     public boolean isPassThroughEscapes()
@@ -1687,6 +1871,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @param dflt If true, then pass escapes through.
+     * @see JSONConfig#setPassThroughEscapes(boolean)
      */
     @Override
     public void setPassThroughEscapes( boolean dflt )
@@ -1702,6 +1887,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @return the encodeDatesAsStrings policy.
+     * @see JSONConfig#isEncodeDatesAsStrings()
      */
     @Override
     public boolean isEncodeDatesAsStrings()
@@ -1718,6 +1904,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * @param dflt If true, then {@link Date} objects will be encoded as ISO 8601 date
      * strings or a custom date format if you have called
      * {@link #setDateGenFormat(DateFormat)}.
+     * @see JSONConfig#setEncodeDatesAsStrings(boolean)
      */
     @Override
     public synchronized void setEncodeDatesAsStrings( boolean dflt )
@@ -1731,11 +1918,12 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the reflection of unknown objects policy.
+     * Get the default reflection of unknown objects policy.
      * <p>
      * Accessible via MBean server.
      *
      * @return the reflectUnknownObjects policy.
+     * @see JSONConfig#isReflectUnknownObjects()
      * @since 1.9
      */
     @Override
@@ -1745,15 +1933,19 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Set the reflection encoding policy.  If true, then any time that an
-     * unknown object is encountered, this package will attempt to use
-     * reflection to encode it.  Default is false.  When false, then unknown
-     * objects will have their toString() method called.
+     * Set the default unknown object reflection encoding policy. If true, then
+     * any time that an unknown object is encountered, this package will attempt
+     * to use reflection to encode it. Default is false. When false, then
+     * unknown objects will have their toString() method called.
      * <p>
      * Accessible via MBean server.
      *
-     * @param dflt If true, then attempt to use reflection
-     * to encode objects which are otherwise unknown.
+     * @param dflt If true, then attempt to use reflection to encode objects
+     *            which are otherwise unknown.
+     * @see #addReflectClass(Object)
+     * @see #addReflectClasses(Collection)
+     * @see #addReflectClassByName(String)
+     * @see JSONConfig#setReflectUnknownObjects(boolean)
      * @since 1.9
      */
     @Override
@@ -1765,9 +1957,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the preciseIntegers policy.
+     * Get the default preciseIntegers policy.
      *
      * @return The preciseIntegers policy.
+     * @see JSONConfig#isPreciseNumbers()
      * @since 1.9
      */
     @Override
@@ -1783,6 +1976,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * lost in the interpreter.
      *
      * @param dflt If true then quote numbers that lose precision in 64-bit floating point.
+     * @see JSONConfig#setPreciseNumbers(boolean)
      * @since 1.9
      */
     @Override
@@ -1794,9 +1988,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the smallNumbers policy.
+     * Get the default smallNumbers policy.
      *
      * @return The smallNumbers policy.
+     * @see JSONConfig#isSmallNumbers()
      * @since 1.9
      */
     @Override
@@ -1813,6 +2008,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * or short or byte if they fit.
      *
      * @param dflt If true then numbers will be made to use as little memory as possible.
+     * @see JSONConfig#setSmallNumbers(boolean)
      * @since 1.9
      */
     @Override
@@ -1824,9 +2020,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * The primitive arrays policy.
+     * The default primitive arrays policy.
      *
      * @return the usePrimitiveArrays policy.
+     * @see JSONConfig#isUsePrimitiveArrays()
      * @since 1.9
      */
     @Override
@@ -1850,6 +2047,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * memory as possible.
      *
      * @param dflt if true, then the parser will create arrays of primitives as applicable.
+     * @see JSONConfig#setUsePrimitiveArrays(boolean)
      * @since 1.9
      */
     @Override
@@ -1861,9 +2059,10 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * Get the the cacheReflectionData policy.
+     * Get the default cacheReflectionData policy.
      *
      * @return the cacheReflectionData policy.
+     * @see JSONConfig#isCacheReflectionData()
      * @since 1.9
      */
     @Override
@@ -1878,6 +2077,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * of objects of its class.
      *
      * @param dflt if true, then cache reflection data.
+     * @see JSONConfig#setCacheReflectionData(boolean)
      * @since 1.9
      */
     @Override
@@ -1897,6 +2097,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @return The default quote identifier policy.
+     * @see JSONConfig#isQuoteIdentifier()
      */
     @Override
     public boolean isQuoteIdentifier()
@@ -1912,6 +2113,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @param dflt If true, then all identifiers will be quoted.
+     * @see JSONConfig#setQuoteIdentifier(boolean)
      */
     @Override
     public void setQuoteIdentifier( boolean dflt )
@@ -1927,6 +2129,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @return The default escape ECMAScript 6 code points policy.
+     * @see JSONConfig#isUseECMA6()
      */
     @Override
     public boolean isUseECMA6()
@@ -1935,7 +2138,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
     }
 
     /**
-     * If you set this to true, then when JSONUtil generates Unicode
+     * If you set this to true, then by default when JSONUtil generates Unicode
      * escapes, it will use ECMAScript 6 code point escapes if they are shorter
      * than code unit escapes. This is not standard JSON and not yet widely
      * supported by Javascript interpreters. It also allows identifiers to have
@@ -1945,6 +2148,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true, use EMCAScript 6 code point escapes and allow
      * ECMAScript 6 identifier character set.
+     * @see JSONConfig#setUseECMA6(boolean)
      */
     @Override
     public void setUseECMA6( boolean dflt )
@@ -1960,6 +2164,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @return the reserverd words in identifiers policy.
+     * @see JSONConfig#isAllowReservedWordsInIdentifiers()
      */
     @Override
     public boolean isAllowReservedWordsInIdentifiers()
@@ -1973,6 +2178,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @param dflt If true, then reserved words will be allowed in identifiers.
+     * @see JSONConfig#setAllowReservedWordsInIdentifiers(boolean)
      */
     @Override
     public void setAllowReservedWordsInIdentifiers( boolean dflt )
@@ -1988,6 +2194,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      * Accessible via MBean server.
      *
      * @return the encodeDatesAsObjects policy.
+     * @see JSONConfig#isEncodeDatesAsObjects()
      */
     @Override
     public boolean isEncodeDatesAsObjects()
@@ -2005,6 +2212,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
      *
      * @param dflt If true, then {@link Date} objects will be encoded as
      * Javascript dates.
+     * @see JSONConfig#setEncodeDatesAsObjects(boolean)
      */
     @Override
     public synchronized void setEncodeDatesAsObjects( boolean dflt )
