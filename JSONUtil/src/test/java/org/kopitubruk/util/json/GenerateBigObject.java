@@ -133,10 +133,10 @@ public class GenerateBigObject
 
     private static String getValue( Random rand, JSONConfig cfg )
     {
-        Set<Character> badChars = new HashSet<Character>(CodePointData.JSON_ESC_MAP.keySet());
+        Set<Character> badChars = new HashSet<Character>(StringProcessor.JSON_ESC_MAP.keySet());
         List<Character> escs = new ArrayList<Character>(badChars);
         escs.remove(Character.valueOf('/'));
-        badChars.addAll(Arrays.asList(CodePointData.LINE_SEPARATOR, CodePointData.PARAGRAPH_SEPARATOR));
+        badChars.addAll(Arrays.asList(StringProcessor.LINE_SEPARATOR, StringProcessor.PARAGRAPH_SEPARATOR));
 
         int[] value = new int[MAX_VAL_LENGTH];
         int escBnd = 48;
