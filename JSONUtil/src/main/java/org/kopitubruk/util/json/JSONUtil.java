@@ -707,7 +707,7 @@ public class JSONUtil
         }
         StringBuilder buf = new StringBuilder(propertyName.length()+20);
         while ( cp.nextReady() ){
-            String esc = cp.getEsc();
+            String esc = cp.getEscape();
             if ( esc != null ){
                 buf.append(esc);                        // have valid escape
             }else if ( cp.getIndex() > 0 && isValidIdentifierPart(cp.getCodePoint(), cfg) ){
