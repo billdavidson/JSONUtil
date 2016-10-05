@@ -35,7 +35,8 @@ and controlling the way that the JSON is generated.
 [Report Issues](https://github.com/billdavidson/JSONUtil/issues)
 
 ### What's New
-* Sep 26 - [JSONUtil 1.10.2](https://github.com/billdavidson/JSONUtil/releases/tag/JSONUtil-1.10.2) released with better handling of bad character data.
+* Oct 05 - [JSONUtil 1.10.4](https://github.com/billdavidson/JSONUtil/releases/tag/JSONUtil-1.10.4) released with change to default for undefined code points.
+* Sep 26 - JSONUtil 1.10.2 released with better handling of bad character data.
 * Sep 19 - JSONUtil 1.10.1 released with major speed enhancement for encoding strings that require escaping.
 * Sep 14 - JSONUtil 1.10.0 released with major speed enhancements for encoding strings and numbers.
 * Aug 17 - [JMX MBean Wiki page updated with images](https://github.com/billdavidson/JSONUtil/wiki/Viewing-and-Modifying-Configuration-Defaults-Using-a-JMX-MBean-Client)
