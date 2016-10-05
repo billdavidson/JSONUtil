@@ -16,7 +16,6 @@
 package org.kopitubruk.util.json;
 
 import java.io.IOException;
-import java.io.StringWriter;
 import java.io.Writer;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -321,7 +320,7 @@ public class JSONUtil
         try{
             toJSON(obj, cfg, json);
         }catch ( IOException e ){
-            // won't happen because StringWriter is really just a wrapper around a StringBuffer.
+            // Won't happen because StringWriter doesn't throw IOException
         }
         return json.toString();
     }
@@ -349,7 +348,7 @@ public class JSONUtil
      * Convert an object to JSON and write it to the given {@link Writer}. Using
      * a {@link Writer} may be preferable in servlets, particularly if the data
      * is large because it can use a lot less memory than a
-     * {@link java.lang.StringBuffer} by sending the data to the browser via a
+     * {@link StringWriter} by sending the data to the browser via a
      * {@link java.io.BufferedWriter} on the output stream as it is being
      * generated. The downside of that is that you could have an error after
      * data begins being sent, which could result in corrupted partial data
@@ -368,12 +367,18 @@ public class JSONUtil
         }catch ( IOException e ){
             // in case the original calling code catches the exception and reuses the JSONConfig.
             jcfg.clearObjStack();
+            IndentPadding.reset(jcfg);
             throw e;
         }catch ( RuntimeException e ){
-            // in case the original calling code catches the exception and reuses the JSONConfig.
+            // in case the calling code catches the Throwable and reuses the JSONConfig.
             jcfg.clearObjStack();
             IndentPadding.reset(jcfg);
             throw e;
+        }catch ( Throwable e ){
+            // in case the calling code catches the Throwable and reuses the JSONConfig.
+            jcfg.clearObjStack();
+            IndentPadding.reset(jcfg);
+            throw new RuntimeException(e);
         }
     }
 
@@ -381,14 +386,16 @@ public class JSONUtil
      * <p>
      *   Append the given value to the given writer. There is special handling for
      *   null, {@link Number}s, {@link JSONAble}s, {@link Map}s,
-     *   {@link ResourceBundle}s, {@link Iterable}s, {@link Enumeration}s and arrays.
+     *   {@link ResourceBundle}s, {@link Iterable}s, {@link Enumeration}s, arrays
+     *   and reflected objects.
      *   Booleans and null are encoded as Javascript literals.
      *   All other objects just get their toString() methods called, surrounded by
      *   double quotes with internal double quotes escaped.
      * </p>
      * <p>
      *   This method is recursively called on values when handling {@link Map}s,
-     *   {@link Iterable}s, {@link Enumeration}s, {@link ResourceBundle}s and arrays.
+     *   {@link Iterable}s, {@link Enumeration}s, {@link ResourceBundle}s and arrays
+     *   or when reflection is enabled for the object.
      * </p>
      *
      * @param propertyValue The value to append.
@@ -827,14 +834,12 @@ public class JSONUtil
         }else if ( cfg.isFastStrings() ){
             fastWriteString(strValue, json);
         }else{
-            boolean processInlineEscapes = cfg.isPassThroughEscapes();
             if ( cfg.isUnEscapeWherePossible() ){
                 strValue = StringProcessor.unEscape(strValue, cfg);
             }
 
             json.write('"');
-            StringProcessor cp = new StringProcessor(strValue, cfg, processInlineEscapes);
-            cp.writeString(json);
+            new StringProcessor(strValue, cfg, cfg.isPassThroughEscapes()).writeString(json);
             json.write('"');
         }
     }
