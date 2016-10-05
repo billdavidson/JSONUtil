@@ -684,7 +684,7 @@ public class JSONConfigDefaults implements JSONConfigDefaultsMBean, Serializable
             reflectClasses = null;
             reflectionPrivacy = ReflectUtil.PUBLIC;
             unmatchedSurrogatePolicy = JSONConfig.REPLACE;
-            undefinedCodePointPolicy = JSONConfig.REPLACE;
+            undefinedCodePointPolicy = JSONConfig.PASS;
         }
     }
 

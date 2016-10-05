@@ -488,7 +488,7 @@ class StringProcessor
                     // no special processing on this code point.
                     if ( didDiscard != 0 ){
                         flushCurrentSubstring(json);
-                        if ( index > lastProcessIndex ){
+                        if ( nextIndex > lastProcessIndex ){
                             nextIndex = len;    // done.
                         }
                     }
@@ -687,9 +687,8 @@ class StringProcessor
     private void replaceCodePoint()
     {
         codePoint = chars[0] = UNICODE_REPLACEMENT_CHARACTER;
-        charCount = 1;
         isSupplementary = isUnmatchedSurrogate = 0;
-        isDefined = isReplaced = 1;
+        isDefined = isReplaced = charCount = 1;
     }
 
     /**
@@ -700,7 +699,7 @@ class StringProcessor
     private String getEscapeIfNeeded()
     {
         if ( index > lastProcessIndex ){
-            // past last escape -- disable escape checking.
+            // past last processed code point -- disable checking.
             handleEscaping = 0;
             return null;
         }else if ( processInlineEscapes != 0 && chars[0] == BACKSLASH ){
@@ -850,6 +849,7 @@ class StringProcessor
     private int findLastProcessIndex()
     {
         isUnmatchedSurrogate = 0;
+        isDefined = 1;
         escChecker = getEscapeChecker();
         int needDefined = undefinedCodePointPolicy != JSONConfig.PASS ? 1 : 0;
         int needMatched = unmatchedSurrogatePolicy != JSONConfig.PASS ? 1 : 0;
@@ -862,9 +862,13 @@ class StringProcessor
                 if ( --i >= 0 ){
                     char ch0 = strValue.charAt(i);
                     if ( Character.isSurrogatePair(ch0, ch1) ){
-                        isDefined = isDefined(Character.toCodePoint(ch0, ch1));
                         isUnmatchedSurrogate = 0;
-                        if ( escChecker.needEscape() || (isDefined == 0 && needDefined != 0) ){
+                        if ( needDefined != 0 ){
+                            isDefined = isDefined(Character.toCodePoint(ch0, ch1));
+                            if ( escChecker.needEscape(ch1) || isDefined == 0 ){
+                                return i;
+                            }
+                        }else if ( escChecker.needEscape(ch1) ){
                             return i;
                         }
                     }
@@ -878,11 +882,13 @@ class StringProcessor
                         isUnmatchedSurrogate = 0;
                     }
                 }
-            }else{
+            }else if ( needDefined != 0 ){
                 isDefined = isDefined(ch1);
-                if ( escChecker.needEscape(ch1) || (isDefined == 0 && needDefined != 0) ){
+                if ( escChecker.needEscape(ch1) || isDefined == 0 ){
                     return i;
                 }
+            }else if ( escChecker.needEscape(ch1) ){
+                return i;
             }
         }
         return -1;

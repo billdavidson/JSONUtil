@@ -775,7 +775,7 @@ public class TestJSONUtil
      * Utility for other tests.
      *
      * @param rand a random number generator.
-     * @return a random surrogate.
+     * @return a random undefined code point.
      */
     private int getRandomUndefined( Random rand )
     {
