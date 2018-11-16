@@ -592,7 +592,7 @@ public class JSONConfig implements Serializable, Cloneable
     {
         if ( dateGenFormat == null ){
             // don't create it until it's needed.
-            dateGenFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.sss'Z'");
+            dateGenFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
             dateGenFormat.setTimeZone(UTC_TIME_ZONE);
         }
         return dateGenFormat;
